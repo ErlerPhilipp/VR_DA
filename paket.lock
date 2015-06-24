@@ -1,0 +1,35 @@
+NUGET
+  remote: https://vrvis.myget.org/F/aardvark_public
+    Aardvark.Base (2.1.5)
+      DevILSharp (>= 0.0.11 < 0.1)
+    Aardvark.Base.FSharp (2.1.5)
+      Aardvark.Base (>= 2.1.5)
+      DevILSharp (>= 0.0.11 < 0.1)
+      FSharp.Compiler.Service (>= 2.0.0.6 < 2.0.1)
+  remote: http://api.nuget.org/v3/index.json
+    DevILSharp (0.0.13)
+    FSharp.Compiler.Service (2.0.0.7)
+
+GROUP Build
+CONTENT: NONE
+NUGET
+  remote: http://api.nuget.org/v3/index.json
+    Chessie (0.5.1) - content: none
+      FSharp.Core
+    FAKE (4.17.1) - content: none
+    FSharp.Core (4.0.0.1) - content: none
+    Mono.Cecil (0.9.5.4) - content: none
+    Newtonsoft.Json (8.0.3) - content: none
+    SourceLink.Fake (1.1) - content: none
+  remote: https://vrvis.myget.org/F/aardvark_public
+    Paket.Core.Temp (2.52.16) - content: none
+      Chessie
+      FSharp.Core
+      Newtonsoft.Json
+GITHUB
+  remote: vrvis/Aardvark.Fake
+    FULLPROJECT (eb782182b4f3b4f468ca18a7dc79239912de012a)
+      FAKE
+      Mono.Cecil
+      Paket.Core.Temp
+      SourceLink.Fake
