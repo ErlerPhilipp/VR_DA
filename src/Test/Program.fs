@@ -3,6 +3,9 @@
 
 open Valve.VR
 
+open OpenTK
+open OpenTK.Graphics
+
 open Aardvark.Base
 open Aardvark.Base.Rendering
 open Aardvark.Application
@@ -62,13 +65,21 @@ type VrDevice(system : CVRSystem, deviceType : VrDeviceType, index : int) =
         let len = system.GetStringTrackedDeviceProperty(uint32 index, prop, builder, uint32 builder.Capacity, &err)
         builder.ToString()
 
+    let getInt (prop : ETrackedDeviceProperty) =
+        let mutable err = ETrackedPropertyError.TrackedProp_Success
+        let len = system.GetInt32TrackedDeviceProperty(uint32 index, prop, &err)
+        len
+
     let vendor  = lazy ( getString ETrackedDeviceProperty.Prop_ManufacturerName_String )
     let model   = lazy ( getString ETrackedDeviceProperty.Prop_ModelNumber_String )
+    
+    let axis    = lazy ( getInt ETrackedDeviceProperty.Prop_Axis0Type_Int32 )
     
     member x.Type = deviceType
     member x.Index = index
     member x.Vendor = vendor.Value
     member x.Model = model.Value
+    member x.Axis = axis
 
 
 module VrDriver =
@@ -112,21 +123,31 @@ module VrDriver =
                     yield VrDevice(system, toDeviceType deviceType, int i)
         |]
 
+
 type VrWindow(runtime : IRuntime, samples : int) =
     let system = VrDriver.system
     let compositor = OpenVR.Compositor
 
     let size = VrDriver.desiredSize
 
+    let screenSignature =
+        runtime.CreateFramebufferSignature [
+            DefaultSemantic.Colors, { format = RenderbufferFormat.Rgba8; samples = 1 }
+            DefaultSemantic.Depth,  { format = RenderbufferFormat.Depth24Stencil8; samples = 1}
+        ]
+
+
+    let screenSize = V2i(1024, 768)
+    let screenDepth = runtime.CreateRenderbuffer(screenSize, RenderbufferFormat.Depth24Stencil8, 1)
+    let screenColor = runtime.CreateTexture(screenSize, TextureFormat.Rgba8, 1, 1, 1)
+    let screenFbo = runtime.CreateFramebuffer(screenSignature, [DefaultSemantic.Colors, { texture = screenColor; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, screenDepth :> IFramebufferOutput])
+    let frustum = Frustum.perspective 60.0 0.1 100.0 (float screenSize.X / float screenSize.Y)
+
     let signature =
         runtime.CreateFramebufferSignature [
             DefaultSemantic.Colors, { format = RenderbufferFormat.Rgba8; samples = samples }
             DefaultSemantic.Depth,  { format = RenderbufferFormat.Depth24Stencil8; samples = samples}
         ]
-
-
-    let lTex = runtime.CreateTexture(size, TextureFormat.Rgba8, 1, 1, 1)
-    let rTex = runtime.CreateTexture(size, TextureFormat.Rgba8, 1, 1, 1)
 
     let depth = runtime.CreateRenderbuffer(size, RenderbufferFormat.Depth24Stencil8, samples)
     let color = runtime.CreateRenderbuffer(size, RenderbufferFormat.Rgba8, samples)
@@ -141,75 +162,153 @@ type VrWindow(runtime : IRuntime, samples : int) =
     let hmd = VrDriver.devices |> Array.find (fun d -> d.Type = VrDeviceType.Hmd)
     let clear = runtime.CompileClear(signature, Mod.constant C4f.Black, Mod.constant 1.0)
 
-    abstract member RenderFrame : fbo : IFramebuffer * eye : VrEye -> unit
-    default x.RenderFrame(_,_) = ()
+    let gameWindow =
+        new OpenTK.GameWindow(
+            1024,
+            768,
+            Graphics.GraphicsMode(
+                OpenTK.Graphics.ColorFormat(Config.BitsPerPixel), 
+                Config.DepthBits, 
+                Config.StencilBits, 
+                samples, 
+                OpenTK.Graphics.ColorFormat.Empty,
+                Config.Buffers, 
+                false
+            ),
+            "Aardvark",
+            GameWindowFlags.Default,
+            DisplayDevice.Default,
+            Config.MajorVersion, 
+            Config.MinorVersion, 
+            Config.ContextFlags,
+            VSync = VSyncMode.Off
+        )
+
+    let mutable renderTask = RenderTask.empty
 
     member x.FramebufferSignature = signature
     member x.View = view :> IMod<_>
     member x.Projection = proj :> IMod<_>
 
+    member x.RenderTask
+        with get() = renderTask
+        and set t = renderTask <- t
+
+
     member x.Run() =
         let mutable evt = Unchecked.defaultof<_>
-        use t = runtime.ContextLock
         compositor.CompositorBringToFront()
         let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
         let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
+        let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+        let l = obj()
 
-        while true do
-            if system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32) then
-                let eType = evt.eventType |> int |> unbox<EVREventType>
-                let eName = eType |> system.GetEventTypeNameFromEnum
-                printfn "%A" eName
+        let run () = 
+            while true do
+                if system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32) then
+                    let eType = evt.eventType |> int |> unbox<EVREventType>
+                    let eName = eType |> system.GetEventTypeNameFromEnum
+                    if evt.trackedDeviceIndex > 0u && evt.trackedDeviceIndex < uint32 VrDriver.devices.Length then
+                        let d = VrDriver.devices.[evt.trackedDeviceIndex |> int]
+                        system.TriggerHapticPulse(evt.trackedDeviceIndex, 1u, '\100')
+                        d.Axis.Value |> printfn "axis: %A"
 
-  
-            compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
+                        let mutable state = Unchecked.defaultof<_>
+                        system.GetControllerState(evt.trackedDeviceIndex, &state) |> ignore
+                        printfn "state: %A" ( V2d( state.rAxis0.x, state.rAxis0.y))
+                        printfn "deviceType: %A (name: %A)" d.Type eName
+              
+                let mutable state = Unchecked.defaultof<_>
+                system.GetControllerState(1u, &state) |> ignore       
+                printfn "state: %A" ( V2d( state.rAxis0.x, state.rAxis0.y))
 
-            let pose = renderPoses.[hmd.Index]
+
+                compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
+
+                let pose = renderPoses.[hmd.Index]
             
-            let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
-            let viewTrafo = 
-                pose.mDeviceToAbsoluteTracking.Trafo.Inverse
+                let viewTrafo = 
+                    pose.mDeviceToAbsoluteTracking.Trafo.Inverse
 
-            let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-            let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+                let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+                let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
 
-            //using runtime.ContextLock (fun _ ->
-            // render left
-            clear.Run(fbo) |> ignore
-            transact(fun () -> 
-                view.Value <- flip * viewTrafo * lHeadToEye
-                proj.Value <- lProj
-            )
-            x.RenderFrame(fbo, VrEye.Left)
-            //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
-            let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
-            let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-            compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
+                using runtime.ContextLock (fun _ -> 
+                    // render left
+                    clear.Run(fbo) |> ignore
+                    transact(fun () -> 
+                        view.Value <- flip * viewTrafo * lHeadToEye
+                        proj.Value <- lProj
+                    )
+                    renderTask.Run fbo |> ignore
+                    //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
+                    let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
+                    let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                    compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
         
 
-            // render right
-            clear.Run(fbo) |> ignore
-            transact(fun () -> 
-                view.Value <- flip * viewTrafo * rHeadToEye
-                proj.Value <- rProj
+                    // render right
+                    clear.Run(fbo) |> ignore
+                    transact(fun () -> 
+                        view.Value <- flip * viewTrafo * rHeadToEye
+                        proj.Value <- rProj
+                    )
+                    renderTask.Run fbo |> ignore
+                    //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
+                    let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
+                    let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                    compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
+
+                    transact(fun () -> 
+                        view.Value <- flip * view.Value
+                        proj.Value <- lProj
+                    )
+                    clear.Run screenFbo |> ignore
+                    renderTask.Run screenFbo |> ignore
+
+                )
+
+        System.Threading.Tasks.Task.Factory.StartNew(run) |> ignore
+
+        let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
+        let ctx = runtime.Context
+        let defaultFramebuffer = 
+            new Aardvark.Rendering.GL.Framebuffer(
+                ctx, screenSignature, 
+                (fun _ -> 0), 
+                ignore, 
+                [0, DefaultSemantic.Colors, Renderbuffer(ctx, 0, V2i.Zero, RenderbufferFormat.Rgba8, samples, 0L) :> IFramebufferOutput], None
+            ) 
+        let handle = new ContextHandle(gameWindow.Context, gameWindow.WindowInfo)
+
+        let tex = Mod.custom (fun self -> screenColor :> ITexture)
+        let fsq =
+            Sg.fullScreenQuad
+                |> Sg.depthTest (Mod.constant DepthTestMode.None)
+                |> Sg.diffuseTexture tex
+                |> Sg.effect [ DefaultSurfaces.diffuseTexture |> toEffect ]
+
+        let fsqTask = runtime.CompileRender(signature, fsq)
+        let frustum = Frustum.perspective 60.0 0.1 100.0 1.0
+        gameWindow.RenderFrame.Add(fun _ -> 
+            defaultFramebuffer.Size <- V2i(gameWindow.Width, gameWindow.Height)
+            transact (fun () -> tex.MarkOutdated())
+
+            using (ctx.RenderingLock handle) (fun _ ->
+                fsqTask.Run defaultFramebuffer |> ignore
+                gameWindow.SwapBuffers()
             )
-            x.RenderFrame(fbo, VrEye.Right)
-            //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
-            let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
-            let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-            compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
-            //)
-type VrRenderWindow(runtime : IRuntime, samples : int) =
-    inherit VrWindow(runtime, samples)
+        )
+        gameWindow.Run()
 
-    let mutable task = RenderTask.empty
-
-    override x.RenderFrame(fbo, eye) =
-        task.Run(fbo) |> ignore
-
-    member x.RenderTask
-        with get() = task
-        and set t = task <- t
+//            let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
+//            let ctx = runtime.Context
+//            let handle = new ContextHandle(gameWindow.Context, gameWindow.WindowInfo)
+//            using ( ctx.RenderingLock(handle) ) (fun _ ->  
+//                OpenTK.Graphics.OpenGL4.GL.ClearColor(1.0f,0.0f,0.0f,1.0f)
+//                OpenTK.Graphics.OpenGL4.GL.Clear(OpenTK.Graphics.OpenGL4.ClearBufferMask.ColorBufferBit)
+//                gameWindow.SwapBuffers()
+//            )
 
 
 
@@ -419,7 +518,10 @@ let main argv =
     Ag.initialize()
     Aardvark.Init()
     use app = new OpenGlApplication()
-    let win = VrRenderWindow(app.Runtime, 16)
+
+
+
+    let win = VrWindow(app.Runtime, 16)
 
     let box = Sg.box' C4b.Red Box3d.Unit
     
@@ -429,6 +531,8 @@ let main argv =
             Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
             Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
         ]
+
+    let cam = CameraView.lookAt V3d.Zero V3d.IOO V3d.OOI
 
     let sg = 
         [ for x in -5 .. 5 do
