@@ -5,7 +5,9 @@ nuget Aardvark.Base                        ~> 2.1.0
 nuget Aardvark.Base.FSharp                 ~> 2.1.0
 
 
-
+nuget Aardvark.Application.WinForms.GL
+nuget Aardvark.SceneGraph
+nuget Aardvark.Rendering.Interactive
 
 group Build
 content: none
