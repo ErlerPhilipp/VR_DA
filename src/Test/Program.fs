@@ -11,6 +11,29 @@ open Aardvark.Application.WinForms
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 
+[<AutoOpen>]
+module Conversions =
+    type HmdMatrix44_t with
+        member x.Trafo =
+            let t = M44f(x.m0,x.m1,x.m2,x.m3,x.m4,x.m5,x.m6,x.m7,x.m8,x.m9,x.m10,x.m11,x.m12,x.m13,x.m14,x.m15) 
+            let t = M44d.op_Explicit(t)
+            Trafo3d(t,t.Inverse)
+
+    type HmdMatrix34_t with
+        member x.Trafo =
+            let m44f = 
+                M44f(
+                    x.m0,x.m4,x.m8, 0.0f,
+                    x.m1,x.m5,x.m9, 0.0f,
+                    x.m2,x.m6,x.m10, 0.0f,
+                    x.m3,x.m7,x.m11, 1.0f
+                ) 
+            let t = M44d.op_Explicit(m44f.Transposed)
+            Trafo3d(t.Inverse,t)
+
+    
+
+
 [<EntryPoint>]
 let main argv =
     
@@ -44,11 +67,25 @@ let main argv =
   
     let box = Sg.box' C4b.Red Box3d.Unit
     
+    let cross =
+        Sg.ofList [
+            Sg.lines (Mod.constant C4b.Red) (Mod.constant [|Line3d(V3d.OOO, V3d.IOO)|])
+            Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
+            Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
+        ]
+
     let sg = 
         [ for x in -5 .. 5 do
             for y in -5 .. 5 do
                 for z in -5 .. 5 do
-                    yield Sg.translate (2.0 * float x) (2.0 * float y) (2.0 * float z) box        
+                    if x <> 0 && y <> 0 && z <> 0 then
+                        yield Sg.translate (2.0 * float x) (2.0 * float y) (2.0 * float z) box        
+            yield 
+                cross
+                    |> Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.vertexColor |> toEffect
+                    ]
         ] 
             |> Sg.ofList
             |> Sg.effect [
@@ -111,28 +148,20 @@ let main argv =
 //        let isConnected = system.IsTrackedDeviceConnected(i)
 //        ()
 
+//
+//    let toTrafo (m : HmdMatrix44_t) =
+//        let t = M44f(m.m0,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15) 
+//        let t = M44d.op_Explicit(t)
+//        Trafo3d(t,t.Inverse)
+//
+//    let toTrafo34 (m : HmdMatrix34_t) =
+//        let t = M44f(m.m0,m.m1,m.m2, 0.0f,m.m3,m.m4,m.m5, 0.0f,m.m6,m.m7,m.m8, 0.0f,m.m9,m.m10,m.m11, 1.0f)
+//        let t = M44d.op_Explicit(t).Transposed
+//        Trafo3d(t.Inverse,t)
 
-    let toTrafo (m : HmdMatrix44_t) =
-        let t = M44f(m.m0,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15) 
-        let t = M44d.op_Explicit(t)
-        Trafo3d(t,t.Inverse)
 
-    let toTrafo34 (m : HmdMatrix34_t) =
-        let t = M44f(m.m0,m.m1,m.m2, 0.0f,m.m3,m.m4,m.m5, 0.0f,m.m6,m.m7,m.m8, 0.0f,m.m9,m.m10,m.m11, 1.0f)
-        let t = M44d.op_Explicit(t).Transposed
-        Trafo3d(t.Inverse,t)
-
-
-    let mutable leftTex = Texture_t()
-    let mutable leftBounds = VRTextureBounds_t()
-
-    leftTex.eColorSpace <- EColorSpace.Gamma
-    leftTex.eType <- EGraphicsAPIConvention.API_OpenGL
-    leftTex.handle <- nativeint 0
     
-    leftBounds.uMax <- 1.0f
-    leftBounds.vMax <- 1.0f
-
+    
     use asdf = app.Context.ResourceLock
 
     let check err =
@@ -142,42 +171,45 @@ let main argv =
     compositor.CompositorBringToFront()
     let mutable evnt = Unchecked.defaultof<_>
 
-    let leftEye = (system.GetEyeToHeadTransform(EVREye.Eye_Left) |> toTrafo34).Inverse
-    let rightEye = (system.GetEyeToHeadTransform(EVREye.Eye_Right) |> toTrafo34).Inverse
-
-    let trans (t : Trafo3d) = Trafo3d(t.Forward.Transposed, t.Backward.Transposed)
-
+    let leftEye     = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
+    let rightEye    = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
 
     while true do
         if system.PollNextEvent(&evnt, sizeof<VREvent_t> |> uint32) then
-            printfn "%A" evnt.eventType
+            let eType = evnt.eventType |> int |> unbox<EVREventType>
+            let eName = eType |> system.GetEventTypeNameFromEnum
+            printfn "%A" eName
 
         let poses = Array.zeroCreate 16
         let ur = Array.zeroCreate 16
         compositor.WaitGetPoses(poses,ur) |> check
 
-        let trafo = Trafo3d.Identity //Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+        let viewTrafo = 
+            Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero) * 
+            poses.[0].mDeviceToAbsoluteTracking.Trafo
 
-        let mat = Trafo3d.Identity //poses.[0].mDeviceToAbsoluteTracking |> toTrafo34
 
+        let leftProj  = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+        let rightProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
 
-        let leftMat  = leftEye *  ( system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,10.0f, EGraphicsAPIConvention.API_OpenGL) |> toTrafo)
-        let rightMat = rightEye * (system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,10.0f, EGraphicsAPIConvention.API_OpenGL) |> toTrafo)
-
-        //printfn "%A" (system.GetEyeToHeadTransform(EVREye.Eye_Left) |> toTrafo34)
-        transact(fun () -> view.Value <- trafo * mat)
-        transact(fun () -> proj.Value <- leftMat)
+        transact(fun () -> 
+            view.Value <- viewTrafo * leftEye
+            proj.Value <- leftProj
+        )
         task.Run(leftFbo) |> ignore
-
-        transact(fun () -> proj.Value <- rightMat)
-        task.Run(rightFbo) |> ignore
-
-
-
-        leftTex.handle <- leftColor.Handle |> nativeint    
+        let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint leftColor.Handle)
+        let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
         compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> check
-        leftTex.handle <- rightColor.Handle |> nativeint    
-        compositor.Submit(EVREye.Eye_Right, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> check
+        
+
+        transact(fun () -> 
+            view.Value <- viewTrafo * leftEye
+            proj.Value <- rightProj
+        )
+        task.Run(rightFbo) |> ignore
+        let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint rightColor.Handle)
+        let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+        compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> check
 
 
     //system.GetStringTrackedDeviceProperty(0u, ETrackedDeviceProperty.Prop_TrackingSystemName_String, )
