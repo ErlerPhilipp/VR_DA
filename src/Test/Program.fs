@@ -13,6 +13,7 @@ open Aardvark.Rendering.GL
 open Aardvark.Application.WinForms
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
+open Aardvark.SceneGraph.IO
 
 [<AutoOpen>]
 module Conversions =
@@ -57,6 +58,69 @@ module private Translations =
             | ETrackedDeviceClass.TrackingReference -> VrDeviceType.TrackingReference
             | _ -> VrDeviceType.Other
 
+    let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+
+    type VRControllerState_t with
+        member x.Item
+            with get (i : int) =
+                match i with
+                    | 0 -> x.rAxis0
+                    | 1 -> x.rAxis1
+                    | 2 -> x.rAxis2
+                    | 3 -> x.rAxis3
+                    | _ -> x.rAxis4
+
+type VrAxis(system : CVRSystem, axisType : EVRControllerAxisType, deviceIndex : int, index : int) =
+    
+    let touched = Mod.init false
+    let pressed = Mod.init false
+    let position = Mod.init None
+    let down = new System.Reactive.Subjects.Subject<unit>()
+    let up = new System.Reactive.Subjects.Subject<unit>()
+
+  
+    member x.Touched = touched :> IMod<_>
+    member x.Pressed = pressed :> IMod<_>
+    member x.Position = position :> IMod<_>
+    member x.Down = down :> System.IObservable<_>
+    member x.Up = up :> System.IObservable<_>
+
+    member x.Update(e : VREvent_t, state : VRControllerState_t) =
+
+        if int e.trackedDeviceIndex = deviceIndex then
+            let buttonIndex = int e.data.controller.button |> unbox<EVRButtonId>
+            if buttonIndex >= EVRButtonId.k_EButton_Axis0 && buttonIndex <= EVRButtonId.k_EButton_Axis4 then
+                let axis = buttonIndex - EVRButtonId.k_EButton_Axis0 |> int
+
+
+                if axis  = index then
+                    let eventType = e.eventType |> int |> unbox<EVREventType>
+                    transact (fun () ->
+                        match eventType with
+                            | EVREventType.VREvent_ButtonTouch -> touched.Value <- true
+                            | EVREventType.VREvent_ButtonUntouch -> touched.Value <- false
+                            | EVREventType.VREvent_ButtonPress -> 
+                                down.OnNext()
+                                pressed.Value <- true
+                            | EVREventType.VREvent_ButtonUnpress -> 
+                                up.OnNext()
+                                pressed.Value <- false
+                            | _ -> ()
+
+                    )
+
+        if touched.Value then
+            let pos = state.[index]
+            transact (fun () ->
+                position.Value <- Some (V2d(pos.x, pos.y))
+            )
+        else
+            match position.Value with
+                | Some _ -> transact (fun () -> position.Value <- None)
+                | _ -> ()
+
+
+
 type VrDevice(system : CVRSystem, deviceType : VrDeviceType, index : int) =
     
     let getString (prop : ETrackedDeviceProperty) =
@@ -68,18 +132,46 @@ type VrDevice(system : CVRSystem, deviceType : VrDeviceType, index : int) =
     let getInt (prop : ETrackedDeviceProperty) =
         let mutable err = ETrackedPropertyError.TrackedProp_Success
         let len = system.GetInt32TrackedDeviceProperty(uint32 index, prop, &err)
+
         len
 
     let vendor  = lazy ( getString ETrackedDeviceProperty.Prop_ManufacturerName_String )
     let model   = lazy ( getString ETrackedDeviceProperty.Prop_ModelNumber_String )
     
-    let axis    = lazy ( getInt ETrackedDeviceProperty.Prop_Axis0Type_Int32 )
+    let axis = 
+        [|
+            for i in 0..4 do
+                let t = getInt (ETrackedDeviceProperty.Prop_Axis0Type_Int32 + unbox i) |> unbox<EVRControllerAxisType>
+                if t <> EVRControllerAxisType.k_eControllerAxis_None then
+                    yield VrAxis(system, t, index, i)
+        |]
     
+    let deviceToWorld = Mod.init Trafo3d.Identity
+    let worldToDevice = deviceToWorld |> Mod.map (fun t -> t.Inverse)
+
+    member x.Update(e : VREvent_t, poses : TrackedDevicePose_t[]) =
+        if axis.Length > 0 then
+            let mutable state = VRControllerState_t()
+            if system.GetControllerState(uint32 index, &state) then
+                for a in axis do
+                    a.Update(e, state)
+
+        let currentPose = poses.[index]
+
+        if currentPose.bPoseIsValid then
+            transact (fun () -> 
+                let theirs = currentPose.mDeviceToAbsoluteTracking.Trafo
+                deviceToWorld.Value <- theirs * flip.Inverse
+            )
+
+
     member x.Type = deviceType
     member x.Index = index
     member x.Vendor = vendor.Value
     member x.Model = model.Value
     member x.Axis = axis
+    member x.DeviceToWorld = deviceToWorld
+    member x.WorldToDevice = worldToDevice
 
 
 module VrDriver =
@@ -153,8 +245,9 @@ type VrWindow(runtime : IRuntime, samples : int) =
     let color = runtime.CreateRenderbuffer(size, RenderbufferFormat.Rgba8, samples)
     let fbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, color :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
 
-    let view = Mod.init Trafo3d.Identity
+    let currentViewTrafo = Mod.init Trafo3d.Identity
     let proj = Mod.init Trafo3d.Identity
+    let currentSize = Mod.init VrDriver.desiredSize
 
     let renderPoses = Array.zeroCreate 16
     let gamePoses = Array.zeroCreate 16
@@ -162,126 +255,132 @@ type VrWindow(runtime : IRuntime, samples : int) =
     let hmd = VrDriver.devices |> Array.find (fun d -> d.Type = VrDeviceType.Hmd)
     let clear = runtime.CompileClear(signature, Mod.constant C4f.Black, Mod.constant 1.0)
 
-    let gameWindow =
-        new OpenTK.GameWindow(
-            1024,
-            768,
-            Graphics.GraphicsMode(
-                OpenTK.Graphics.ColorFormat(Config.BitsPerPixel), 
-                Config.DepthBits, 
-                Config.StencilBits, 
-                samples, 
-                OpenTK.Graphics.ColorFormat.Empty,
-                Config.Buffers, 
-                false
-            ),
-            "Aardvark",
-            GameWindowFlags.Default,
-            DisplayDevice.Default,
-            Config.MajorVersion, 
-            Config.MinorVersion, 
-            Config.ContextFlags,
-            VSync = VSyncMode.Off
-        )
+    let gameWindow = new Aardvark.Application.GameWindow(runtime |> unbox,1)
+
+    let time = Mod.init System.DateTime.Now
 
     let mutable renderTask = RenderTask.empty
 
+    interface IRenderTarget with
+        member x.FramebufferSignature = screenSignature
+        member x.Runtime = runtime 
+        member x.Time = time :> IMod<_>
+        member x.RenderTask
+            with get() = x.RenderTask
+            and set t = x.RenderTask <- t
+        member x.Sizes = currentSize :> IMod<_>
+        member x.Samples = samples
+
+    interface IRenderControl with
+        member x.Mouse = gameWindow.Mouse 
+        member x.Keyboard = gameWindow.Keyboard
+
+    member x.Hmd = hmd
+    member x.Runtime = runtime 
+    member x.Time = time :> IMod<_>
+    member x.Sizes = currentSize :> IMod<_>
+    member x.Samples = samples
+    member x.Mouse = gameWindow.Mouse 
+    member x.Keyboard = gameWindow.Keyboard
     member x.FramebufferSignature = signature
-    member x.View = view :> IMod<_>
+    member x.View = currentViewTrafo :> IMod<_>
     member x.Projection = proj :> IMod<_>
 
     member x.RenderTask
         with get() = renderTask
         and set t = renderTask <- t
 
-
     member x.Run() =
         let mutable evt = Unchecked.defaultof<_>
         compositor.CompositorBringToFront()
         let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
         let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
+        let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+        let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+
         let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+
         let l = obj()
 
+        let tex = Mod.custom (fun self -> screenColor :> ITexture)
+
+        let controller = VrDriver.devices
+        controller |> Array.iteri (fun _ c ->
+            if c.Type = VrDeviceType.Controller then
+                c.Axis |> Array.iteri (fun ai a ->
+                    a.Position |> Mod.unsafeRegisterCallbackKeepDisposable (fun v ->
+                        Log.line "c%d/a%d: %A" c.Index ai v
+                    ) |> ignore
+                )
+        )
+
         let run () = 
+            let renderCtx = ContextHandle.create()
+
+
             while true do
-                if system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32) then
-                    let eType = evt.eventType |> int |> unbox<EVREventType>
-                    let eName = eType |> system.GetEventTypeNameFromEnum
-                    if evt.trackedDeviceIndex > 0u && evt.trackedDeviceIndex < uint32 VrDriver.devices.Length then
-                        let d = VrDriver.devices.[evt.trackedDeviceIndex |> int]
-                        system.TriggerHapticPulse(evt.trackedDeviceIndex, 1u, '\100')
-                        d.Axis.Value |> printfn "axis: %A"
 
-                        let mutable state = Unchecked.defaultof<_>
-                        system.GetControllerState(evt.trackedDeviceIndex, &state) |> ignore
-                        printfn "state: %A" ( V2d( state.rAxis0.x, state.rAxis0.y))
-                        printfn "deviceType: %A (name: %A)" d.Type eName
-              
-                let mutable state = Unchecked.defaultof<_>
-                system.GetControllerState(1u, &state) |> ignore       
-                printfn "state: %A" ( V2d( state.rAxis0.x, state.rAxis0.y))
-
+                if not (system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32)) then
+                    evt.trackedDeviceIndex <- 0xFFFFFFFFu
 
                 compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
 
+
+                for d in VrDriver.devices do
+                    d.Update(evt, renderPoses)
+
                 let pose = renderPoses.[hmd.Index]
-            
-                let viewTrafo = 
-                    pose.mDeviceToAbsoluteTracking.Trafo.Inverse
+                let viewTrafo = hmd.WorldToDevice.GetValue()
 
-                let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-                let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+                let sw = System.Diagnostics.Stopwatch()
 
-                using runtime.ContextLock (fun _ -> 
-                    // render left
-                    clear.Run(fbo) |> ignore
-                    transact(fun () -> 
-                        view.Value <- flip * viewTrafo * lHeadToEye
-                        proj.Value <- lProj
-                    )
-                    renderTask.Run fbo |> ignore
-                    //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
-                    let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
-                    let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                    compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
+                let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
+                let ctx = runtime.Context
+
+                let renderTask = unbox<Aardvark.Rendering.GL.RenderTasks.RenderTask> renderTask
+
+                using (ctx.RenderingLock renderCtx) (fun _ -> 
+                    
+                    sw.Restart()
+                    renderTask.RenderTaskLock.Run (fun () ->
+                        // render left
+                        clear.Run(fbo) |> ignore
+                        transact(fun () -> 
+                            currentViewTrafo.Value <- viewTrafo * lHeadToEye
+                            proj.Value <- lProj
+                        )
+                        renderTask.Run fbo |> ignore
+                        //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
+                        let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
+                        let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                        compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
         
 
-                    // render right
-                    clear.Run(fbo) |> ignore
-                    transact(fun () -> 
-                        view.Value <- flip * viewTrafo * rHeadToEye
-                        proj.Value <- rProj
-                    )
-                    renderTask.Run fbo |> ignore
-                    //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
-                    let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
-                    let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                    compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
+                        // render right
+                        clear.Run(fbo) |> ignore
+                        transact(fun () -> 
+                            currentViewTrafo.Value <- viewTrafo * rHeadToEye
+                            proj.Value <- rProj
+                        )
+                        renderTask.Run fbo |> ignore
+                        //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
+                        let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> color.Handle))
+                        let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                        compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_GlRenderBuffer) |> VrDriver.check
 
-                    transact(fun () -> 
-                        view.Value <- flip * view.Value
-                        proj.Value <- lProj
                     )
-                    clear.Run screenFbo |> ignore
-                    renderTask.Run screenFbo |> ignore
+                    sw.Stop()
+                    transact (fun () -> 
+                        tex.MarkOutdated()
+                        //printfn "%A" sw.Elapsed.TotalMilliseconds
+                        //printfn "%A" (System.DateTime.Now - time.Value)
+                        time.Value <- System.DateTime.Now
+                    )
 
                 )
 
         System.Threading.Tasks.Task.Factory.StartNew(run) |> ignore
 
-        let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
-        let ctx = runtime.Context
-        let defaultFramebuffer = 
-            new Aardvark.Rendering.GL.Framebuffer(
-                ctx, screenSignature, 
-                (fun _ -> 0), 
-                ignore, 
-                [0, DefaultSemantic.Colors, Renderbuffer(ctx, 0, V2i.Zero, RenderbufferFormat.Rgba8, samples, 0L) :> IFramebufferOutput], None
-            ) 
-        let handle = new ContextHandle(gameWindow.Context, gameWindow.WindowInfo)
-
-        let tex = Mod.custom (fun self -> screenColor :> ITexture)
         let fsq =
             Sg.fullScreenQuad
                 |> Sg.depthTest (Mod.constant DepthTestMode.None)
@@ -289,17 +388,10 @@ type VrWindow(runtime : IRuntime, samples : int) =
                 |> Sg.effect [ DefaultSurfaces.diffuseTexture |> toEffect ]
 
         let fsqTask = runtime.CompileRender(signature, fsq)
-        let frustum = Frustum.perspective 60.0 0.1 100.0 1.0
-        gameWindow.RenderFrame.Add(fun _ -> 
-            defaultFramebuffer.Size <- V2i(gameWindow.Width, gameWindow.Height)
-            transact (fun () -> tex.MarkOutdated())
+        gameWindow.RenderTask <- fsqTask
 
-            using (ctx.RenderingLock handle) (fun _ ->
-                fsqTask.Run defaultFramebuffer |> ignore
-                gameWindow.SwapBuffers()
-            )
-        )
-        gameWindow.Run()
+        while true do ()
+        //gameWindow.Run()
 
 //            let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
 //            let ctx = runtime.Context
@@ -311,206 +403,367 @@ type VrWindow(runtime : IRuntime, samples : int) =
 //            )
 
 
+module Lod =
+    open System
 
+    module Helpers = 
+        let rand = Random()
+        let randomPoints (bounds : Box3d) (pointCount : int) =
+            let size = bounds.Size
+            let randomV3f() = V3d(rand.NextDouble(), rand.NextDouble(), rand.NextDouble()) * size + bounds.Min |> V3f.op_Explicit
+            let randomColor() = C4b(rand.NextDouble(), rand.NextDouble(), rand.NextDouble(), 1.0)
 
-
-let run() =
-   
-    Ag.initialize()
-    Aardvark.Init()
-    use app = new OpenGlApplication()
-
-    for d in VrDriver.devices do
-        Log.start "device %d" d.Index
-        Log.line "type:   %A" d.Type
-        Log.line "vendor: %s" d.Vendor
-        Log.line "model:  %s" d.Model
-        Log.stop()
-
-//    let win = VrRenderWindow(app.Runtime, 1)
-
-
-    let rt = app.Runtime
-
-
-    let mutable err = EVRInitError.None
-    let system = OpenVR.Init(&err, EVRApplicationType.VRApplication_Scene)
- 
-    let hasDevice = OpenVR.IsHmdPresent()
-    let compositor = OpenVR.Compositor
-
-    let mutable width = 0u
-    let mutable height = 0u
-    system.GetRecommendedRenderTargetSize(&width,&height)
-
-    let s = V2i(int width,int height)
-    printfn "%A" s
-    
-    
-
-    let start = OpenVR.k_unTrackedDeviceIndex_Hmd + 1u
-    let cnt = OpenVR.k_unMaxTrackedDeviceCount
-
-    let proj = Mod.init Trafo3d.Identity
-    let view = CameraView.lookAt (V3d.III * 4.0) V3d.Zero V3d.OOI |> CameraView.viewTrafo |> Mod.init
-  
-    let box = Sg.box' C4b.Red Box3d.Unit
-    
-    let cross =
-        Sg.ofList [
-            Sg.lines (Mod.constant C4b.Red) (Mod.constant [|Line3d(V3d.OOO, V3d.IOO)|])
-            Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
-            Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
-        ]
-
-    let sg = 
-        [ for x in -5 .. 5 do
-            for y in -5 .. 5 do
-                for z in -5 .. 5 do
-                    if x <> 0 && y <> 0 && z <> 0 then
-                        yield Sg.translate (2.0 * float x) (2.0 * float y) (2.0 * float z) box        
-            yield 
-                cross
-                    |> Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.vertexColor |> toEffect
+            IndexedGeometry(
+                Mode = IndexedGeometryMode.PointList,
+                IndexedAttributes = 
+                    SymDict.ofList [
+                            DefaultSemantic.Positions, Array.init pointCount (fun _ -> randomV3f()) :> Array
+                            DefaultSemantic.Colors, Array.init pointCount (fun _ -> randomColor()) :> Array
                     ]
-        ] 
-            |> Sg.ofList
-            |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
-                DefaultSurfaces.constantColor C4f.White |> toEffect
-                DefaultSurfaces.simpleLighting |> toEffect
-            ]
-            |> Sg.viewTrafo view
-            |> Sg.projTrafo proj
-
-//    let task = app.Runtime.CompileRender(win.FramebufferSignature, sg)
-//    win.RenderTask <- task
-//    win.Run()
-
-    
-
-    let signature =
-        rt.CreateFramebufferSignature(
-            1, 
-            [
-                DefaultSemantic.Colors, RenderbufferFormat.Rgba8
-                DefaultSemantic.Depth, RenderbufferFormat.Depth24Stencil8
-            ]
-        )
-
-    let depth = rt.CreateRenderbuffer(s, RenderbufferFormat.Depth24Stencil8, 1)
-    let leftColor  = rt.CreateTexture(s,TextureFormat.Rgba8,1,1,1)
-    let rightColor = rt.CreateTexture(s,TextureFormat.Rgba8,1,1,1)
-
-    let leftFbo = 
-        rt.CreateFramebuffer(
-            signature, 
-            [
-                DefaultSemantic.Colors, { texture = leftColor; slice = 0; level = 0 } :> IFramebufferOutput
-                DefaultSemantic.Depth, depth :> IFramebufferOutput
-            ]
-        )
-
-    let rightFbo = 
-        rt.CreateFramebuffer(
-            signature, 
-            [
-                DefaultSemantic.Colors, { texture = rightColor; slice = 0; level = 0 } :> IFramebufferOutput
-                DefaultSemantic.Depth, depth :> IFramebufferOutput
-            ]
-        )
-
-    let render = app.Runtime.CompileRender(signature, sg)
-    let clear = app.Runtime.CompileClear(signature, Mod.constant C4f.Black, Mod.constant 1.0)
-
-    let task = RenderTask.ofList [ clear; render ]
-
-
-    let deviceId =
-        { start .. cnt - 1u }
-            |> Seq.tryPick (fun i ->
-                let isConnected = system.IsTrackedDeviceConnected(i)
-                if isConnected then Some i
-                else None
             )
 
+        let randomColor() =
+            C4b(128 + rand.Next(127) |> byte, 128 + rand.Next(127) |> byte, 128 + rand.Next(127) |> byte, 255uy)
+        let randomColor2 ()  =
+            C4b(rand.Next(255) |> byte, rand.Next(255) |> byte, rand.Next(255) |> byte, 255uy)
 
-    for i in start .. cnt - 1u do
-        let isConnected = system.IsTrackedDeviceConnected(i)
-        ()
+        let box (color : C4b) (box : Box3d) =
+
+            let randomColor = color //C4b(rand.Next(255) |> byte, rand.Next(255) |> byte, rand.Next(255) |> byte, 255uy)
+
+            let indices =
+                [|
+                    1;2;6; 1;6;5
+                    2;3;7; 2;7;6
+                    4;5;6; 4;6;7
+                    3;0;4; 3;4;7
+                    0;1;5; 0;5;4
+                    0;3;2; 0;2;1
+                |]
+
+            let positions = 
+                [|
+                    V3f(box.Min.X, box.Min.Y, box.Min.Z)
+                    V3f(box.Max.X, box.Min.Y, box.Min.Z)
+                    V3f(box.Max.X, box.Max.Y, box.Min.Z)
+                    V3f(box.Min.X, box.Max.Y, box.Min.Z)
+                    V3f(box.Min.X, box.Min.Y, box.Max.Z)
+                    V3f(box.Max.X, box.Min.Y, box.Max.Z)
+                    V3f(box.Max.X, box.Max.Y, box.Max.Z)
+                    V3f(box.Min.X, box.Max.Y, box.Max.Z)
+                |]
+
+            let normals = 
+                [| 
+                    V3f.IOO;
+                    V3f.OIO;
+                    V3f.OOI;
+
+                    -V3f.IOO;
+                    -V3f.OIO;
+                    -V3f.OOI;
+                |]
+
+            IndexedGeometry(
+                Mode = IndexedGeometryMode.TriangleList,
+
+                IndexedAttributes =
+                    SymDict.ofList [
+                        DefaultSemantic.Positions, indices |> Array.map (fun i -> positions.[i]) :> Array
+                        DefaultSemantic.Normals, indices |> Array.mapi (fun ti _ -> normals.[ti / 6]) :> Array
+                        DefaultSemantic.Colors, indices |> Array.map (fun _ -> randomColor) :> Array
+                    ]
+
+            )
+
+        let wireBox (color : C4b) (box : Box3d) =
+            let indices =
+                [|
+                    1;2; 2;6; 6;5; 5;1;
+                    2;3; 3;7; 7;6; 4;5; 
+                    7;4; 3;0; 0;4; 0;1;
+                |]
+
+            let positions = 
+                [|
+                    V3f(box.Min.X, box.Min.Y, box.Min.Z)
+                    V3f(box.Max.X, box.Min.Y, box.Min.Z)
+                    V3f(box.Max.X, box.Max.Y, box.Min.Z)
+                    V3f(box.Min.X, box.Max.Y, box.Min.Z)
+                    V3f(box.Min.X, box.Min.Y, box.Max.Z)
+                    V3f(box.Max.X, box.Min.Y, box.Max.Z)
+                    V3f(box.Max.X, box.Max.Y, box.Max.Z)
+                    V3f(box.Min.X, box.Max.Y, box.Max.Z)
+                |]
+
+            let normals = 
+                [| 
+                    V3f.IOO;
+                    V3f.OIO;
+                    V3f.OOI;
+
+                    -V3f.IOO;
+                    -V3f.OIO;
+                    -V3f.OOI;
+                |]
+
+            IndexedGeometry(
+                Mode = IndexedGeometryMode.LineList,
+
+                IndexedAttributes =
+                    SymDict.ofList [
+                        DefaultSemantic.Positions, indices |> Array.map (fun i -> positions.[i]) :> Array
+                        DefaultSemantic.Normals, indices |> Array.mapi (fun ti _ -> normals.[ti / 6]) :> Array
+                        DefaultSemantic.Colors, indices |> Array.map (fun _ -> color) :> Array
+                    ]
+
+            )
+
+        let frustum (f : IMod<Trafo3d>) (proj : IMod<Trafo3d>) =
+            let invViewProj = Mod.map2 (fun (v : Trafo3d) p -> (v * p).Inverse) f proj
+
+            let positions = 
+                [|
+                    V3f(-1.0, -1.0, -1.0)
+                    V3f(1.0, -1.0, -1.0)
+                    V3f(1.0, 1.0, -1.0)
+                    V3f(-1.0, 1.0, -1.0)
+                    V3f(-1.0, -1.0, 1.0)
+                    V3f(1.0, -1.0, 1.0)
+                    V3f(1.0, 1.0, 1.0)
+                    V3f(-1.0, 1.0, 1.0)
+                |]
+
+            let indices =
+                [|
+                    1;2; 2;6; 6;5; 5;1;
+                    2;3; 3;7; 7;6; 4;5; 
+                    7;4; 3;0; 0;4; 0;1;
+                |]
+
+            let geometry =
+                IndexedGeometry(
+                    Mode = IndexedGeometryMode.LineList,
+                    IndexedAttributes =
+                        SymDict.ofList [
+                            DefaultSemantic.Positions, indices |> Array.map (fun i -> positions.[i]) :> Array
+                            DefaultSemantic.Colors, Array.create indices.Length C4b.Red :> Array
+                        ]
+                )
+
+            geometry
+                |> Sg.ofIndexedGeometry
+                |> Sg.trafo invViewProj
+
+    module Instanced =
+        open FShade
+        open Aardvark.SceneGraph.Semantics
+        type Vertex = { 
+                [<Position>] pos : V4d 
+                [<Color>] col : V4d
+                [<TexCoord>] tc : V2d
+                [<Semantic("ZZZInstanceTrafo")>] trafo : M44d
+            }
+
+        type Fragment = { 
+                [<Color>] col : V4d
+                [<TexCoord>] tc : V2d
+                [<Normal>] n : V3d
+            }
+        let trafo (v : Vertex) =
+            vertex {
+                return { 
+                    pos = uniform.ViewProjTrafo * v.trafo * v.pos
+                    col = v.col
+                    trafo = v.trafo
+                    tc = v.tc
+                }
+            }
+            
+        let diffuse (v : Effects.Vertex) =
+            fragment {
+                return V4d(v.c.XYZ * v.n.Z, v.c.W)
+            }
+
+        let pointSprite (p : Point<Effects.Vertex>) =
+            triangle {
+                
+                let s = uniform.PointSize
+                let pos = p.Value.wp
+                let r = uniform.ViewTrafoInv * V4d.IOOO |> Vec.xyz
+                let u = uniform.ViewTrafoInv * V4d.OIOO |> Vec.xyz
+                let pxyz = pos.XYZ
+
+                let p00 = pxyz - s * r - s * u
+                let p01 = pxyz - s * r + s * u
+                let p10 = pxyz + s * r - s * u
+                let p11 = pxyz + s * r + s * u
+
+                yield { p.Value with pos = uniform.ViewProjTrafo * V4d(p00, 1.0); tc = V2d.OO; }
+                yield { p.Value with pos = uniform.ViewProjTrafo * V4d(p10, 1.0); tc = V2d.IO; }
+                yield { p.Value with pos = uniform.ViewProjTrafo * V4d(p01, 1.0); tc = V2d.OI; }
+                yield { p.Value with pos = uniform.ViewProjTrafo * V4d(p11, 1.0); tc = V2d.II; }
+            }
+
+        let pointSpriteFragment (v : Effects.Vertex) =
+            fragment {
+                let c = 2.0 * v.tc - V2d.II
+                if c.Length > 1.0 then
+                    discard()
+
+                let z = sqrt (1.0 - c.LengthSquared)
+                let n = V3d(c.XY,z)
+
+               
+                return { 
+                    col = v.c
+                    tc = v.tc
+                    n = n
+                } 
+            }
 
 
-    let toTrafo (m : HmdMatrix44_t) =
-        let t = M44f(m.m0,m.m1,m.m2,m.m3,m.m4,m.m5,m.m6,m.m7,m.m8,m.m9,m.m10,m.m11,m.m12,m.m13,m.m14,m.m15) 
-        let t = M44d.op_Explicit(t)
-        Trafo3d(t,t.Inverse)
+    type DummyDataProvider(root : Box3d) =
+    
+        interface ILodData with
+            member x.BoundingBox = root
 
-    let toTrafo34 (m : HmdMatrix34_t) =
-        let t = M44f(m.m0,m.m1,m.m2, 0.0f,m.m3,m.m4,m.m5, 0.0f,m.m6,m.m7,m.m8, 0.0f,m.m9,m.m10,m.m11, 1.0f)
-        let t = M44d.op_Explicit(t).Transposed
-        Trafo3d(t.Inverse,t)
+            member x.Traverse f =
+                let rec traverse (level : int) (b : Box3d) =
+                    let box = b
+                    let n = 100.0
+                    let node = { id = b; level = level; bounds = box; inner = true; granularity = Fun.Cbrt(box.Volume / n); render = true}
 
+                    if f node then
+                        let center = b.Center
+
+                        let children =
+                            let l = b.Min
+                            let u = b.Max
+                            let c = center
+                            [
+                                Box3d(V3d(l.X, l.Y, l.Z), V3d(c.X, c.Y, c.Z))
+                                Box3d(V3d(c.X, l.Y, l.Z), V3d(u.X, c.Y, c.Z))
+                                Box3d(V3d(l.X, c.Y, l.Z), V3d(c.X, u.Y, c.Z))
+                                Box3d(V3d(c.X, c.Y, l.Z), V3d(u.X, u.Y, c.Z))
+                                Box3d(V3d(l.X, l.Y, c.Z), V3d(c.X, c.Y, u.Z))
+                                Box3d(V3d(c.X, l.Y, c.Z), V3d(u.X, c.Y, u.Z))
+                                Box3d(V3d(l.X, c.Y, c.Z), V3d(c.X, u.Y, u.Z))
+                                Box3d(V3d(c.X, c.Y, c.Z), V3d(u.X, u.Y, u.Z))
+                            ]
+
+                        children |> List.iter (traverse (level + 1))
+                    else
+                        ()
+                traverse 0 root
+
+            member x.Dependencies = []
+
+            member x.GetData (cell : LodDataNode) =
+                async {
+                    //do! Async.SwitchToThreadPool()
+                    let box = cell.bounds
+                    let points = 
+                        [| for x in 0 .. 9 do
+                             for y in 0 .. 9 do
+                                for z in 0 .. 9 do
+                                    yield V3d(x,y,z)*0.1*box.Size + box.Min |> V3f.op_Explicit
+                         |]
+                    let colors = Array.create points.Length (Helpers.randomColor())
+                    //let points = Helpers.randomPoints cell.bounds 1000
+                    //let b = Helpers.box (Helpers.randomColor()) cell.bounds
+//                  
+                    //do! Async.Sleep(100)
+                    let mutable a = 0
+
+//                    for i in 0..(1 <<< 20) do a <- a + 1
+//
+//                    let a = 
+//                        let mutable a = 0
+//                        for i in 0..(1 <<< 20) do a <- a + 1
+//                        a
+
+                    return Some <| IndexedGeometry(Mode = unbox a, IndexedAttributes = SymDict.ofList [ DefaultSemantic.Positions, points :> Array; DefaultSemantic.Colors, colors :> System.Array])
+                }
+
+    let data = DummyDataProvider(Box3d.FromMinAndSize(V3d.OOO, 200.0 * V3d.III)) :> ILodData
 
     
-    
-    use asdf = app.Context.ResourceLock
+    let scene (view : IMod<Trafo3d>) (win : VrWindow) (r : IRuntime) =
 
-    let check err =
-        if err <> EVRCompositorError.None then
-            failwith ""
+        let eff =
+            let effects = [
+                Instanced.trafo |> toEffect           
+                DefaultSurfaces.vertexColor  |> toEffect         
+            ]
+            let e = FShade.SequentialComposition.compose effects
+            FShadeSurface(e) :> ISurface 
 
-    compositor.CompositorBringToFront()
-    let mutable evnt = Unchecked.defaultof<_>
+        let surf = 
+            win.Runtime.PrepareSurface(
+                win.FramebufferSignature,
+                eff
+            ) :> ISurface |> Mod.constant
 
-    let leftEye     = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
-    let rightEye    = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
+        let f = Frustum.perspective 100.0 0.2 40.0 (1.7) |> Frustum.projTrafo
 
-    while true do
-        if system.PollNextEvent(&evnt, sizeof<VREvent_t> |> uint32) then
-            let eType = evnt.eventType |> int |> unbox<EVREventType>
-            let eName = eType |> system.GetEventTypeNameFromEnum
-            printfn "%A" eName
+        let cloud =
+            Sg.pointCloud data {
+                targetPointDistance     = Mod.constant 200.0
+                maxReuseRatio           = 0.5
+                minReuseCount           = 1L <<< 20
+                pruneInterval           = 500
+                customView              = Some view //win.Hmd.WorldToDevice 
+                customProjection        = Some (Mod.constant f)
+                attributeTypes =
+                    Map.ofList [
+                        DefaultSemantic.Positions, typeof<V3f>
+                        DefaultSemantic.Colors, typeof<C4b>
+                    ]
+                boundingBoxSurface      = Some surf
+            } 
+                 
+        let somePoints =
+            let positions =
+                [|
+                    for z in 0 .. 50 do
+                        yield V3f(0.0f, 0.0f, 0.2f * float32 z)
+                |]
+            
+            IndexedGeometryMode.PointList
+                |> Sg.draw
+                |> Sg.vertexAttribute DefaultSemantic.Positions (Mod.constant positions)
+                |> Sg.vertexBufferValue DefaultSemantic.Colors (Mod.constant V4f.IOOI)  
+        let sg = 
+            Sg.group' [
+                cloud
+                    |> Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect                  
+                        DefaultSurfaces.vertexColor  |> toEffect         
+                        Instanced.pointSprite  |> toEffect     
+                        Instanced.pointSpriteFragment  |> toEffect
+                        Instanced.diffuse |> toEffect 
+                    ]
+//                Helpers.frustum win.Hmd.WorldToDevice (Mod.constant f)
+//                    |> Sg.effect [
+//                        DefaultSurfaces.trafo |> toEffect                  
+//                        DefaultSurfaces.constantColor C4f.Green  |> toEffect    
+//                    ]
 
-        let poses = Array.zeroCreate 16
-        let ur = Array.zeroCreate 16
-        compositor.WaitGetPoses(poses,ur) |> check
+                data.BoundingBox.EnlargedByRelativeEps(0.005)
+                    |> Helpers.wireBox C4b.VRVisGreen
+                    |> Sg.ofIndexedGeometry
+            ]
 
-        let viewTrafo = 
-            Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero) * 
-            poses.[0].mDeviceToAbsoluteTracking.Trafo
+        let final =
+            sg |> Sg.effect [
+                    DefaultSurfaces.trafo |> toEffect                  
+                    DefaultSurfaces.vertexColor  |> toEffect 
+                    ]
+                |> Sg.uniform "PointSize" (Mod.constant 0.05)
+                |> Sg.uniform "ViewportSize" win.Sizes
 
-
-        let leftProj  = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-        let rightProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-
-        transact(fun () -> 
-            view.Value <- viewTrafo * leftEye
-            proj.Value <- leftProj
-        )
-        task.Run(leftFbo) |> ignore
-        let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint leftColor.Handle)
-        let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-        compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> check
-        
-
-        transact(fun () -> 
-            view.Value <- viewTrafo * leftEye
-            proj.Value <- rightProj
-        )
-        task.Run(rightFbo) |> ignore
-        let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Auto, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint rightColor.Handle)
-        let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-        compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> check
-
-
-    //system.GetStringTrackedDeviceProperty(0u, ETrackedDeviceProperty.Prop_TrackingSystemName_String, )
-
-
-    //printfn "%A" hasDevice
-    OpenVR.Shutdown()
-
+        final
 
 [<EntryPoint>]
 let main argv =
@@ -524,28 +777,79 @@ let main argv =
     let win = VrWindow(app.Runtime, 16)
 
     let box = Sg.box' C4b.Red Box3d.Unit
-    
-    let cross =
+        
+    let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+    let firstController = VrDriver.devices |> Array.find (fun c -> c.Type = VrDeviceType.Controller)
+    let trafo = firstController.DeviceToWorld
+
+    let moveController =
+        controller {
+            let! state = firstController.Axis.[1].Position
+
+            match state with
+                | Some dir -> 
+                    let speed = dir.X
+                    let! dt = differentiate win.Time
+                    return fun (t : Trafo3d) ->
+                        let forward = firstController.DeviceToWorld.GetValue().Forward.TransformDir(V3d.OOI)
+                        t * Trafo3d.Translation(forward * speed * 8.0 * dt.TotalSeconds)
+                | _ ->
+                    ()
+        }
+
+    let moveTrafo = AFun.integrate moveController Trafo3d.Identity
+    let moveTrafoInv = moveTrafo |> Mod.map (fun t -> t.Inverse)
+
+    let finalHandTrafo = Mod.map2 (*) trafo moveTrafoInv
+
+    let controllerBox = 
+        Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromCenterAndSize(V3d.OOO,V3d.III))
+            |> Sg.scale 0.1
+            |> Sg.trafo finalHandTrafo
+
+    let beam = 
+        Sg.lines (Mod.constant C4b.Red) (finalHandTrafo |> Mod.map (fun d -> 
+                let origin = d.Forward.TransformPos(V3d.OOO)
+                let target = origin + d.Forward.TransformDir(-V3d.OOI) * 100.0
+                [| Line3d(origin,target) |]) 
+        ) 
+
+    let lines =
         Sg.ofList [
             Sg.lines (Mod.constant C4b.Red) (Mod.constant [|Line3d(V3d.OOO, V3d.IOO)|])
             Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
             Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
+            beam
         ]
 
-    let cam = CameraView.lookAt V3d.Zero V3d.IOO V3d.OOI
+    let debugStuff =
+        Sg.ofList [
+            lines
+                |> Sg.effect [
+                    DefaultSurfaces.trafo |> toEffect
+                    DefaultSurfaces.vertexColor |> toEffect
+                ]
+            
+            controllerBox
+                |> Sg.effect [
+                    DefaultSurfaces.trafo |> toEffect
+                    DefaultSurfaces.constantColor C4f.White |> toEffect
+                    DefaultSurfaces.simpleLighting |> toEffect
+                ]
+        ]
 
-    let sg = 
+    let initial = CameraView.lookAt V3d.Zero V3d.IOO V3d.OOI
+    let camera = DefaultCameraController.control win.Mouse win.Keyboard win.Time initial
+
+
+
+    let scene = 
         [ for x in -5 .. 5 do
             for y in -5 .. 5 do
                 for z in -5 .. 5 do
                     if x <> 0 && y <> 0 && z <> 0 then
                         yield Sg.translate (2.0 * float x) (2.0 * float y) (2.0 * float z) box        
-            yield 
-                cross
-                    |> Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.vertexColor |> toEffect
-                    ]
+            yield debugStuff
         ] 
             |> Sg.ofList
             |> Sg.effect [
@@ -553,7 +857,51 @@ let main argv =
                 DefaultSurfaces.constantColor C4f.White |> toEffect
                 DefaultSurfaces.simpleLighting |> toEffect
             ]
-            |> Sg.viewTrafo win.View
+    
+    let bla =
+        Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromMinAndSize(V3d.Zero,V3d.III))
+            |> Sg.effect [
+                DefaultSurfaces.trafo |> toEffect
+                DefaultSurfaces.constantColor C4f.White |> toEffect
+            ]
+
+    let trafo = Mod.map2 (*) moveTrafo win.View
+
+    let scene = 
+        Lod.scene trafo win app.Runtime
+            |> Sg.andAlso debugStuff
+
+    let models =
+        [
+            @"C:\Aardwork\Sponza bunt\sponza_cm.obj", Trafo3d.Scale 0.01
+            @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 0.0, 1.0)
+            @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0)
+            @"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
+            @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-4.0, 0.0, 0.0)
+        ]
+
+    
+    let scene =
+        let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
+
+        models
+            |> List.map (fun (file, trafo) -> file |> Loader.Assimp.load |> Sg.AdapterNode |> Sg.transform (flip * trafo))
+            |> Sg.ofList
+            |> Sg.andAlso debugStuff
+            |> Sg.effect [
+                DefaultSurfaces.trafo |> toEffect
+                DefaultSurfaces.constantColor C4f.White |> toEffect
+                DefaultSurfaces.diffuseTexture |> toEffect
+                DefaultSurfaces.normalMap |> toEffect
+                DefaultSurfaces.lighting false |> toEffect
+            ]
+
+
+    let sg = 
+        scene
+            //|> Sg.trafo moveTrafo
+            |> Sg.viewTrafo trafo //win.View
+            //|> Sg.viewTrafo (Mod.constant Trafo3d.Identity)
             |> Sg.projTrafo win.Projection
 
     let task = app.Runtime.CompileRender(win.FramebufferSignature, sg)

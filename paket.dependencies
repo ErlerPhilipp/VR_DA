@@ -1,13 +1,14 @@
 source https://api.nuget.org/v3/index.json
 source https://vrvis.myget.org/F/aardvark_public/api/v3/index.json
 
-nuget Aardvark.Base                        ~> 2.1.0
-nuget Aardvark.Base.FSharp                 ~> 2.1.0
+nuget Aardvark.Base                        = 2.1.2
+nuget Aardvark.Base.FSharp                 = 2.1.2
 
 
-nuget Aardvark.Application.WinForms.GL
-nuget Aardvark.SceneGraph
-nuget Aardvark.Rendering.Interactive
+nuget Aardvark.Application.WinForms.GL     ~> 2.2.2
+nuget Aardvark.SceneGraph                  ~> 2.2.2
+nuget Aardvark.SceneGraph.IO               ~> 2.2.2
+nuget Aardvark.Rendering.Interactive       ~> 2.2.2
 
 group Build
 content: none
