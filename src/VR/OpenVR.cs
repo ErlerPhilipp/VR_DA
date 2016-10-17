@@ -2104,6 +2104,8 @@ namespace Valve.VR
             EVRCompositorError result = FnTable.Submit(eEye, ref pTexture, ref pBounds, nSubmitFlags);
             return result;
         }
+        
+
         public void ClearLastSubmittedFrame()
         {
             FnTable.ClearLastSubmittedFrame();
