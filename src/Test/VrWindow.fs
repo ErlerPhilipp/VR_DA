@@ -115,93 +115,102 @@ module VrWindow =
                     )
             )
 
+            let cts = new System.Threading.CancellationTokenSource()
+
             let run () = 
 
                 do 
-                    let renderCtx = ContextHandle.create()
-                    let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
-                    let ctx = runtime.Context
-                    use token = ctx.RenderingLock renderCtx
+                    try
+                        let renderCtx = ContextHandle.create()
+                        let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
+                        let ctx = runtime.Context
+                        use token = ctx.RenderingLock renderCtx
 
-                    while true do
+                        while not cts.IsCancellationRequested do
 
-                        if not (system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32)) then
-                            evt.trackedDeviceIndex <- 0xFFFFFFFFu
+                            if not (system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32)) then
+                                evt.trackedDeviceIndex <- 0xFFFFFFFFu
 
-                        OpenVR.Compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
-
-
-                        for d in VrDriver.devices do
-                            d.Update(evt, renderPoses)
-
-                        //let pose = renderPoses.[hmd.Index]
-                        let viewTrafo = hmd.WorldToDevice.GetValue()
-                        let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-                        let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
-
-                        let sw = System.Diagnostics.Stopwatch()
+                            OpenVR.Compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
 
 
-                        let renderTask = unbox<Aardvark.Rendering.GL.RenderTasks.RenderTask> renderTask
+                            for d in VrDriver.devices do
+                                d.Update(evt, renderPoses)
 
-                        let bla =
-                            Mod.custom (fun self ->
-                                renderTask.Use (fun () ->
-                                    let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
-                            
-                                    sw.Restart()
-                                    // render left
-                                    clear.Run(lFbo) |> ignore
+                            //let pose = renderPoses.[hmd.Index]
+                            let viewTrafo = hmd.WorldToDevice.GetValue()
+                            let lProj = system.GetProjectionMatrix(EVREye.Eye_Left, 0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+                            let rProj = system.GetProjectionMatrix(EVREye.Eye_Right,0.1f,100.0f, EGraphicsAPIConvention.API_OpenGL).Trafo
+
+                            let sw = System.Diagnostics.Stopwatch()
+
+
+                            let renderTask = unbox<Aardvark.Rendering.GL.RenderTasks.RenderTask> renderTask
+
+                            let bla =
+                                Mod.custom (fun self ->
                                     transact(fun () -> 
-                                        currentViewTrafo.Value <- viewTrafo * lHeadToEye
-                                        proj.Value <- lProj
+                                        currentViewTrafo.Value <- viewTrafo
                                     )
-                                    renderTask.Run(self, OutputDescription.ofFramebuffer lFbo) |> ignore
-
-                                    let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
-                                    // render right
-                                    clear.Run(rFbo) |> ignore
-                                    transact(fun () -> 
-                                        currentViewTrafo.Value <- viewTrafo * rHeadToEye
-                                        proj.Value <- rProj
-                                    )
-                                    renderTask.Run(self, OutputDescription.ofFramebuffer rFbo) |> ignore
+                                    renderTask.Use (fun () ->
+                                        let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
                             
-                                    //OpenTK.Graphics.OpenGL4.GL.Flush()
-            //                            OpenTK.Graphics.OpenGL4.GL.Finish()
+                                        sw.Restart()
+                                        // render left
+                                        clear.Run(lFbo) |> ignore
+                                        transact(fun () -> 
+                                            proj.Value <- lHeadToEye * lProj
+                                        )
+                                        renderTask.Run(self, OutputDescription.ofFramebuffer lFbo) |> ignore
 
-                                    //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
-                                    let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
-                                    let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                                    OpenVR.Compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+                                        let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
+                                        // render right
+                                        clear.Run(rFbo) |> ignore
+                                        transact(fun () -> 
+                                            proj.Value <- rHeadToEye * rProj
+                                        )
+                                        renderTask.Run(self, OutputDescription.ofFramebuffer rFbo) |> ignore
+                            
+                                        //OpenTK.Graphics.OpenGL4.GL.Flush()
+                //                            OpenTK.Graphics.OpenGL4.GL.Finish()
 
-                                    //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
-                                    let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> rColor.Handle))
-                                    let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                                    OpenVR.Compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+                                        //runtime.ResolveMultisamples(color, lTex, ImageTrafo.Rot0)
+                                        let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
+                                        let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                                        OpenVR.Compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+
+                                        //runtime.ResolveMultisamples(color, rTex, ImageTrafo.Rot0)
+                                        let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> rColor.Handle))
+                                        let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                                        OpenVR.Compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+                                    )
                                 )
-                            )
 
-                        bla.OutOfDate <- true
-                        bla.GetValue()
-                            //OpenTK.Graphics.OpenGL4.GL.Flush()
+                            bla.OutOfDate <- true
+                            bla.GetValue()
+                                //OpenTK.Graphics.OpenGL4.GL.Flush()
 
-                            //System.Threading.Thread.Sleep 20
-    //                            OpenTK.Graphics.OpenGL4.GL.Flush()
-    //                            OpenTK.Graphics.OpenGL4.GL.Finish()
+                                //System.Threading.Thread.Sleep 20
+        //                            OpenTK.Graphics.OpenGL4.GL.Flush()
+        //                            OpenTK.Graphics.OpenGL4.GL.Finish()
 
                     
-                        sw.Stop()
-                        printfn "time : %A" (1000.0 / float sw.Elapsed.TotalMilliseconds)
+                            sw.Stop()
+                            printfn "time : %A" (1000.0 / float sw.Elapsed.TotalMilliseconds)
 
-                        transact (fun () -> 
-    //tex.MarkOutdated()
-                            //printfn "%A" sw.Elapsed.TotalMilliseconds
-                            //printfn "%A" (System.DateTime.Now - time.Value)
-                            time.Value <- System.DateTime.Now
-                        )
-            
+                            transact (fun () -> 
+        //tex.MarkOutdated()
+                                //printfn "%A" sw.Elapsed.TotalMilliseconds
+                                //printfn "%A" (System.DateTime.Now - time.Value)
+                                time.Value <- System.DateTime.Now
+                            )
+                    with e ->
+                        Log.error "exn: %A" e
 
+            let task = System.Threading.Tasks.Task.Factory.StartNew(run,cts.Token)
+            System.Windows.Forms.Application.ApplicationExit.Add(fun _ -> 
+                cts.Cancel()
+            )
             System.Threading.Tasks.Task.Factory.StartNew(run) |> ignore
 
             let fsq =
@@ -213,7 +222,7 @@ module VrWindow =
             let fsqTask = runtime.CompileRender(signature, fsq)
             gameWindow.RenderTask <- fsqTask
 
-            while true do System.Threading.Thread.Sleep 10
+//            while true do System.Threading.Thread.Sleep 10
             //gameWindow.Run()
 
     //            let runtime = runtime |> unbox<Aardvark.Rendering.GL.Runtime>
