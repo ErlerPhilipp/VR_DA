@@ -17,6 +17,72 @@ open Aardvark.SceneGraph
 open Aardvark.SceneGraph.IO
 open Aardvark.VR
 
+// mod bind example:
+//let flag = Mod.init true
+//let heavyComp = Mod.init 20
+//let easyComp = Mod.init 10
+//let switchComp = Mod.bind (fun flagValue -> if flagValue then heavyComp else easyComp) flag
+
+//    let m = firstObj.transformedBB.GetValue()
+//
+//    let transformedBox = Mod.map (fun (t : Trafo3d) -> firstObj.model.bounds.Transformed(t)) firstObj.trafo
+//
+//    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
+//    transact (fun () -> Mod.change firstObj.trafo (Trafo3d.Translation(V3d.OOO)))
+
+type Object = 
+    {
+        trafo   : ModRef<Trafo3d>
+        model   : Loader.Scene
+    }
+
+type Scene = 
+    {
+        objects : list<Object>
+        staticGeometry : list<Object>
+    }
+
+let mutable grappedObj : Option<Object> = None
+
+let respondToSensors (sensors : unit) (scene : Scene) =
+    // grab sensors,
+    // compute trafos
+    // modify scene objects
+    let firstObj = scene.objects.[0]
+    let objectInWorldSpace = firstObj.model.bounds.Transformed(firstObj.trafo.Value)
+
+    // logic happens
+    //
+
+
+    let x = 
+        if false then 
+            transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO)) 
+            1
+        else 
+            299
+
+
+    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
+
+    ()
+
+
+let makeSceneGraph (s : Scene) : ISg =
+        
+    let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
+
+    let objects = 
+        List.concat [s.objects; s.staticGeometry]
+        |> List.map (fun o -> 
+                let scene = o.model |> Sg.AdapterNode
+                let transformed = o.trafo |> Mod.map (fun t -> flip * t) 
+                Sg.trafo transformed scene
+           )
+        |> Sg.ofSeq
+    objects
+    
+
 [<EntryPoint>]
 let main argv =
     
@@ -28,12 +94,12 @@ let main argv =
 //    System.Environment.Exit 0
 
     use app = new OpenGlApplication()
-
-    let win = VrWindow(app.Runtime, 1)
+    
+    let vrWin = VrWindow(app.Runtime, 1)
+    let screenWin = app.CreateSimpleRenderWindow()
 
     let box = Sg.box' C4b.Red Box3d.Unit
-        
-    let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)
+
     //let firstController = VrDriver.devices |> Array.find (fun c -> c.Type = VrDeviceType.Controller)
     //let trafo = firstController.DeviceToWorld
 
@@ -47,7 +113,7 @@ let main argv =
                 match state with
                     | Some dir -> 
                         let speed = dir.X
-                        let! dt = differentiate win.Time
+                        let! dt = differentiate vrWin.Time
                         return fun (t : Trafo3d) ->
                             let forward = c.DeviceToWorld.GetValue().Forward.TransformDir(V3d.OOI)
                             t * Trafo3d.Translation(forward * speed * 8.0 * dt.TotalSeconds)
@@ -116,24 +182,7 @@ let main argv =
         ]
 
     let initial = CameraView.lookAt V3d.Zero V3d.IOO V3d.OOI
-    let camera = DefaultCameraController.control win.Mouse win.Keyboard win.Time initial
-
-
-
-    let scene = 
-        [ for x in -5 .. 5 do
-            for y in -5 .. 5 do
-                for z in -5 .. 5 do
-                    if x <> 0 && y <> 0 && z <> 0 then
-                        yield Sg.translate (2.0 * float x) (2.0 * float y) (2.0 * float z) box        
-            yield debugStuff
-        ] 
-            |> Sg.ofList
-            |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
-                DefaultSurfaces.constantColor C4f.White |> toEffect
-                DefaultSurfaces.simpleLighting |> toEffect
-            ]
+    let camera = DefaultCameraController.control vrWin.Mouse vrWin.Keyboard vrWin.Time initial
     
     let bla =
         Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromMinAndSize(V3d.Zero,V3d.III))
@@ -142,29 +191,31 @@ let main argv =
                 DefaultSurfaces.constantColor C4f.White |> toEffect
             ]
 
-    let trafo = Mod.map2 (*) moveTrafo win.View
-    let lodTrafo = Mod.map2 (*) moveTrafo win.LodView
-
-    let scene = 
-        PointCloud.scene lodTrafo trafo win app.Runtime
-            |> Sg.andAlso debugStuff
-
-    let models =
+    let viewTrafo = Mod.map2 (*) moveTrafo vrWin.View
+    let lodTrafo = Mod.map2 (*) moveTrafo vrWin.LodView
+    
+    let staticModels =
         [
             @"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01
+        ]
+
+    let manipulableModels =
+        [
             @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 0.0, 1.0)
             @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0)
             //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
             @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
         ]
 
-//    
-    let scene =
-        let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
+    let myScene : Scene = {
+        objects = staticModels |> List.map (fun (file, initialTrafo) -> {model = file |> Loader.Assimp.load; trafo = ModRef<Trafo3d>(initialTrafo)});
+        staticGeometry = manipulableModels |> List.map (fun (file, initialTrafo) -> {model = file |> Loader.Assimp.load; trafo = ModRef<Trafo3d>(initialTrafo)});
+    }
 
-        models
-            |> List.map (fun (file, trafo) -> file |> Loader.Assimp.load |> Sg.AdapterNode |> Sg.transform (flip * trafo))
-            |> Sg.ofList
+    let scene =
+        
+        myScene
+            |> makeSceneGraph
             |> Sg.andAlso debugStuff
             |> Sg.effect [
                 DefaultSurfaces.trafo |> toEffect
@@ -173,21 +224,34 @@ let main argv =
                 DefaultSurfaces.normalMap |> toEffect
                 DefaultSurfaces.lighting false |> toEffect
             ]
+            
+    let frustum = screenWin.Sizes |> Mod.map(fun s -> Frustum.perspective 60.0 0.01 100.0 (float s.X / float s.Y) |> Frustum.projTrafo)
+            
 
-
-    let sg = 
+    let vrSg = 
         scene
-            //|> Sg.trafo moveTrafo
-            |> Sg.viewTrafo trafo //win.View
-            //|> Sg.viewTrafo (Mod.constant Trafo3d.Identity)
-            |> Sg.projTrafo win.Projection
+            |> Sg.viewTrafo viewTrafo
+            |> Sg.projTrafo vrWin.Projection
             |> Sg.uniform "LineWidth" (Mod.constant 5.0)
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
 
-    let task = app.Runtime.CompileRender(win.FramebufferSignature, sg)
-    win.RenderTask <- task
-    win.Run()
+    let screenSg = 
+        scene
+            |> Sg.viewTrafo viewTrafo
+            |> Sg.projTrafo frustum
+            |> Sg.uniform "LineWidth" (Mod.constant 5.0)
+            |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
+ 
+    let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, vrSg)
+    vrWin.RenderTask <- task
 
+    let screenTask = app.Runtime.CompileRender(screenWin.FramebufferSignature, screenSg)
+    screenWin.RenderTask <- screenTask
+
+    vrWin.Run()
+    screenWin.Run()
+
+    printfn "shutting down"
     //printfn "%A" hasDevice
     OpenVR.Shutdown()
 
