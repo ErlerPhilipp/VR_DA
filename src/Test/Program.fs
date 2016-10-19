@@ -30,58 +30,274 @@ open Aardvark.VR
 //    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
 //    transact (fun () -> Mod.change firstObj.trafo (Trafo3d.Translation(V3d.OOO)))
 
-type Object = 
+type pset<'a> = PersistentHashSet<'a>
+type Object =
     {
-        trafo   : ModRef<Trafo3d>
-        model   : Loader.Scene
+        id              : int
+        canMove         : bool
+        boundingBox     : Box3d
+        trafo           : Trafo3d
+        model           : ISg
     }
 
-type Scene = 
+type Scene =
     {
-        objects : list<Object>
-        staticGeometry : list<Object>
+        activeObjects   : pset<Object>
+        things          : pset<Object>
+        viewTrafo       : Trafo3d
+        lastTrafo       : Trafo3d
     }
 
-let mutable grappedObj : Option<Object> = None
+module NewStuff =
 
-let respondToSensors (sensors : unit) (scene : Scene) =
-    // grab sensors,
-    // compute trafos
-    // modify scene objects
-    let firstObj = scene.objects.[0]
-    let objectInWorldSpace = firstObj.model.bounds.Transformed(firstObj.trafo.Value)
+    type MObject =
+        {
+            mutable original : Object
+            mtrafo : ModRef<Trafo3d>
+            mmodel : ModRef<ISg>
+        }
 
-    // logic happens
-    //
+    type MScene =
+        {
+            mutable original : Scene
+            mactiveObjects : cset<MObject>
+            mthings : cset<MObject>
+            mviewTrafo : ModRef<Trafo3d>
+        }
+
+    type Conversion private() =
+        static member Create(o : Object) =
+            {
+                original = o
+                mtrafo = Mod.init o.trafo
+                mmodel = Mod.init o.model
+            }
+
+        static member Create(s : Scene) =
+            {
+                original = s
+                mactiveObjects = CSet.ofSeq (PersistentHashSet.toSeq s.activeObjects |> Seq.map Conversion.Create)
+                mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
+                mviewTrafo = Mod.init s.viewTrafo
+            }
+
+        static member Update(m : MObject, o : Object) =
+            if not (System.Object.ReferenceEquals(m.original, o)) then
+                m.original <- o
+                m.mmodel.Value <- o.model
+                m.mtrafo.Value <- o.trafo
+
+        static member Update(m : MScene, s : Scene) =
+            if not (System.Object.ReferenceEquals(m.original, s)) then
+                m.original <- s
+
+                m.mviewTrafo.Value <- s.viewTrafo
+                
+                let table = 
+                    Seq.append m.mthings m.mactiveObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                
+                
+                for t in PersistentHashSet.toSeq s.things do
+                    match table.TryRemove t.id with
+                        | (true, mo) -> 
+                            Conversion.Update(mo, t)
+                        | _ ->
+                            let mo = Conversion.Create(t)
+                            m.mthings.Add mo |> ignore
+                
+
+                for t in PersistentHashSet.toSeq s.activeObjects do
+                    match table.TryRemove t.id with
+                        | (true, mo) -> 
+                            Conversion.Update(mo, t)
+                        | _ ->
+                            let mo = Conversion.Create(t)
+                            m.mactiveObjects.Add mo |> ignore
+                    ()
+                
+                m.mactiveObjects.ExceptWith table.Values
+            
+
+    type Message =
+        | Add of Object
+        | Remove of Object
+        | DevicePress of int * int * Trafo3d
+        | DeviceRelease of int * int * Trafo3d
+        | DeviceMove of int * Trafo3d
+        | TimeElapsed of System.TimeSpan
+        | UpdateViewTrafo of Trafo3d
+
+   
 
 
-    let x = 
-        if false then 
-            transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO)) 
-            1
-        else 
-            299
 
 
-    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
+    let update (scene : Scene) (message : Message) : Scene =
+        match message with
+            | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ -> ()
+            | _ -> printfn "%A" message
 
-    ()
+        match message with
+            | DevicePress(4, _, t)  ->
+                let worldLocation = t.Forward.C3.XYZ
+
+                let pickedObjs = 
+                    scene.things 
+                        |> PersistentHashSet.toList 
+                        |> List.choose (fun o -> 
+                            if o.canMove then
+                                let modelLocation = o.trafo.Backward.TransformPos worldLocation
+                                if o.boundingBox.Contains modelLocation then
+                                    Some o
+                                else
+                                    None
+                            else
+                                None
+                            ) 
+                        |> PersistentHashSet.ofList
+
+                if PersistentHashSet.isEmpty pickedObjs then
+                    scene
+                else
+                    { scene with 
+                        lastTrafo       = t
+                        activeObjects   = PersistentHashSet.union scene.activeObjects pickedObjs
+                        things          = PersistentHashSet.difference scene.things pickedObjs
+                    }
+
+            | DeviceMove(4, t) ->
+                if PersistentHashSet.isEmpty scene.activeObjects then
+                    scene
+                else
+                    let deltaTrafo = scene.lastTrafo.Inverse * t
+                    { scene with 
+                        activeObjects =
+                            scene.activeObjects |> PersistentHashSet.map (fun a ->
+                                { a with trafo = a.trafo * deltaTrafo }
+                            ) 
+                        lastTrafo = t
+                    }
+
+            | DeviceRelease(4, _, _) ->
+                { scene with 
+                    activeObjects = PersistentHashSet.empty
+                    things = PersistentHashSet.union scene.activeObjects scene.things 
+                    lastTrafo = Trafo3d.Identity
+                }
+
+            | TimeElapsed(dt) ->
+                scene // do cam
+
+            | UpdateViewTrafo trafo -> 
+                { scene with viewTrafo = trafo }
+
+            | _ ->
+                scene
 
 
-let makeSceneGraph (s : Scene) : ISg =
-        
-    let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
 
-    let objects = 
-        List.concat [s.objects; s.staticGeometry]
-        |> List.map (fun o -> 
-                let scene = o.model |> Sg.AdapterNode
-                let transformed = o.trafo |> Mod.map (fun t -> flip * t) 
-                Sg.trafo transformed scene
-           )
-        |> Sg.ofSeq
-    objects
-    
+    let createScene (initialScene : Scene) (win : NewVrStuff.VrWindow) =
+        let mutable scene = initialScene
+        let mscene = Conversion.Create initialScene
+
+        let perform (msg : Message) =
+            transact (fun () ->
+                scene <- update scene msg
+                Conversion.Update(mscene, scene)
+            )
+
+        let deviceCount = VrDriver.devices.Length
+        let oldTrafos = Array.zeroCreate deviceCount
+        let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
+            perform (TimeElapsed dt)
+
+            for i in 0 .. VrDriver.devices.Length-1 do
+                let t = trafos.[i]
+                if oldTrafos.[i] <> t then
+                    oldTrafos.[i] <- t
+                    if i = 0 then perform (UpdateViewTrafo(t.Inverse))
+                    else perform (DeviceMove(i, t))
+                
+            if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
+                let deviceId = e.trackedDeviceIndex |> int
+                let button = int e.data.controller.button |> unbox<EVRButtonId>
+                let axis = button - EVRButtonId.k_EButton_Axis0 |> int
+                let trafo = trafos.[deviceId]
+
+                match unbox<EVREventType> (int e.eventType) with
+                    | EVREventType.VREvent_ButtonPress -> perform(DevicePress(deviceId, axis, trafo))
+                    | EVREventType.VREvent_ButtonUnpress -> perform(DeviceRelease(deviceId, axis, trafo))
+                    | _ -> ()
+
+            ()
+
+        win.Update <- update
+        let sgs = 
+            ASet.union' [mscene.mthings; mscene.mactiveObjects]
+                |> ASet.map (fun t -> 
+                    t.mmodel
+                        |> Sg.dynamic
+                        |> Sg.trafo t.mtrafo
+                )
+
+        Sg.set sgs
+            |> Sg.viewTrafo mscene.mviewTrafo
+
+
+
+module OldStuff = 
+    type Object = 
+        {
+            trafo   : ModRef<Trafo3d>
+            model   : Loader.Scene
+        }
+
+    type Scene = 
+        {
+            objects : list<Object>
+            staticGeometry : list<Object>
+        }
+
+let mutable grabbedObj : Option<Object> = None
+
+//let respondToSensors (sensors : unit) (scene : Scene) =
+//    // grab sensors,
+//    // compute trafos
+//    // modify scene objects
+//    let firstObj = scene.objects.[0]
+//    let objectInWorldSpace = firstObj.model.bounds.Transformed(firstObj.trafo.Value)
+//
+//    // logic happens
+//    //
+//
+//
+//    let x = 
+//        if false then 
+//            transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO)) 
+//            1
+//        else 
+//            299
+//
+//
+//    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
+//
+//    ()
+
+//
+//let makeSceneGraph (s : Scene) : ISg =
+//        
+//    let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
+//
+//    let objects = 
+//        List.concat [s.objects; s.staticGeometry]
+//        |> List.map (fun o -> 
+//                let scene = o.model |> Sg.AdapterNode
+//                let transformed = o.trafo |> Mod.map (fun t -> flip * t) 
+//                Sg.trafo transformed scene
+//           )
+//        |> Sg.ofSeq
+//    objects
+//    
 
 [<EntryPoint>]
 let main argv =
@@ -95,105 +311,8 @@ let main argv =
 
     use app = new OpenGlApplication()
     
-    let vrWin = VrWindow(app.Runtime, 1)
-    let screenWin = app.CreateSimpleRenderWindow()
+    let vrWin = NewVrStuff.VrWindow(app.Runtime)
 
-    let box = Sg.box' C4b.Red Box3d.Unit
-
-    //let firstController = VrDriver.devices |> Array.find (fun c -> c.Type = VrDeviceType.Controller)
-    //let trafo = firstController.DeviceToWorld
-
-    let controllers = VrDriver.devices |> Array.toList |> List.filter (fun c -> c.Type = VrDeviceType.Controller)
-
-    let moveController =
-        controllers |> List.map (fun c -> 
-            controller {
-                let! state = c.Axis.[1].Position
-
-                match state with
-                    | Some dir -> 
-                        let speed = dir.X
-                        let! dt = differentiate vrWin.Time
-                        return fun (t : Trafo3d) ->
-                            let forward = c.DeviceToWorld.GetValue().Forward.TransformDir(V3d.OOI)
-                            t * Trafo3d.Translation(forward * speed * 8.0 * dt.TotalSeconds)
-                    | _ ->
-                        ()
-            }
-        ) |> AFun.chain
-
-    let moveTrafo = AFun.integrate moveController Trafo3d.Identity
-    let moveTrafoInv = moveTrafo |> Mod.map (fun t -> t.Inverse)
-
-    
-
-    let controllerStuff =
-        controllers |> List.map (fun c ->
-
-            let finalHandTrafo = Mod.map2 (*) c.DeviceToWorld moveTrafoInv
-
-            let controllerBox = 
-                Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromCenterAndSize(V3d.OOO,V3d.III))
-                    |> Sg.scale 0.1
-                    |> Sg.trafo finalHandTrafo
-
-            let beam = 
-                Sg.lines (Mod.constant C4b.Red) (finalHandTrafo |> Mod.map (fun d -> 
-                        let origin = d.Forward.TransformPos(V3d.OOO)
-                        let target = origin + d.Forward.TransformDir(-V3d.OOI) * 100.0
-                        [| Line3d(origin,target) |]) 
-                ) 
-
-            Sg.ofList [
-                controllerBox
-                    |> Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.White |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
-                    ]
-                beam
-                    |> Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.vertexColor |> toEffect
-                        DefaultSurfaces.thickLine |> toEffect
-                    ]
-            ]
-
-        )
-
-    let lines =
-        Sg.ofList [
-            Sg.lines (Mod.constant C4b.Red) (Mod.constant [|Line3d(V3d.OOO, V3d.IOO)|])
-            Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
-            Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
-           
-        ]
-
-    let debugStuff =
-        Sg.ofList [
-            yield lines
-                |> Sg.effect [
-                    DefaultSurfaces.trafo |> toEffect
-                    DefaultSurfaces.vertexColor |> toEffect
-                ]
-
-            yield! controllerStuff
-           
-        ]
-
-    let initial = CameraView.lookAt V3d.Zero V3d.IOO V3d.OOI
-    let camera = DefaultCameraController.control vrWin.Mouse vrWin.Keyboard vrWin.Time initial
-    
-    let bla =
-        Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromMinAndSize(V3d.Zero,V3d.III))
-            |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
-                DefaultSurfaces.constantColor C4f.White |> toEffect
-            ]
-
-    let viewTrafo = Mod.map2 (*) moveTrafo vrWin.View
-    let lodTrafo = Mod.map2 (*) moveTrafo vrWin.LodView
-    
     let staticModels =
         [
             @"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01
@@ -207,16 +326,40 @@ let main argv =
             @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
         ]
 
-    let myScene : Scene = {
-        objects = staticModels |> List.map (fun (file, initialTrafo) -> {model = file |> Loader.Assimp.load; trafo = ModRef<Trafo3d>(initialTrafo)});
-        staticGeometry = manipulableModels |> List.map (fun (file, initialTrafo) -> {model = file |> Loader.Assimp.load; trafo = ModRef<Trafo3d>(initialTrafo)});
-    }
+    let objects =
+        let mutable currentId = 0
+        let newId() = 
+            currentId <- currentId + 1
+            currentId
+
+        let toObjects (canMove : bool) (l : list<_>) =
+            l |> List.mapi (fun i (file, trafo) ->
+                    let scene = file |> Loader.Assimp.load 
+                    let sg = scene |> Sg.AdapterNode :> ISg
+                    {
+                        id = newId()
+                        canMove = canMove
+                        boundingBox = scene.bounds
+                        trafo = trafo
+                        model = sg
+                    }
+                )
+
+        toObjects true manipulableModels @ 
+        toObjects false staticModels
 
     let scene =
-        
-        myScene
-            |> makeSceneGraph
-            |> Sg.andAlso debugStuff
+        {
+            activeObjects = PersistentHashSet.empty
+            things = PersistentHashSet.ofList objects
+            viewTrafo = Trafo3d.Identity
+            lastTrafo = Trafo3d.Identity
+        }
+
+
+    let scene =
+        NewStuff.createScene scene vrWin
+            //|> Sg.andAlso debugStuff
             |> Sg.effect [
                 DefaultSurfaces.trafo |> toEffect
                 DefaultSurfaces.constantColor C4f.White |> toEffect
@@ -224,35 +367,21 @@ let main argv =
                 DefaultSurfaces.normalMap |> toEffect
                 DefaultSurfaces.lighting false |> toEffect
             ]
-            
-    let frustum = screenWin.Sizes |> Mod.map(fun s -> Frustum.perspective 60.0 0.01 100.0 (float s.X / float s.Y) |> Frustum.projTrafo)
-            
+
 
     let vrSg = 
         scene
-            |> Sg.viewTrafo viewTrafo
             |> Sg.projTrafo vrWin.Projection
             |> Sg.uniform "LineWidth" (Mod.constant 5.0)
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
 
-    let screenSg = 
-        scene
-            |> Sg.viewTrafo viewTrafo
-            |> Sg.projTrafo frustum
-            |> Sg.uniform "LineWidth" (Mod.constant 5.0)
-            |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
  
     let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, vrSg)
     vrWin.RenderTask <- task
 
-    let screenTask = app.Runtime.CompileRender(screenWin.FramebufferSignature, screenSg)
-    screenWin.RenderTask <- screenTask
 
     vrWin.Run()
-    screenWin.Run()
 
-    printfn "shutting down"
-    //printfn "%A" hasDevice
     OpenVR.Shutdown()
 
-    0 // return an integer exit code
+    0
