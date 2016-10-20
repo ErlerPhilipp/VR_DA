@@ -197,10 +197,10 @@ module MutableScene =
                         things          = PersistentHashSet.difference scene.things pickedObjs
                     }
 
-            | DeviceMove(4, t) ->
+            | DeviceMove(_, t) ->
                 if PersistentHashSet.isEmpty scene.activeObjects then
                     scene
-                else
+                else    
                     let deltaTrafo = scene.lastTrafo.Inverse * t
                     { scene with 
                         activeObjects =
@@ -242,12 +242,16 @@ module MutableScene =
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
             perform (TimeElapsed dt)
 
+            //printfn "number of devices: %A" VrDriver.devices.Length
+            
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
                 if oldTrafos.[i] <> t then
                     oldTrafos.[i] <- t
-                    if i = 0 then perform (UpdateViewTrafo(t.Inverse))
-                    else perform (DeviceMove(i, t))
+                    if i = 0 then 
+                        perform (UpdateViewTrafo(t.Inverse)) 
+                    else 
+                        perform (DeviceMove(i, t))
                 
             if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
                 let deviceId = e.trackedDeviceIndex |> int
@@ -298,7 +302,7 @@ let main argv =
 
     use app = new OpenGlApplication()
     
-    let vrWin = NewVrStuff.VrWindow(app.Runtime)
+    let vrWin = VrWindow(app.Runtime, true)
 
     let staticModels =
         [
@@ -315,6 +319,12 @@ let main argv =
         
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
+//    let beam = 
+//        Sg.lines (Mod.constant C4b.Red) (finalHandTrafo |> Mod.map (fun d -> 
+//                let origin = V3d.OOO
+//                let target = origin + d.Forward.TransformDir(-V3d.OOI) * 100.0
+//                [| Line3d(origin,target) |]) 
+//        ) 
 
     let leftHandObject : Object = 
         {
@@ -384,26 +394,6 @@ let main argv =
 //            ]
 //
 //        )
-//
-//    let lines =
-//        Sg.ofList [
-//            Sg.lines (Mod.constant C4b.Red) (Mod.constant [|Line3d(V3d.OOO, V3d.IOO)|])
-//            Sg.lines (Mod.constant C4b.Green) (Mod.constant [|Line3d(V3d.OOO, V3d.OIO)|])
-//            Sg.lines (Mod.constant C4b.Blue) (Mod.constant [|Line3d(V3d.OOO, V3d.OOI)|])
-//           
-//        ]
-//
-//    let debugStuff =
-//        Sg.ofList [
-//            yield lines
-//                |> Sg.effect [
-//                    DefaultSurfaces.trafo |> toEffect
-//                    DefaultSurfaces.vertexColor |> toEffect
-//                ]
-//
-//            yield! controllerStuff
-//           
-//        ]
 
 
     let getControllerObject (i : int) =
@@ -411,7 +401,7 @@ let main argv =
 //        if i > 0 then Some leftHandObject
 //        else None
 
-    let scene =
+    let sceneObj =
         {
             controllerObjects = List.init VrDriver.devices.Length getControllerObject
             activeObjects = PersistentHashSet.empty
@@ -422,7 +412,7 @@ let main argv =
 
 
     let scene =
-        MutableScene.createScene scene vrWin
+        MutableScene.createScene sceneObj vrWin
             |> Sg.effect [
                 DefaultSurfaces.trafo |> toEffect
                 DefaultSurfaces.constantColor C4f.White |> toEffect
@@ -442,7 +432,6 @@ let main argv =
  
     let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, vrSg)
     vrWin.RenderTask <- task
-
 
     vrWin.Run()
 
