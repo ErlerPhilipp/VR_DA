@@ -63,6 +63,7 @@
     <Compile Include="Lod.fs" />
     <Compile Include="Instanced.fs" />
     <Compile Include="PointCloud.fs" />
+    <Compile Include="MutableScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

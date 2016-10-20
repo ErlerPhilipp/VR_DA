@@ -12,12 +12,69 @@ open Aardvark.VR
 
 [<AutoOpen>]
 module NewVrStuff =
-
     open System
     open System.Threading
     open Aardvark.Rendering.GL
     open OpenTK.Graphics
     open OpenTK.Graphics.OpenGL4
+
+
+    type BlitWindow(b : ref<Framebuffer>, c : ref<Framebuffer>) =
+        inherit OpenTK.GameWindow(
+            1024, 768,
+            GraphicsMode(
+                ColorFormat(Config.BitsPerPixel), 
+                0, 
+                0, 
+                1, 
+                OpenTK.Graphics.ColorFormat(8,8,8,8),
+                Config.Buffers, 
+                false
+            ),
+            "asdasd",
+            OpenTK.GameWindowFlags.Default,
+            OpenTK.DisplayDevice.Default,
+
+            Config.MajorVersion, 
+            Config.MinorVersion, 
+            Config.ContextFlags
+        )
+
+        let check() =
+            let err = GL.GetError()
+            if err <> ErrorCode.NoError then printfn "err: %A" err
+
+        let mutable ctx = Unchecked.defaultof<_>
+        let mutable loaded = false
+        override x.OnLoad(e) =
+            base.OnLoad(e)
+            ctx <- ContextHandle(x.Context, x.WindowInfo)
+            ContextHandle.Current <- Some ctx
+            loaded <- true
+            
+
+        override x.OnRenderFrame(e) =
+            if loaded then
+                base.OnRenderFrame(e)
+                let fbo = !c
+                GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, fbo.Handle)
+                check()
+                GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0)
+                check()
+                GL.ReadBuffer(ReadBufferMode.ColorAttachment0)
+                GL.DrawBuffer(DrawBufferMode.Back)
+
+                GL.BlitFramebuffer(0, 0, fbo.Size.X, fbo.Size.Y, 0, 0, x.Width, x.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest)
+                check()
+                GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0)
+                check()
+                GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0)
+                check()
+                x.SwapBuffers()
+                lock b (fun () -> Fun.Swap(&b.contents, &c.contents))
+
+
+
 
     type ScreenWindow =
         {
@@ -41,6 +98,20 @@ module NewVrStuff =
         let lFbo    = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = lColor; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
         let rFbo    = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = rColor; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
         
+        let screenA, screenB, screenC =
+            if createWindow then
+                let aTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
+                let bTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
+                let cTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
+                let depth   = runtime.CreateRenderbuffer(V2i(1024, 768), RenderbufferFormat.Depth24Stencil8, 1)
+                let aFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = aTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
+                let bFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = bTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
+                let cFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = cTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
+
+                (aFbo |> unbox<Framebuffer> |> ref, bFbo |> unbox<Framebuffer> |> ref, cFbo |> unbox<Framebuffer> |> ref)
+            else
+                Unchecked.defaultof<_>
+
         let renderCtx       = ContextHandle.create()
         let cancel          = new CancellationTokenSource()
         let ct              = cancel.Token
@@ -57,7 +128,8 @@ module NewVrStuff =
 
         let mutable update : TimeSpan -> Trafo3d[] -> VREvent_t -> unit = fun _ _ _ -> ()
         let frameWatch = System.Diagnostics.Stopwatch()
-        
+        let watch = System.Diagnostics.Stopwatch()
+
         let ctx = runtime.Context
 
         let defaultFramebuffer = 
@@ -68,36 +140,47 @@ module NewVrStuff =
                 [0, DefaultSemantic.Colors, Renderbuffer(ctx, 0, V2i.Zero, RenderbufferFormat.Rgba8, 1, 0L) :> IFramebufferOutput], None
             )
 
-        let screenWindow =
-            if createWindow then
-                let f = new System.Windows.Forms.Form(Text = "Aardvark rocks \\o/", Width = 1024, Height = 768)
-                let ctrl = 
-                    new OpenTK.GLControl(
-                        GraphicsMode(
-                            ColorFormat(Config.BitsPerPixel), 
-                            Config.DepthBits, 
-                            Config.StencilBits, 
-                            1, 
-                            OpenTK.Graphics.ColorFormat.Empty,
-                            Config.Buffers, 
-                            false
-                        ), 
-                        Config.MajorVersion, 
-                        Config.MinorVersion, 
-                        Config.ContextFlags, 
-                        VSync = false
-                    )
-                ctrl.Dock <- System.Windows.Forms.DockStyle.Fill
-                f.Controls.Add ctrl
-
-                f.Show()
-
-                Some (ctrl, ContextHandle(ctrl.Context, ctrl.WindowInfo))
-            else
-                None 
+        do if createWindow then
+                async {
+                    do! Async.SwitchToNewThread()
+                    let win = new BlitWindow(screenB, screenC)
+                    win.Run(10.0, 30.0)
+                } |> Async.Start
+//                let f = new System.Windows.Forms.Form(Text = "Aardvark rocks \\o/", Width = 1024, Height = 768)
+//                let ctrl = 
+//                    new OpenTK.GLControl(
+//                        GraphicsMode(
+//                            ColorFormat(Config.BitsPerPixel), 
+//                            Config.DepthBits, 
+//                            Config.StencilBits, 
+//                            1, 
+//                            OpenTK.Graphics.ColorFormat.Empty,
+//                            Config.Buffers, 
+//                            false
+//                        ), 
+//                        Config.MajorVersion, 
+//                        Config.MinorVersion, 
+//                        Config.ContextFlags, 
+//                        VSync = false
+//                    )
+//                ctrl.Dock <- System.Windows.Forms.DockStyle.Fill
+//                f.Controls.Add ctrl
+//
+//                ctrl
+//
+//                f.Show()
+//
+//                Some (ctrl, ContextHandle(ctrl.Context, ctrl.WindowInfo))
+//            else
+//                None 
 
         let renderBothEyes =
             Mod.custom (fun self ->
+                let lastFrameTook = watch.Elapsed.TotalSeconds
+                watch.Restart()
+                let timeRemaining = OpenVR.Compositor.GetFrameTimeRemaining() |> float
+                //printfn "rem: %A" timeRemaining
+
                 let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
                 let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
 
@@ -113,11 +196,15 @@ module NewVrStuff =
 
                     // render right
                     clear.Run(rFbo) |> ignore
-                    
                     transact(fun () -> projection.Value <- rHeadToEye * rProj)
                     task.Run(self, OutputDescription.ofFramebuffer rFbo) |> ignore
                     OpenTK.Graphics.OpenGL4.GL.Flush()
                     OpenTK.Graphics.OpenGL4.GL.Finish()
+
+                    if timeRemaining > lastFrameTook then    
+                        Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
+                    else
+                        printfn "long frame; %As %As" lastFrameTook timeRemaining
 
                     do
                         let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
@@ -145,6 +232,7 @@ module NewVrStuff =
                 evt.trackedDeviceIndex <- 0xFFFFFFFFu
 
             OpenVR.Compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
+
             let dt = frameWatch.Elapsed
             frameWatch.Restart()
             update dt (renderPoses |> Array.map (fun p -> p.mDeviceToAbsoluteTracking.Trafo)) evt
@@ -152,26 +240,39 @@ module NewVrStuff =
             renderBothEyes.OutOfDate <- true
             renderBothEyes.GetValue()
 
-
-            match screenWindow with
-                | Some (win, handle) ->
-                    use token = ctx.RenderingLock handle
-
-                    let proj = Frustum.perspective 60.0 0.1 100.0 (float win.Width / float win.Height) |> Frustum.projTrafo
-                            
-                    transact(fun () -> projection.Value <- proj)
-                    GL.Viewport(0, 0, win.Width, win.Height)
-                    GL.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
-                    GL.ClearDepth(1.0)
-                    GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)
-                    defaultFramebuffer.Size <- V2i(win.Width, win.Height)
-
-                    task.Run(defaultFramebuffer) |> ignore
-                    win.SwapBuffers()
-                    System.Windows.Forms.Application.DoEvents()
-
-                | None ->
-                    ()
+            if createWindow then
+                let fbo = !screenA
+                let proj = Frustum.perspective 60.0 0.1 100.0 (float fbo.Size.X / float fbo.Size.Y) |> Frustum.projTrafo
+                transact(fun () -> projection.Value <- proj)
+//                GL.BindFramebuffer(FramebufferTarget.Framebuffer, screenFbo.Handle)
+//                GL.Viewport(0, 0, screenFbo.Size.X, screenFbo.Size.Y)
+//                GL.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+//                GL.ClearDepth(1.0)
+//                GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)
+//                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
+                clear.Run(fbo) |> ignore
+                task.Run(fbo) |> ignore
+                lock screenB (fun () -> Fun.Swap(&screenA.contents, &screenB.contents))
+//
+//            match screenWindow with
+//                | Some (win, handle) ->
+//                    use token = ctx.RenderingLock handle
+//
+//                    let proj = Frustum.perspective 60.0 0.1 100.0 (float win.Width / float win.Height) |> Frustum.projTrafo
+//                            
+//                    transact(fun () -> projection.Value <- proj)
+//                    GL.Viewport(0, 0, win.Width, win.Height)
+//                    GL.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+//                    GL.ClearDepth(1.0)
+//                    GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)
+//                    defaultFramebuffer.Size <- V2i(win.Width, win.Height)
+//
+//                    task.Run(defaultFramebuffer) |> ignore
+//                    win.SwapBuffers()
+//                    System.Windows.Forms.Application.DoEvents()
+//
+//                | None ->
+//                    ()
 
 
             transact (fun () -> time.Value <- DateTime.Now)
@@ -207,6 +308,7 @@ module NewVrStuff =
         member x.Run() =
             let mutable evt = Unchecked.defaultof<_>
             OpenVR.Compositor.CompositorBringToFront()
+            
             while true do
                 x.RenderFrame()
 
