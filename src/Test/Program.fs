@@ -142,7 +142,6 @@ let main argv =
 
     let vrSg = 
         scene
-        //  |> Sg.andAlso debugStuff
             |> Sg.projTrafo vrWin.Projection
             |> Sg.uniform "LineWidth" (Mod.constant 5.0)
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
@@ -152,11 +151,10 @@ let main argv =
     vrWin.RenderTask <- task
     
     match VrDriver.devices.Length with
-        | 0 -> printf "Found no device!\n"
-        | 1 -> printf "Found only 1 device!\n"
-        | 2 -> printf "Found only 1 controller!\n"
-        | _ -> () //printf "Found all devices.\n"
-    //printfn "number of devices: %A" VrDriver.devices.Length
+        | 0 -> printfn "Found no device!"
+        | 1 -> printfn "Found only 1 device!"
+        | 2 -> printfn "Found only 1 controller!"
+        | _ -> () //printfn "Found all %A devices." VrDriver.devices.Length
 
     vrWin.Run()
 

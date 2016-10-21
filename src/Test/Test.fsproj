@@ -60,9 +60,6 @@
     <Compile Include="VrDevice.fs" />
     <Compile Include="VrDriver.fs" />
     <Compile Include="VrWindow.fs" />
-    <Compile Include="Lod.fs" />
-    <Compile Include="Instanced.fs" />
-    <Compile Include="PointCloud.fs" />
     <Compile Include="MutableScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -31,7 +31,7 @@ module NewVrStuff =
                 Config.Buffers, 
                 false
             ),
-            "asdasd",
+            "Aardvark rocks \\o/",
             OpenTK.GameWindowFlags.Default,
             OpenTK.DisplayDevice.Default,
 
@@ -146,33 +146,6 @@ module NewVrStuff =
                     let win = new BlitWindow(screenB, screenC)
                     win.Run(10.0, 30.0)
                 } |> Async.Start
-//                let f = new System.Windows.Forms.Form(Text = "Aardvark rocks \\o/", Width = 1024, Height = 768)
-//                let ctrl = 
-//                    new OpenTK.GLControl(
-//                        GraphicsMode(
-//                            ColorFormat(Config.BitsPerPixel), 
-//                            Config.DepthBits, 
-//                            Config.StencilBits, 
-//                            1, 
-//                            OpenTK.Graphics.ColorFormat.Empty,
-//                            Config.Buffers, 
-//                            false
-//                        ), 
-//                        Config.MajorVersion, 
-//                        Config.MinorVersion, 
-//                        Config.ContextFlags, 
-//                        VSync = false
-//                    )
-//                ctrl.Dock <- System.Windows.Forms.DockStyle.Fill
-//                f.Controls.Add ctrl
-//
-//                ctrl
-//
-//                f.Show()
-//
-//                Some (ctrl, ContextHandle(ctrl.Context, ctrl.WindowInfo))
-//            else
-//                None 
 
         let renderBothEyes =
             Mod.custom (fun self ->
@@ -244,36 +217,9 @@ module NewVrStuff =
                 let fbo = !screenA
                 let proj = Frustum.perspective 60.0 0.1 100.0 (float fbo.Size.X / float fbo.Size.Y) |> Frustum.projTrafo
                 transact(fun () -> projection.Value <- proj)
-//                GL.BindFramebuffer(FramebufferTarget.Framebuffer, screenFbo.Handle)
-//                GL.Viewport(0, 0, screenFbo.Size.X, screenFbo.Size.Y)
-//                GL.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
-//                GL.ClearDepth(1.0)
-//                GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)
-//                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0)
                 clear.Run(fbo) |> ignore
                 task.Run(fbo) |> ignore
                 lock screenB (fun () -> Fun.Swap(&screenA.contents, &screenB.contents))
-//
-//            match screenWindow with
-//                | Some (win, handle) ->
-//                    use token = ctx.RenderingLock handle
-//
-//                    let proj = Frustum.perspective 60.0 0.1 100.0 (float win.Width / float win.Height) |> Frustum.projTrafo
-//                            
-//                    transact(fun () -> projection.Value <- proj)
-//                    GL.Viewport(0, 0, win.Width, win.Height)
-//                    GL.ClearColor(0.0f, 0.0f, 0.0f, 1.0f)
-//                    GL.ClearDepth(1.0)
-//                    GL.Clear(ClearBufferMask.ColorBufferBit ||| ClearBufferMask.DepthBufferBit)
-//                    defaultFramebuffer.Size <- V2i(win.Width, win.Height)
-//
-//                    task.Run(defaultFramebuffer) |> ignore
-//                    win.SwapBuffers()
-//                    System.Windows.Forms.Application.DoEvents()
-//
-//                | None ->
-//                    ()
-
 
             transact (fun () -> time.Value <- DateTime.Now)
 

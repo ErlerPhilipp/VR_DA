@@ -25,7 +25,6 @@ module MutableScene =
             activeObjects     : pset<Object>
             things            : pset<Object>
             viewTrafo         : Trafo3d
-            //globalTrafo       : Trafo3d
             lastTrafo         : Trafo3d
             controllerObjects : list<Option<Object>>
             moving            : bool
@@ -50,7 +49,6 @@ module MutableScene =
             mactiveObjects : cset<MObject>
             mthings : cset<MObject>
             mviewTrafo : ModRef<Trafo3d>
-            //mglobalTrafo : ModRef<Trafo3d>
             mcontrollerObjects : array<ModRef<Option<MObject>>>
         }
 
@@ -68,7 +66,6 @@ module MutableScene =
                 mactiveObjects = CSet.ofSeq (PersistentHashSet.toSeq s.activeObjects |> Seq.map Conversion.Create)
                 mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
-                //mglobalTrafo = Mod.init s.globalTrafo
                 mcontrollerObjects = s.controllerObjects |> List.toArray |> Array.map (fun o -> o |> Option.map Conversion.Create |> Mod.init)
             }
 
@@ -83,7 +80,6 @@ module MutableScene =
                 m.original <- s
 
                 m.mviewTrafo.Value <- s.viewTrafo
-               // m.mglobalTrafo.Value <- s.globalTrafo
                 let controllers = s.controllerObjects |> List.toArray
                 for i in 0 .. m.mcontrollerObjects.Length-1 do
                     let target = m.mcontrollerObjects.[i]
