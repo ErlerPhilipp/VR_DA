@@ -9,6 +9,33 @@ open Aardvark.SceneGraph
 
 [<AutoOpen>]
 module MutableScene =
+    
+    type pset<'a> = PersistentHashSet<'a>
+    type Object =
+        {
+            id              : int
+            canMove         : bool
+            boundingBox     : Box3d
+            trafo           : Trafo3d
+            model           : ISg
+        }
+
+    type Scene =
+        {
+            activeObjects     : pset<Object>
+            things            : pset<Object>
+            viewTrafo         : Trafo3d
+            //globalTrafo       : Trafo3d
+            lastTrafo         : Trafo3d
+            controllerObjects : list<Option<Object>>
+            moving            : bool
+            moveDirection     : V3d
+        }
+        
+    let mutable currentId = 0
+    let newId() = 
+        currentId <- currentId + 1
+        currentId
 
     type MObject =
         {
@@ -23,6 +50,7 @@ module MutableScene =
             mactiveObjects : cset<MObject>
             mthings : cset<MObject>
             mviewTrafo : ModRef<Trafo3d>
+            //mglobalTrafo : ModRef<Trafo3d>
             mcontrollerObjects : array<ModRef<Option<MObject>>>
         }
 
@@ -40,6 +68,7 @@ module MutableScene =
                 mactiveObjects = CSet.ofSeq (PersistentHashSet.toSeq s.activeObjects |> Seq.map Conversion.Create)
                 mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
+                //mglobalTrafo = Mod.init s.globalTrafo
                 mcontrollerObjects = s.controllerObjects |> List.toArray |> Array.map (fun o -> o |> Option.map Conversion.Create |> Mod.init)
             }
 
@@ -54,7 +83,7 @@ module MutableScene =
                 m.original <- s
 
                 m.mviewTrafo.Value <- s.viewTrafo
-                
+               // m.mglobalTrafo.Value <- s.globalTrafo
                 let controllers = s.controllerObjects |> List.toArray
                 for i in 0 .. m.mcontrollerObjects.Length-1 do
                     let target = m.mcontrollerObjects.[i]
@@ -103,6 +132,15 @@ module MutableScene =
     let change (i : int) (f : 'a -> 'a) (l : list<'a>) =
         l |> List.mapi (fun ii v -> if ii = i then f v else v)
 
+    let filterIndices (set : Set<int>) (l : list<'a>) =
+        let rec filterIndices (i : int) (set : Set<int>) (l : list<'a>) =
+            match l with
+                | [] -> []
+                | h :: rest ->
+                    if Set.contains i set then h :: filterIndices (i+1) set rest
+                    else filterIndices (i+1) set rest
+        filterIndices 0 set l
+
     let update (scene : Scene) (message : Message) : Scene =
         match message with
             | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ -> ()
@@ -121,7 +159,10 @@ module MutableScene =
                 | _ -> 
                     scene
 
+
         match message with
+            | DevicePress(3, _, t)  ->
+                { scene with moving = true }
             | DevicePress(4, _, t)  ->
                 let worldLocation = t.Forward.C3.XYZ
 
@@ -148,7 +189,10 @@ module MutableScene =
                         activeObjects   = PersistentHashSet.union scene.activeObjects pickedObjs
                         things          = PersistentHashSet.difference scene.things pickedObjs
                     }
-
+                    
+            | DeviceMove(3, t) ->
+                let direction = t.Forward.TransformDir(V3d.OOI)
+                { scene with moveDirection = direction }
             | DeviceMove(_, t) ->
                 if PersistentHashSet.isEmpty scene.activeObjects then
                     scene
@@ -161,7 +205,9 @@ module MutableScene =
                             ) 
                         lastTrafo = t
                     }
-
+                    
+            | DeviceRelease(3, _, t)  ->
+                { scene with moving = false }
             | DeviceRelease(4, _, _) ->
                 { scene with 
                     activeObjects = PersistentHashSet.empty
@@ -170,13 +216,22 @@ module MutableScene =
                 }
 
             | TimeElapsed(dt) ->
-                scene // do cam
+                if scene.moving then
+                    let speed = 3.0
+                    let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * speed)
+                    { scene with
+                        // only move static things, keep active things like controllers
+                        things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp })
+                    }
+                else
+                    scene
 
             | UpdateViewTrafo trafo -> 
                 { scene with viewTrafo = trafo }
 
             | _ ->
                 scene
+
 
 
     let createScene (initialScene : Scene) (win : NewVrStuff.VrWindow) =

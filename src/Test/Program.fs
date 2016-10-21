@@ -92,7 +92,6 @@ let main argv =
         }
 
     let objects =
-
         let toObjects (canMove : bool) (l : list<_>) =
             l |> List.mapi (fun i (file, trafo) ->
                     let scene = file |> Loader.Assimp.load 
@@ -109,41 +108,6 @@ let main argv =
         toObjects true manipulableModels @ 
         toObjects false staticModels
         
-//    let controllerStuff =
-//        controllers |> List.map (fun c ->
-//
-//            let finalHandTrafo = Mod.map2 (*) c.DeviceToWorld moveTrafoInv
-//
-//            let controllerBox = 
-//                Sg.box (Mod.constant C4b.Green) (Mod.constant <| Box3d.FromCenterAndSize(V3d.OOO,V3d.III))
-//                    |> Sg.scale 0.1
-//                    |> Sg.trafo finalHandTrafo
-//
-//            let beam = 
-//                Sg.lines (Mod.constant C4b.Red) (finalHandTrafo |> Mod.map (fun d -> 
-//                        let origin = d.Forward.TransformPos(V3d.OOO)
-//                        let target = origin + d.Forward.TransformDir(-V3d.OOI) * 100.0
-//                        [| Line3d(origin,target) |]) 
-//                ) 
-//
-//            Sg.ofList [
-//                controllerBox
-//                    |> Sg.effect [
-//                        DefaultSurfaces.trafo |> toEffect
-//                        DefaultSurfaces.constantColor C4f.White |> toEffect
-//                        DefaultSurfaces.simpleLighting |> toEffect
-//                    ]
-//                beam
-//                    |> Sg.effect [
-//                        DefaultSurfaces.trafo |> toEffect
-//                        DefaultSurfaces.vertexColor |> toEffect
-//                        DefaultSurfaces.thickLine |> toEffect
-//                    ]
-//            ]
-//
-//        )
-
-
     let getControllerObject (i : int) =
         match i with
             | 0 -> None // hmd
@@ -158,6 +122,8 @@ let main argv =
             controllerObjects = List.init VrDriver.devices.Length getControllerObject
             activeObjects = PersistentHashSet.empty
             things = PersistentHashSet.ofList objects
+            moving = false
+            moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastTrafo = Trafo3d.Identity
         }
