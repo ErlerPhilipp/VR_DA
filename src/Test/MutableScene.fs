@@ -121,6 +121,8 @@ module MutableScene =
         | Remove of Object
         | DevicePress of int * int * Trafo3d
         | DeviceRelease of int * int * Trafo3d
+        | DeviceTouch of int * int * Trafo3d
+        | DeviceUntouch of int * int * Trafo3d
         | DeviceMove of int * Trafo3d
         | TimeElapsed of System.TimeSpan
         | UpdateViewTrafo of Trafo3d
@@ -157,9 +159,9 @@ module MutableScene =
 
 
         match message with
-            | DevicePress(3, _, t)  ->
+            | DeviceTouch(1, _, t)  ->
                 { scene with moving = true }
-            | DevicePress(4, _, t)  ->
+            | DevicePress(2, _, t)  ->
                 let worldLocation = t.Forward.C3.XYZ
 
                 let pickedObjs = 
@@ -186,7 +188,7 @@ module MutableScene =
                         things          = PersistentHashSet.difference scene.things pickedObjs
                     }
                     
-            | DeviceMove(3, t) ->
+            | DeviceMove(1, t) ->
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 { scene with moveDirection = direction }
             | DeviceMove(_, t) ->
@@ -202,9 +204,9 @@ module MutableScene =
                         lastTrafo = t
                     }
                     
-            | DeviceRelease(3, _, t)  ->
+            | DeviceUntouch(1, _, t)  ->
                 { scene with moving = false }
-            | DeviceRelease(4, _, _) ->
+            | DeviceRelease(2, _, _) ->
                 { scene with 
                     activeObjects = PersistentHashSet.empty
                     things = PersistentHashSet.union scene.activeObjects scene.things 
@@ -263,6 +265,8 @@ module MutableScene =
                 match unbox<EVREventType> (int e.eventType) with
                     | EVREventType.VREvent_ButtonPress -> perform(DevicePress(deviceId, axis, trafo))
                     | EVREventType.VREvent_ButtonUnpress -> perform(DeviceRelease(deviceId, axis, trafo))
+                    | EVREventType.VREvent_ButtonTouch -> perform(DeviceTouch(deviceId, axis, trafo))
+                    | EVREventType.VREvent_ButtonUntouch -> perform(DeviceUntouch(deviceId, axis, trafo))
                     | _ -> ()
 
             ()

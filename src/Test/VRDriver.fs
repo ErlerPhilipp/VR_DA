@@ -44,4 +44,4 @@ module VrDriver =
                 let deviceType = system.GetTrackedDeviceClass i
                 if deviceType <> ETrackedDeviceClass.Invalid then
                     yield VrDevice(system, toDeviceType deviceType, int i)
-        |]
+        |] |> Array.sortBy (fun x -> x.Type)

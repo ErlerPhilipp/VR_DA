@@ -90,6 +90,7 @@ let main argv =
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
         }
+    let camObject = rightHandObject
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
@@ -108,14 +109,18 @@ let main argv =
         toObjects true manipulableModels @ 
         toObjects false staticModels
         
+    let mutable numControllers = 0
+
     let getControllerObject (i : int) =
-        match i with
-            | 0 -> None // hmd
-            | 1 -> Some rightHandObject // cam 1
-            | 2 -> Some rightHandObject // cam 2
-            | 3 -> Some leftHandObject // controller 1
-            | 4 -> Some rightHandObject // controller 2
-            | _ -> None // error
+        let t = VrDriver.devices.[i].Type
+        match t with
+            | VrDeviceType.Other -> Some camObject
+            | VrDeviceType.Hmd -> None
+            | VrDeviceType.Controller -> numControllers <- numControllers + 1
+                                         if numControllers = 1 then Some leftHandObject else Some rightHandObject
+            | VrDeviceType.TrackingReference -> Some camObject
+            | _ -> None
+
 
     let sceneObj =
         {
