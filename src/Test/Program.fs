@@ -31,8 +31,6 @@ open Aardvark.VR
 //    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
 //    transact (fun () -> Mod.change firstObj.trafo (Trafo3d.Translation(V3d.OOO)))
 
-    
-
 [<EntryPoint>]
 let main argv =
     
@@ -63,6 +61,11 @@ let main argv =
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
+    let virtualHandEffect = Sg.effect [
+                                DefaultSurfaces.trafo |> toEffect
+                                DefaultSurfaces.uniformColor (MutableScene.virtualHandColor) |> toEffect
+                                DefaultSurfaces.simpleLighting |> toEffect
+                            ]
     let handEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         DefaultSurfaces.constantColor C4f.White |> toEffect
@@ -88,9 +91,16 @@ let main argv =
             canMove = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
+            model = handSg |> virtualHandEffect
+        }
+    let camObject : Object = 
+        {
+            id = newId()
+            canMove = false
+            boundingBox = handBox
+            trafo = Trafo3d.Identity
             model = handSg |> handEffect
         }
-    let camObject = rightHandObject
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
@@ -121,6 +131,7 @@ let main argv =
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastTrafo = Trafo3d.Identity
+            interactionType = VrInteractionTechnique.VirtualHand
         }
 
 

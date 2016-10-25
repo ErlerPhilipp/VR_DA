@@ -17,3 +17,14 @@ module Types =
         | Right = 2
         
     exception VrException of string
+
+    type VrInteractionTechnique =
+        | VirtualHand = 1
+        | GoGo = 2
+
+    let nextInteractionTechnique (it : VrInteractionTechnique) =
+        match it with
+            | VrInteractionTechnique.VirtualHand -> VrInteractionTechnique.GoGo
+            | VrInteractionTechnique.GoGo -> VrInteractionTechnique.VirtualHand
+            | _ -> VrInteractionTechnique.VirtualHand
+
