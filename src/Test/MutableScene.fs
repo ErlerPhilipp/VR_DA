@@ -153,6 +153,26 @@ module MutableScene =
             | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ | DeviceTouch _ | DevicePress _ | DeviceUntouch _ | DeviceRelease _ -> ()
             | _ -> printfn "%A" message
 
+        let virtualHandToGogoHandTrafo (t : Trafo3d) = 
+            let headPos = t.Forward.TransformPos V3d.Zero
+            let handPos = scene.viewTrafo.Backward.TransformPos V3d.Zero
+            let headToHand = headPos - handPos
+            //printfn "hand: %A, head: %A" (headPos) (handPos)
+            let headToHandDist = headToHand.Length
+                    
+            let linearExtensionLimit = 0.5
+
+            if headToHandDist < linearExtensionLimit then
+                t
+            else
+                let quadraticTermFactor = 200.0
+                let quadraticExtension = headToHandDist - linearExtensionLimit
+                let gogoAdditionalExtension = max 0.0 quadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
+                let gogoHandPosOffset = headToHand.Normalized * gogoAdditionalExtension
+                let gogoHandTrafo = t * Trafo3d.Translation(gogoHandPosOffset)
+                //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
+                gogoHandTrafo
+
         let scene =
             match message with
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
@@ -161,7 +181,7 @@ module MutableScene =
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
                     { scene with 
-                        controller2Object = {scene.controller2Object with trafo = t}
+                        controller2Object = {scene.controller2Object with trafo = virtualHandToGogoHandTrafo t}
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
                     { scene with 
@@ -177,7 +197,14 @@ module MutableScene =
 
         match message with
             | DevicePress(deviceId, _, t) when deviceId = assignedInputs.controller2Id ->
-                let worldLocation = t.Forward.C3.XYZ
+                
+                let trafo = 
+                    if deviceId = assignedInputs.controller2Id then
+                        scene.controller2Object.trafo
+                    else
+                        t
+                
+                let worldLocation = trafo.Forward.C3.XYZ
 
                 let pickedObjs = 
                     scene.things 
@@ -198,7 +225,7 @@ module MutableScene =
                     scene
                 else
                     { scene with 
-                        lastTrafo       = t
+                        lastTrafo       = trafo
                         activeObjects   = PersistentHashSet.union scene.activeObjects pickedObjs
                         things          = PersistentHashSet.difference scene.things pickedObjs
                     }
@@ -206,17 +233,23 @@ module MutableScene =
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 { scene with moveDirection = direction }
-            | DeviceMove(_, t) ->
+            | DeviceMove(deviceId, t) ->
+                let trafo = 
+                    if deviceId = assignedInputs.controller2Id then
+                        scene.controller2Object.trafo
+                    else
+                        t
+
                 if PersistentHashSet.isEmpty scene.activeObjects then
                     scene
                 else    
-                    let deltaTrafo = scene.lastTrafo.Inverse * t
+                    let deltaTrafo = scene.lastTrafo.Inverse * trafo
                     { scene with 
                         activeObjects =
                             scene.activeObjects |> PersistentHashSet.map (fun a ->
                                 { a with trafo = a.trafo * deltaTrafo }
                             ) 
-                        lastTrafo = t
+                        lastTrafo = trafo
                     }
                     
             | DeviceRelease(deviceId, _, _) when deviceId = assignedInputs.controller2Id ->

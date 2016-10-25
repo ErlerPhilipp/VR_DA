@@ -176,8 +176,8 @@ module NewVrStuff =
 
                     if timeRemaining > lastFrameTook then    
                         Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
-                    else
-                        printfn "long frame; %As %As" lastFrameTook timeRemaining
+//                    else
+//                        printfn "long frame; %As %As" lastFrameTook timeRemaining
 
                     do
                         let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
