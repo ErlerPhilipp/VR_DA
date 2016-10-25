@@ -26,11 +26,17 @@ module MutableScene =
             things            : pset<Object>
             viewTrafo         : Trafo3d
             lastTrafo         : Trafo3d
-            controllerObjects : list<Option<Object>>
-            moving            : bool
+            
+            cam1Object        : Object
+            cam2Object        : Object
+            controller1Object : Object
+            controller2Object : Object
+
             moveDirection     : V3d
         }
         
+    let assignedInputs = VrDriver.inputAssignment ()
+
     let mutable currentId = 0
     let newId() = 
         currentId <- currentId + 1
@@ -49,7 +55,11 @@ module MutableScene =
             mactiveObjects : cset<MObject>
             mthings : cset<MObject>
             mviewTrafo : ModRef<Trafo3d>
-            mcontrollerObjects : array<ModRef<Option<MObject>>>
+            
+            mcam1Object        : ModRef<MObject>
+            mcam2Object        : ModRef<MObject>
+            mcontroller1Object : ModRef<MObject>
+            mcontroller2Object : ModRef<MObject>
         }
 
     type Conversion private() =
@@ -66,7 +76,11 @@ module MutableScene =
                 mactiveObjects = CSet.ofSeq (PersistentHashSet.toSeq s.activeObjects |> Seq.map Conversion.Create)
                 mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
-                mcontrollerObjects = s.controllerObjects |> List.toArray |> Array.map (fun o -> o |> Option.map Conversion.Create |> Mod.init)
+
+                mcam1Object = s.cam1Object |> Conversion.Create |> Mod.init
+                mcam2Object = s.cam2Object |> Conversion.Create |> Mod.init
+                mcontroller1Object = s.controller1Object |> Conversion.Create |> Mod.init
+                mcontroller2Object = s.controller2Object |> Conversion.Create |> Mod.init
             }
 
         static member Update(m : MObject, o : Object) =
@@ -80,16 +94,11 @@ module MutableScene =
                 m.original <- s
 
                 m.mviewTrafo.Value <- s.viewTrafo
-                let controllers = s.controllerObjects |> List.toArray
-                for i in 0 .. m.mcontrollerObjects.Length-1 do
-                    let target = m.mcontrollerObjects.[i]
-                    match controllers.[i] with
-                        | Some d ->
-                            match target.Value with
-                                | Some ctrl -> Conversion.Update(ctrl, d)
-                                | None -> target.Value <- Some (Conversion.Create d)
-                        | None ->
-                            target.Value <- None
+                
+                Conversion.Update(m.mcam1Object.Value, s.cam1Object)
+                Conversion.Update(m.mcam2Object.Value, s.cam2Object)
+                Conversion.Update(m.mcontroller1Object.Value, s.controller1Object)
+                Conversion.Update(m.mcontroller2Object.Value, s.controller2Object)
 
                 let table = 
                     Seq.append m.mthings m.mactiveObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -141,27 +150,33 @@ module MutableScene =
 
     let update (scene : Scene) (message : Message) : Scene =
         match message with
-            | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ -> ()
+            | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ | DeviceTouch _ | DevicePress _ | DeviceUntouch _ | DeviceRelease _ -> ()
             | _ -> printfn "%A" message
 
         let scene =
             match message with
-                | DeviceMove(d, t) ->
+                | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                     { scene with 
-                        controllerObjects = scene.controllerObjects |> change d (fun o -> 
-                            match o with
-                                | Some o -> Some { o with trafo = t }
-                                | None -> None
-                        )
+                        controller1Object = {scene.controller1Object with trafo = t}
+                    }
+                | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
+                    { scene with 
+                        controller2Object = {scene.controller2Object with trafo = t}
+                    }
+                | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
+                    { scene with 
+                        cam1Object = {scene.cam1Object with trafo = t}
+                    }
+                | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
+                    { scene with 
+                        cam2Object = {scene.cam2Object with trafo = t}
                     }
                 | _ -> 
                     scene
 
 
         match message with
-            | DeviceTouch(1, _, t)  ->
-                { scene with moving = true }
-            | DevicePress(2, _, t)  ->
+            | DevicePress(deviceId, _, t) when deviceId = assignedInputs.controller2Id ->
                 let worldLocation = t.Forward.C3.XYZ
 
                 let pickedObjs = 
@@ -188,7 +203,7 @@ module MutableScene =
                         things          = PersistentHashSet.difference scene.things pickedObjs
                     }
                     
-            | DeviceMove(1, t) ->
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 { scene with moveDirection = direction }
             | DeviceMove(_, t) ->
@@ -204,9 +219,7 @@ module MutableScene =
                         lastTrafo = t
                     }
                     
-            | DeviceUntouch(1, _, t)  ->
-                { scene with moving = false }
-            | DeviceRelease(2, _, _) ->
+            | DeviceRelease(deviceId, _, _) when deviceId = assignedInputs.controller2Id ->
                 { scene with 
                     activeObjects = PersistentHashSet.empty
                     things = PersistentHashSet.union scene.activeObjects scene.things 
@@ -214,15 +227,25 @@ module MutableScene =
                 }
 
             | TimeElapsed(dt) ->
-                if scene.moving then
-                    let speed = 3.0
-                    let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * speed)
-                    { scene with
-                        // only move static things, keep active things like controllers
-                        things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp })
-                    }
-                else
-                    scene
+                let maxSpeed = 10.0
+                    
+                let mutable state = VRControllerState_t()
+                let axisPosition =
+                    if system.GetControllerState(uint32 assignedInputs.controller1Id, &state) then
+                        Some (V2d(state.[1].x, state.[1].y))
+                    else None
+
+                let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
+
+                let deathZone = 0.1
+                let axisWithDeathZone = clamp 0.0 1.0 (axisValue * (1.0 + deathZone) - deathZone)
+                //printfn "axisWithDeathZone: %A" axisWithDeathZone
+
+                let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
+                { scene with
+                    // only move static things, keep active things like controllers
+                    things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp })
+                }
 
             | UpdateViewTrafo trafo -> 
                 { scene with viewTrafo = trafo }
@@ -245,6 +268,7 @@ module MutableScene =
         let deviceCount = VrDriver.devices.Length
         let oldTrafos = Array.zeroCreate deviceCount
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
+
             perform (TimeElapsed dt)
             
             for i in 0 .. VrDriver.devices.Length-1 do
@@ -262,13 +286,15 @@ module MutableScene =
                 let axis = button - EVRButtonId.k_EButton_Axis0 |> int
                 let trafo = trafos.[deviceId]
 
+
+
                 match unbox<EVREventType> (int e.eventType) with
                     | EVREventType.VREvent_ButtonPress -> perform(DevicePress(deviceId, axis, trafo))
                     | EVREventType.VREvent_ButtonUnpress -> perform(DeviceRelease(deviceId, axis, trafo))
                     | EVREventType.VREvent_ButtonTouch -> perform(DeviceTouch(deviceId, axis, trafo))
                     | EVREventType.VREvent_ButtonUntouch -> perform(DeviceUntouch(deviceId, axis, trafo))
-                    | _ -> ()
-
+                    | _ -> () //printfn "%A" (e.eventType)
+    
             ()
 
         win.Update <- update
@@ -278,9 +304,10 @@ module MutableScene =
                 |> Sg.dynamic
                 |> Sg.trafo t.mtrafo
 
+        let visibleDevices = [mscene.mcontroller1Object.Value; mscene.mcontroller2Object.Value; mscene.mcam1Object.Value; mscene.mcam2Object.Value]
         let objects = 
-            mscene.mcontrollerObjects |> ASet.ofArray |> ASet.chooseM (fun m -> m :> IMod<_>) |> ASet.map toSg
-                |> Sg.set
+            visibleDevices |> List.map toSg
+                |> Sg.ofList
                 |> Sg.shader {
                     do! DefaultSurfaces.trafo
                     do! DefaultSurfaces.vertexColor

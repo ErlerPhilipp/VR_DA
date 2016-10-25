@@ -61,3 +61,21 @@ module VrDevice =
         member x.Axis = axis
         member x.DeviceToWorld = deviceToWorld
         member x.WorldToDevice = worldToDevice
+        
+type InputDevices =
+    {
+        hmd : VrDevice
+        controller1 : VrDevice
+        controller2 : VrDevice
+        cam1 : VrDevice
+        cam2 : VrDevice
+    }
+        
+type InputAssignment =
+    {
+        hmdId : int
+        controller1Id : int
+        controller2Id : int
+        cam1Id : int
+        cam2Id : int
+    }

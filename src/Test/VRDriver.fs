@@ -37,6 +37,8 @@ module VrDriver =
         system.GetRecommendedRenderTargetSize(&width,&height)
         V2i(int width, int height)
         
+    
+
     [<CompiledName("Devices")>]
     let devices =
         [|
@@ -44,4 +46,34 @@ module VrDriver =
                 let deviceType = system.GetTrackedDeviceClass i
                 if deviceType <> ETrackedDeviceClass.Invalid then
                     yield VrDevice(system, toDeviceType deviceType, int i)
-        |] |> Array.sortBy (fun x -> x.Type)
+        |]
+
+    let inputDevices = 
+        let controllers = devices |> Array.filter(fun d -> d.Type = VrDeviceType.Controller)
+        let cams = devices |> Array.filter(fun d -> d.Type = VrDeviceType.TrackingReference)
+        {
+            hmd = devices |> Array.find(fun d -> d.Type = VrDeviceType.Hmd)
+            controller1 = controllers.[0]
+            controller2 = controllers.[1]
+            cam1 = cams.[0]
+            cam2 = cams.[1]
+        }
+
+    let inputAssignment () =
+        // todo regrab devices
+        let hmdIndex = devices |> Array.findIndex (fun d -> d.Type = VrDeviceType.Hmd)
+        let controllers = devices |> Array.mapi (fun index d -> index,d) |> Array.filter (fun (i,d) -> d.Type = VrDeviceType.Controller)
+        match controllers with
+            | [|(id1,_); (id2,_)|] -> 
+                let cams = devices |> Array.mapi (fun index d -> index,d) |> Array.filter (fun (i,d) -> d.Type = VrDeviceType.TrackingReference)
+                match cams with
+                    | [|(camid1,_); (camid2,_)|] -> 
+                    {
+                        hmdId = hmdIndex
+                        controller1Id = id1
+                        controller2Id = id2
+                        cam1Id = camid1
+                        cam2Id = camid2
+                    }
+                    | _ -> failwithf "could not get input assignment. need exactly 2 cams, was: %d" cams.Length
+            | _ -> failwithf "could not get input assignment. need exactly 2 controllers, was: %d" controllers.Length

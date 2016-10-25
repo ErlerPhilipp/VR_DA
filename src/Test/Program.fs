@@ -109,25 +109,15 @@ let main argv =
         toObjects true manipulableModels @ 
         toObjects false staticModels
         
-    let mutable numControllers = 0
-
-    let getControllerObject (i : int) =
-        let t = VrDriver.devices.[i].Type
-        match t with
-            | VrDeviceType.Other -> Some camObject
-            | VrDeviceType.Hmd -> None
-            | VrDeviceType.Controller -> numControllers <- numControllers + 1
-                                         if numControllers = 1 then Some leftHandObject else Some rightHandObject
-            | VrDeviceType.TrackingReference -> Some camObject
-            | _ -> None
-
 
     let sceneObj =
         {
-            controllerObjects = List.init VrDriver.devices.Length getControllerObject
+            cam1Object = camObject
+            cam2Object = camObject
+            controller1Object = leftHandObject
+            controller2Object = rightHandObject
             activeObjects = PersistentHashSet.empty
             things = PersistentHashSet.ofList objects
-            moving = false
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastTrafo = Trafo3d.Identity
