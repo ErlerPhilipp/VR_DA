@@ -90,6 +90,7 @@ NUGET
   remote: http://api.nuget.org/v3/index.json
   specs:
     AssimpNet (3.3.1)
+    BulletSharp (0.9.0)
     DevILSharp (0.0.13)
     FSharp.Quotations.Evaluator (1.0.7)
     Microsoft.NETCore.Platforms (1.0.1) - framework: net10, net11, net20, net30, net35, net40, net40-full
