@@ -14,7 +14,7 @@ module MutableScene =
     type Object =
         {
             id              : int
-            canMove         : bool
+            isManipulable   : bool
             boundingBox     : Box3d
             trafo           : Trafo3d
             model           : ISg
@@ -230,7 +230,7 @@ module MutableScene =
                     scene.things 
                         |> PersistentHashSet.toList 
                         |> List.choose (fun o -> 
-                            if o.canMove then
+                            if o.isManipulable then
                                 let modelLocation = o.trafo.Backward.TransformPos worldLocation
                                 if o.boundingBox.Contains modelLocation then
                                     Some o
@@ -308,7 +308,7 @@ module MutableScene =
 
 
 
-    let createScene (initialScene : Scene) (win : NewVrStuff.VrWindow) =
+    let createScene (initialScene : Scene) (win : VrWindow) =
         let mutable scene = initialScene
         let mscene = Conversion.Create initialScene
 

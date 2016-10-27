@@ -11,7 +11,7 @@ open Aardvark.SceneGraph
 open Aardvark.VR
 
 [<AutoOpen>]
-module NewVrStuff =
+module VrWindow =
     open System
     open System.Threading
     open Aardvark.Rendering.GL
