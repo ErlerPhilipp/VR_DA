@@ -31,31 +31,26 @@ open Aardvark.VR
 //    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
 //    transact (fun () -> Mod.change firstObj.trafo (Trafo3d.Translation(V3d.OOO)))
 
+
 [<EntryPoint>]
 let main argv =
-    
     Ag.initialize()
     Aardvark.Init()
 
-// Hello World test
-//    VRTest.VRTest.helloWorld () |> ignore
-//    System.Environment.Exit 0
-
     use app = new OpenGlApplication()
-    
     let vrWin = VrWindow(app.Runtime, true)
 
     let staticModels =
         [
-            @"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01
+            //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite
         ]
 
     let manipulableModels =
         [
-            @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 0.0, 1.0)
-            @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0)
+            @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Scale(1.0,4.0,1.0) * Trafo3d.Translation(0.0, 5.0, 0.0), Mass 80.0f
+           // @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0), Mass 100.0f
             //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
-            @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
+           // @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f
         ]
         
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
@@ -76,48 +71,79 @@ let main argv =
                         DefaultSurfaces.vertexColor |> toEffect
                         DefaultSurfaces.thickLine |> toEffect
                     ]
+    let groundEffect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor C4f.Gray80 |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
 
     let leftHandObject : Object = 
         {
             id = newId()
-            canMove = false
+            isManipulable = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
+            collisionShape = None
+            model2World = Trafo3d.Identity
+            mass = Infinite
         }
     let rightHandObject : Object = 
         {
             id = newId()
-            canMove = false
+            isManipulable = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
+            collisionShape = None
+            model2World = Trafo3d.Identity
+            mass = Infinite
         }
     let camObject : Object = 
         {
             id = newId()
-            canMove = false
+            isManipulable = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
+            collisionShape = None
+            model2World = Trafo3d.Identity
+            mass = Infinite
+        }
+    let groundObject : Object = 
+        {
+            id = newId()
+            isManipulable = false
+            boundingBox = handBox
+            trafo = Trafo3d.Identity
+            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2))) |> groundEffect
+
+            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> Shape.Plane )
+            model2World = Trafo3d.Identity
+            mass = Infinite
         }
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
-            l |> List.mapi (fun i (file, trafo) ->
-                    let scene = file |> Loader.Assimp.load 
-                    let sg = scene |> Sg.AdapterNode :> ISg
+            l |> List.mapi (fun i (file, trafo, mass) ->
+                    let assimpScene = file |> Loader.Assimp.load 
+                    let firstMesh = assimpScene.meshes |> Array.take 1
+                    let sg = assimpScene |> Sg.AdapterNode :> ISg
                     {
                         id = newId()
-                        canMove = canMove
-                        boundingBox = scene.bounds
+                        isManipulable = canMove
+                        boundingBox = assimpScene.bounds
                         trafo = trafo
                         model = sg
+                        mass = mass
+                        model2World = trafo
+                        collisionShape = Some <| Shape.Box assimpScene.bounds
                     }
                 )
 
         toObjects true manipulableModels @ 
-        toObjects false staticModels
+        toObjects false staticModels 
+        @  [groundObject]
         
 
     let sceneObj =

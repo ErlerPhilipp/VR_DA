@@ -7,9 +7,10 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
+
 [<AutoOpen>]
-module MutableScene =
-    
+module ImmutableScene =
+
     type pset<'a> = PersistentHashSet<'a>
     type Object =
         {
@@ -18,6 +19,9 @@ module MutableScene =
             boundingBox     : Box3d
             trafo           : Trafo3d
             model           : ISg
+            mass            : Mass
+            model2World     : Trafo3d
+            collisionShape  : Option<Shape> 
         }
 
     type Scene =
@@ -36,6 +40,142 @@ module MutableScene =
 
             moveDirection     : V3d
         }
+
+module Physics =
+
+    open BulletSharp
+    open BulletSharp.Math
+    
+    type PhysicsBody = 
+        { 
+            mutable original : Object
+            body : Option<BulletSharp.RigidBody>
+            innerTrafo : Trafo3d
+            inertia : Vector3
+        }
+
+    type PhysicsWorld =
+        {
+            mutable original : Scene
+            
+            collisionConf    : DefaultCollisionConfiguration
+            collisionDisp    : CollisionDispatcher
+            broadPhase       : DbvtBroadphase
+            dynamicsWorld    : DiscreteDynamicsWorld
+
+            mutable bodies   : cset<PhysicsBody>
+        }
+
+    let mutable currentWorld = None
+
+
+    // Replay changes into physics world....
+    type Conversion private() =
+        static member Create(o : Object, scene : PhysicsWorld) : PhysicsBody =
+            // aha we have new object, tell bullet we have a new object
+            match o.collisionShape with
+                | Some collisionShape -> 
+                    let inner, cshape = toCollisionShape collisionShape Trafo3d.Identity // o.model2World
+                    //let inner = Trafo3d.Scale(1.0, 4.0, 1.0) // Trafo3d.Identity
+                    let state = new BulletSharp.DefaultMotionState(toMatrix (inner.Inverse * o.trafo))
+
+                    match o.mass with
+                        | Infinite ->
+                            let info = new BulletSharp.RigidBodyConstructionInfo(0.0f, state, cshape)
+                            let rigidBody = new BulletSharp.RigidBody(info)
+                            scene.dynamicsWorld.AddCollisionObject(rigidBody)
+                            { 
+                                original = o
+                                body = Some rigidBody 
+                                inertia = Vector3.Zero
+                                innerTrafo = inner.Inverse
+                            }
+                        | Mass m -> 
+                            let inertia = cshape.CalculateLocalInertia(m)
+                            let info = new BulletSharp.RigidBodyConstructionInfo(m, state, cshape, inertia)
+                            let rigidBody = new BulletSharp.RigidBody(info)
+                            scene.dynamicsWorld.AddRigidBody(rigidBody)
+
+                            // TODO: kommt auch nachm pick
+                            printfn "r0 %A" (inner.Forward.R0)
+                            printfn "r1 %A" (inner.Forward.R1)
+                            printfn "r2 %A" (inner.Forward.R2)
+                            printfn "r3 %A" (inner.Forward.R3)
+
+                            { 
+                                original = o
+                                body = Some rigidBody 
+                                inertia = inertia
+                                innerTrafo = inner
+                            }
+
+                | None -> { original = o; body = None; innerTrafo = Trafo3d.Identity; inertia = Vector3.Zero }
+
+        static member Create(s : Scene) : PhysicsWorld =
+            let collConf = new DefaultCollisionConfiguration()
+            let dispatcher = new CollisionDispatcher(collConf)
+            let broad = new DbvtBroadphase()
+            let dynWorld = new DiscreteDynamicsWorld(dispatcher, broad, null, collConf)
+            dynWorld.Gravity <- Vector3(0.0f, -1.0f, 0.0f)
+            let scene ={ original = s; collisionConf = collConf; collisionDisp = dispatcher;  broadPhase = broad; dynamicsWorld = dynWorld; bodies = CSet.empty }
+            scene.bodies <- CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map (fun o -> Conversion.Create(o,scene)))
+            scene
+
+        static member Update(m : PhysicsBody, o : Object) =
+            if not (System.Object.ReferenceEquals(m.original, o)) then
+                match o.collisionShape, m.body with
+                    | Some collisionShape, Some body -> 
+                        //printfn "%A" (o.trafo.Forward.TransformPos(V3d.OOO))
+                        body.SetMassProps(Mass.toFloat o.mass, m.inertia)
+
+                        body.WorldTransform <- toMatrix (m.innerTrafo * o.trafo)
+                        m.original <- o
+                    | _ -> failwith "not yet implemented...."
+
+        static member Update(m : PhysicsWorld, s : Scene) =
+            if not (System.Object.ReferenceEquals(m.original, s)) then
+                m.original <- s
+                
+                let table = 
+                    m.bodies |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                
+                for t in s.things |> PersistentHashSet.toSeq do
+                    match table.TryRemove t.id with
+                        | (true, mo) -> 
+                            Conversion.Update(mo, t)
+                        | _ ->
+                            let mo = Conversion.Create(t,m)
+                            m.bodies.Add mo |> ignore
+
+                m.bodies.ExceptWith table.Values
+
+
+    let stepSimulation (dt : System.TimeSpan) (s : Scene) : Scene =
+        match currentWorld with
+            | Some world -> 
+                Conversion.Update(world,s)
+                world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds) |> ignore
+
+                let objects =
+                    [
+                        for b in world.bodies do
+                            match b.body with
+                                | Some body -> 
+                                    yield { b.original with trafo = b.innerTrafo.Inverse * toTrafo body.WorldTransform}
+                                | None -> 
+                                    yield b.original
+                    ]
+
+                { s with
+                    things = PersistentHashSet.ofList objects
+                }
+            | None -> 
+                currentWorld <- Conversion.Create s |> Some
+                s
+
+[<AutoOpen>]
+module MutableScene =
+    
         
     let assignedInputs = VrDriver.inputAssignment ()
 
@@ -54,9 +194,9 @@ module MutableScene =
     type MScene =
         {
             mutable original : Scene
-            mactiveObjects : cset<MObject>
-            mthings : cset<MObject>
-            mviewTrafo : ModRef<Trafo3d>
+            mactiveObjects   : cset<MObject>
+            mthings          : cset<MObject>
+            mviewTrafo       : ModRef<Trafo3d>
             
             mcam1Object        : ModRef<MObject>
             mcam2Object        : ModRef<MObject>
@@ -303,9 +443,7 @@ module MutableScene =
             | UpdateViewTrafo trafo -> 
                 { scene with viewTrafo = trafo }
 
-            | _ ->
-                scene
-
+            | _ -> scene
 
 
     let createScene (initialScene : Scene) (win : VrWindow) =
@@ -322,7 +460,13 @@ module MutableScene =
         let oldTrafos = Array.zeroCreate deviceCount
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
 
+            transact (fun () -> 
+                scene <- Physics.stepSimulation dt scene 
+                Conversion.Update(mscene,scene)
+            )
+
             perform (TimeElapsed dt)
+
             
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
@@ -374,5 +518,3 @@ module MutableScene =
 
         Sg.ofList [sgs; objects]
             |> Sg.viewTrafo mscene.mviewTrafo
-
-

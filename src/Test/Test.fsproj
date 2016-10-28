@@ -60,8 +60,8 @@
     <Compile Include="VrDevice.fs" />
     <Compile Include="VrDriver.fs" />
     <Compile Include="VrWindow.fs" />
-    <Compile Include="MutableScene.fs" />
     <Compile Include="Bullet.fs" />
+    <Compile Include="MutableScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
