@@ -10,11 +10,13 @@ open Aardvark.SceneGraph
 open System
 
 type Shape =
-    | Box of Box3d
-    | Sphere of Sphere3d
-    | Cylinder of Cylinder3d
-    | Plane of Plane3d
-    | Mesh of IndexedGeometry
+    | Box            of size :  V3d
+    | Sphere         of radius : float
+    | Cylinder       of radius : float * height : float
+    | Plane          of Plane3d
+    | Mesh           of IndexedGeometry
+    | TriangleMesh   of Triangle3d[]
+    | Compound       of list<Trafo3d * Shape>
 
         
 type Mass = Infinite | Mass of float32
@@ -54,27 +56,40 @@ module BulletConversions =
     let toVector3 (v : V3d) =
         Vector3(float32 v.X, float32 v.Y, float32 v.Z)
         
-    let toCollisionShape (s : Shape) (modelTrafo : Trafo3d) : Trafo3d * CollisionShape =
+    let rec toCollisionShape (s : Shape) : CollisionShape =
         match s with
-            | Box b ->
-                let b = b.Transformed(modelTrafo)
-                let trafo = Trafo3d.Translation(b.Center) 
-                let shape = new BoxShape(b.Size * 0.5 |> toVector3) :> CollisionShape
-                trafo, shape
+            | Box size ->
+                let shape = new BoxShape(size * 0.5 |> toVector3) :> CollisionShape
+                shape
 
-            | Sphere s ->
-                let trafo = Trafo3d.Translation(modelTrafo.Forward.TransformPos(s.Center))
-                let shape = new SphereShape(float32 (modelTrafo.Forward.TransformDir(V3d.III).Length * s.Radius)) :> CollisionShape
-                trafo, shape
+            | Sphere radius ->
+                let shape = new SphereShape(float32 radius) :> CollisionShape
+                shape
 
-            | Cylinder c ->
-                let trafo = Trafo3d.FromNormalFrame(modelTrafo.Forward.TransformPos(c.P0), modelTrafo.Forward.TransformDir(c.Axis.Direction.Normalized))
-                let shape = new CylinderShapeZ(float32 c.Radius, float32 c.Radius, float32 (c.Height / 2.0)) :> CollisionShape
-                trafo, shape
+            | Cylinder(radius, height) ->
+                let shape = new CylinderShapeZ(float32 radius, float32 radius, float32 (0.5 * height)) :> CollisionShape
+                shape
 
             | Plane p ->
                 let shape = new StaticPlaneShape(toVector3 p.Normal, float32 p.Distance) :> CollisionShape
-                Trafo3d.Identity, shape
+                shape
+
+            | Compound inner -> 
+                let co = new BulletSharp.CompoundShape()
+                for (trafo,shape) in inner do
+                    let shape = toCollisionShape shape
+                    co.AddChildShape(toMatrix trafo, shape)
+                co :> _
+
+            | TriangleMesh triangles ->
+                let mesh = new TriangleMesh()
+                for t in triangles do
+                    mesh.AddTriangle(toVector3 t.P0, toVector3 t.P1, toVector3 t.P2)
+
+                let shape = new BvhTriangleMeshShape(mesh, true, true)
+                shape.BuildOptimizedBvh()
+                shape :> CollisionShape
+
 
             | Mesh m ->
               
@@ -136,25 +151,24 @@ module BulletConversions =
 
 
                 let mesh = new TriangleMesh()
-                
-                let positions = positions |> Array.map (fun p -> V3f(modelTrafo.Forward.TransformPos(V3d(p))))
 
                 let positions = positions.UnsafeCoerce<Vector3>()
                 if isNull triangles then
-                    for i in 0 .. 3 .. positions.Length-1 do
+                    for i in 0 .. 3 .. positions.Length-3 do
                         mesh.AddTriangle(positions.[i + 0], positions.[i + 1], positions.[i + 2])
 
                 else
                     let ids = positions |> Array.map (fun v -> mesh.FindOrAddVertex(v, false))
-                    for i in 0 .. 3 .. triangles.Length-1 do
+                    for i in 0 .. 3 .. triangles.Length-3 do
                         let i0 = ids.[triangles.[i + 0]]
                         let i1 = ids.[triangles.[i + 1]]
                         let i2 = ids.[triangles.[i + 2]]
                         mesh.AddTriangleIndices(i0, i1, i2)
 
-                let shape = new BvhTriangleMeshShape(mesh, true, true) :> CollisionShape
+                let shape = new BvhTriangleMeshShape(mesh, true, true)
 
-                Trafo3d.Identity, shape
+
+                shape :> CollisionShape
 
 //
 //[<AutoOpen>]
