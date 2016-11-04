@@ -4,8 +4,10 @@ open Valve.VR
 
 open Aardvark.Base
 
-[<AutoOpen>]
 module VrDriver =
+    open VrTypes
+    open VrConversions
+
     let inline fail fmt = 
         Printf.kprintf (fun str -> 
             Log.error "%s" str
@@ -45,7 +47,7 @@ module VrDriver =
             for i in 0u .. OpenVR.k_unMaxTrackedDeviceCount-1u do
                 let deviceType = system.GetTrackedDeviceClass i
                 if deviceType <> ETrackedDeviceClass.Invalid then
-                    yield VrDevice(system, toDeviceType deviceType, int i)
+                    yield VrDevice.VrDevice(system, toDeviceType deviceType, int i)
         |]
 
     let getInputDevices () = 

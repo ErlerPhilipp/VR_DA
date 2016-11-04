@@ -4,8 +4,7 @@ open Valve.VR
 
 open Aardvark.Base
 
-[<AutoOpen>]
-module Conversions =
+module VrConversions =
     type HmdMatrix44_t with
         member x.Trafo =
             let t = M44f(x.m0,x.m1,x.m2,x.m3,x.m4,x.m5,x.m6,x.m7,x.m8,x.m9,x.m10,x.m11,x.m12,x.m13,x.m14,x.m15) 
@@ -24,3 +23,11 @@ module Conversions =
             let t = M44d.op_Explicit(m44f.Transposed)
             Trafo3d(t,t.Inverse)
 
+    let toDeviceType (c : ETrackedDeviceClass) =
+        match c with
+            | ETrackedDeviceClass.HMD -> VrTypes.VrDeviceType.Hmd
+            | ETrackedDeviceClass.Controller -> VrTypes.VrDeviceType.Controller
+            | ETrackedDeviceClass.TrackingReference -> VrTypes.VrDeviceType.TrackingReference
+            | _ -> VrTypes.VrDeviceType.Other
+
+    let flip = Trafo3d.FromBasis(V3d.IOO, -V3d.OOI, V3d.OIO, V3d.Zero)

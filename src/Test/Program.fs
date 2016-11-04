@@ -18,6 +18,8 @@ open Aardvark.SceneGraph.IO
 open Aardvark.SceneGraph.Semantics
 open Aardvark.VR
 
+open LogicalScene
+
 // mod bind example:
 //let flag = Mod.init true
 //let heavyComp = Mod.init 20
@@ -38,7 +40,7 @@ let main argv =
     Aardvark.Init()
 
     use app = new OpenGlApplication()
-    let vrWin = VrWindow(app.Runtime, true)
+    let vrWin = VrWindow.VrWindow(app.Runtime, true)
 
     let staticModels =
         [
@@ -58,7 +60,7 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
-                                DefaultSurfaces.uniformColor (MutableScene.virtualHandColor) |> toEffect
+                                DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
                                 DefaultSurfaces.simpleLighting |> toEffect
                             ]
     let handEffect = Sg.effect [
@@ -77,7 +79,7 @@ let main argv =
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
 
-    let leftHandObject : Object = 
+    let leftHandObject : LogicalScene.Object = 
         {
             id = newId()
             isManipulable = false
@@ -89,7 +91,7 @@ let main argv =
             collisionShape = None
             mass = Infinite
         }
-    let rightHandObject : Object = 
+    let rightHandObject : LogicalScene.Object = 
         {
             id = newId()
             isManipulable = false
@@ -101,7 +103,7 @@ let main argv =
             collisionShape = None
             mass = Infinite
         }
-    let camObject : Object = 
+    let camObject : LogicalScene.Object = 
         {
             id = newId()
             isManipulable = false
@@ -113,7 +115,7 @@ let main argv =
             collisionShape = None
             mass = Infinite
         }
-    let groundObject : Object = 
+    let groundObject : LogicalScene.Object = 
         {
             id = newId()
             isManipulable = false
@@ -206,12 +208,12 @@ let main argv =
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastTrafo = Trafo3d.Identity
-            interactionType = VrInteractionTechnique.VirtualHand
+            interactionType = VrTypes.VrInteractionTechnique.VirtualHand
         }
 
 
     let scene =
-        MutableScene.createScene sceneObj vrWin
+        GraphicsScene.createScene sceneObj vrWin
             |> Sg.effect [
                 DefaultSurfaces.trafo |> toEffect
                 DefaultSurfaces.constantColor C4f.White |> toEffect

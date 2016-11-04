@@ -18,16 +18,14 @@ type Shape =
     | TriangleMesh   of Triangle3d[]
     | Compound       of list<Trafo3d * Shape>
 
-        
 type Mass = Infinite | Mass of float32
     
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Mass =
     let toFloat =
         function | Mass m   -> m
-                 | Infinite -> 0.0f
+                    | Infinite -> 0.0f
 
-[<AutoOpen>]
 module BulletConversions =
         
     let toTrafo (m : Matrix) =
@@ -169,135 +167,3 @@ module BulletConversions =
 
 
                 shape :> CollisionShape
-
-//
-//[<AutoOpen>]
-//module Bullet =
-//
-//    type Body(shape : Shape, trafo : IMod<Trafo3d>, mass : float, body : RigidBody) =
-//        member x.Shape = shape
-//        member x.Trafo = trafo
-//        member x.Mass = mass
-//
-//        member x.IsStatic = trafo.IsConstant
-//
-//    type World(time : IMod<DateTime>) =
-//        inherit Mod.AbstractMod<int>()
-//
-//        let config = new DefaultCollisionConfiguration()
-//        let disp = new CollisionDispatcher(config)
-//        let broad = new DbvtBroadphase()
-//
-//        let sw = System.Diagnostics.Stopwatch()
-//
-//        let sim = new DiscreteDynamicsWorld(disp, broad, null, config)
-//        do sim.Gravity <- Vector3(0.0f, -0.0f, 0.0f)
-//
-//
-//        let bodies : cset<Body> = CSet.empty
-//
-//
-//        member x.Gravity
-//            with get() = toV3d sim.Gravity
-//            and set v = sim.Gravity <- toVector3 v
-//
-//        override x.Compute() =
-//            time.GetValue x |> ignore
-//            let res = sim.StepSimulation(float32 sw.Elapsed.TotalSeconds)
-//            sw.Restart()
-//            res
-//
-//        member x.AddBody(trafo : Trafo3d, shape : Shape, mass : float) =
-//            let inner, cshape = failwith ""//toCollisionShape shape
-//            let state = new DefaultMotionState(toMatrix (inner * trafo))
-//            let info = new RigidBodyConstructionInfo(float32 mass, state, cshape, cshape.CalculateLocalInertia(float32 mass))
-//            let body = new BulletSharp.RigidBody(info)
-//            sim.AddRigidBody(body)
-//            
-//            let trafo = 
-//                x |> Mod.map (fun _ ->
-//                    let current = body.WorldTransform |> toTrafo
-//                    inner.Inverse * current
-//                )
-//
-//            let body = Body(shape, trafo, mass, body)
-//            transact (fun () -> bodies.Add(body) |> ignore)
-//            body
-//
-//        member x.AddStatic(trafo : Trafo3d, shape : Shape) =
-//            let inner, cshape = failwith ""//toCollisionShape shape
-//            
-//            let state = new DefaultMotionState(toMatrix (inner * trafo))
-//            let info = new RigidBodyConstructionInfo(0.0f, state, cshape)
-//            let body = new BulletSharp.RigidBody(info)
-//            sim.AddCollisionObject(body)
-//            let body = Body(shape, Mod.constant trafo, Double.PositiveInfinity, body)
-//            transact (fun () -> bodies.Add(body) |> ignore)
-//            body
-//
-//        member x.Bodies = bodies :> aset<_>
-//
-//        
-//module BulletSg =
-//    let private red = Mod.constant C4b.Red
-//    let private white = Mod.constant C4b.White
-//
-//    let world (w : World) =
-//        let objects = 
-//            w.Bodies |> ASet.map (fun b ->
-//                let trafo = b.Trafo
-//
-//                let color =
-//                    if b.IsStatic then white
-//                    else red
-//
-//                let geometry = 
-//                    match b.Shape with
-//                        | Box b -> 
-//                            Sg.box color (Mod.constant b)
-//
-//                        | Plane p -> 
-//                            Sg.fullScreenQuad
-//                                |> Sg.scale 100.0
-//                                |> Sg.vertexBufferValue DefaultSemantic.Colors (color |> Mod.map (fun c -> c.ToC4f() |> V4f))
-//
-//                        | Cylinder c ->
-//                            Sg.cylinder 20 color (Mod.constant c.Radius) (Mod.constant c.Height)
-//                                    
-//                                |> Sg.transform (Trafo3d.Translation (V3d(0.0, 0.0, -c.Height / 2.0)) * Trafo3d.Translation c.Center)
-//
-//
-//                        | Sphere s ->
-//                            Sg.sphere 5 color (Mod.constant s.Radius)
-//                                |> Sg.transform (Trafo3d.Translation s.Center)
-//
-//                        | Mesh m ->
-//                            Sg.ofIndexedGeometry m
-//
-//
-//                Sg.trafo trafo geometry
-//            )
-//
-//        Sg.set objects
-//    
-//    let init(deltaTime : IMod<DateTime>) =
-//
-//        let w = Bullet.World(deltaTime)
-//        let r = Random()
-//        let bounds = Box3d.FromCenterAndSize(V3d(0.0, 0.0, 5.0), V3d(2.0, 2.0, 2.0))
-//        let randomPosition() =
-//            bounds.Min + bounds.Size * V3d(r.NextDouble(), r.NextDouble(), r.NextDouble())
-//
-//        let box = Box3d.FromCenterAndSize(V3d.Zero, V3d.III)
-//        for i in 1 .. 100 do   
-//            let initial = randomPosition() |> Trafo3d.Translation
-//            w.AddBody(initial, Box box, 0.5) |> ignore
-//
-//        w.AddBody(Trafo3d.Translation(0.0, 0.0, 10.0), Sphere(Sphere3d(V3d.Zero, 1.0)), 0.5) |> ignore
-//        w.AddBody(Trafo3d.Translation(0.5, 0.0, 25.0), Sphere(Sphere3d(V3d.Zero, 1.0)), 0.5) |> ignore
-//
-//        w.AddStatic(Trafo3d.Identity, Plane Plane3d.ZPlane) |> ignore
-//
-//        w.AddStatic(Trafo3d.Translation(0.0, 0.0, 15.0), Box box) |> ignore
-//
-//        ()

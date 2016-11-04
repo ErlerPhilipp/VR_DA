@@ -53,15 +53,16 @@
     <Compile Include="HelloWorld.fs" />
     <None Include="App.config" />
     <None Include="paket.references" />
-    <Compile Include="Conversions.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="Translations.fs" />
-    <Compile Include="VRAxis.fs" />
+    <Compile Include="VrTypes.fs" />
+    <Compile Include="VrConversions.fs" />
+    <Compile Include="VrAxis.fs" />
     <Compile Include="VrDevice.fs" />
     <Compile Include="VrDriver.fs" />
     <Compile Include="VrWindow.fs" />
-    <Compile Include="Bullet.fs" />
-    <Compile Include="MutableScene.fs" />
+    <Compile Include="BulletConversions.fs" />
+    <Compile Include="LogicalScene.fs" />
+    <Compile Include="PhysicsScene.fs" />
+    <Compile Include="GraphicsScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

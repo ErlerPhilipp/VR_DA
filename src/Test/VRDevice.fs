@@ -6,8 +6,9 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.VR
 
-[<AutoOpen>]
 module VrDevice =
+    open VrTypes
+    open VrConversions
 
     type VrDevice(system : CVRSystem, deviceType : VrDeviceType, index : int) =
     
@@ -31,7 +32,7 @@ module VrDevice =
                 for i in 0..4 do
                     let t = getInt (ETrackedDeviceProperty.Prop_Axis0Type_Int32 + unbox i) |> unbox<EVRControllerAxisType>
                     if t <> EVRControllerAxisType.k_eControllerAxis_None then
-                        yield VrAxis(system, t, index, i)
+                        yield VrAxis.VrAxis(system, t, index, i)
             |]
 
     
@@ -69,11 +70,11 @@ module VrDevice =
         
 type InputDevices =
     {
-        hmd : VrDevice
-        controller1 : VrDevice
-        controller2 : VrDevice
-        cam1 : VrDevice
-        cam2 : VrDevice
+        hmd : VrDevice.VrDevice
+        controller1 : VrDevice.VrDevice
+        controller2 : VrDevice.VrDevice
+        cam1 : VrDevice.VrDevice
+        cam2 : VrDevice.VrDevice
     }
         
 type InputAssignment =

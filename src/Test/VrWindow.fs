@@ -10,7 +10,6 @@ open Aardvark.Rendering.GL
 open Aardvark.SceneGraph
 open Aardvark.VR
 
-[<AutoOpen>]
 module VrWindow =
     open System
     open System.Threading
@@ -18,6 +17,7 @@ module VrWindow =
     open OpenTK.Graphics
     open OpenTK.Graphics.OpenGL4
 
+    open VrConversions
 
     type BlitWindow(b : ref<Framebuffer>, c : ref<Framebuffer>) =
         inherit OpenTK.GameWindow(

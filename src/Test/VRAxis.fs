@@ -5,8 +5,8 @@ open Valve.VR
 open Aardvark.Base
 open Aardvark.Base.Incremental
 
-[<AutoOpen>]
 module VrAxis =
+    open VrTypes
 
     type VrAxis(system : CVRSystem, axisType : EVRControllerAxisType, deviceIndex : int, index : int) =
     
