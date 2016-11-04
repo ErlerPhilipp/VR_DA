@@ -48,7 +48,7 @@ module VrDriver =
                     yield VrDevice(system, toDeviceType deviceType, int i)
         |]
 
-    let inputDevices = 
+    let getInputDevices () = 
         let controllers = devices |> Array.filter(fun d -> d.Type = VrDeviceType.Controller)
         let cams = devices |> Array.filter(fun d -> d.Type = VrDeviceType.TrackingReference)
         {
@@ -59,7 +59,7 @@ module VrDriver =
             cam2 = cams.[1]
         }
 
-    let inputAssignment () =
+    let getInputAssignment () =
         // todo regrab devices
         let hmdIndex = devices |> Array.findIndex (fun d -> d.Type = VrDeviceType.Hmd)
         let controllers = devices |> Array.mapi (fun index d -> index,d) |> Array.filter (fun (i,d) -> d.Type = VrDeviceType.Controller)
@@ -77,3 +77,24 @@ module VrDriver =
                     }
                     | _ -> failwithf "could not get input assignment. need exactly 2 cams, was: %d" cams.Length
             | _ -> failwithf "could not get input assignment. need exactly 2 controllers, was: %d" controllers.Length
+        
+    let assignedInputs = getInputAssignment ()
+    let inputDevices = getInputDevices ()
+
+    let updateInputDevices () =
+
+        let mutable pose = TrackedDevicePose_t()
+        let mutable gamePose = TrackedDevicePose_t()
+            
+        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.hmdId), &pose, &gamePose)
+        inputDevices.hmd.Update (pose)
+        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.controller1Id), &pose, &gamePose)
+        inputDevices.controller1.Update (pose)
+        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.controller2Id), &pose, &gamePose)
+        inputDevices.controller2.Update (pose)
+        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.cam1Id), &pose, &gamePose)
+        inputDevices.cam1.Update (pose)
+        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.cam1Id), &pose, &gamePose)
+        inputDevices.cam1.Update (pose)
+
+        ()

@@ -38,21 +38,24 @@ module VrDevice =
         let deviceToWorld = Mod.init Trafo3d.Identity
         let worldToDevice = deviceToWorld |> Mod.map (fun t -> t.Inverse)
 
-        member x.Update(e : VREvent_t, poses : TrackedDevicePose_t[]) =
-            if axis.Length > 0 then
-                let mutable state = VRControllerState_t()
-                if system.GetControllerState(uint32 index, &state) then
-                    for a in axis do
-                        a.Update(e, state)
+        let mutable velocity = V3d(0.0, 0.0, 0.0)
+        let mutable angularVelocity = V3d(0.0, 0.0, 0.0)
 
-            let currentPose = poses.[index]
+        member x.Update(currentPose : TrackedDevicePose_t) =
+//            if axis.Length > 0 then
+//                let mutable state = VRControllerState_t()
+//                if system.GetControllerState(uint32 index, &state) then
+//                    for a in axis do
+//                        a.Update(e, state)
 
             if currentPose.bPoseIsValid then
                 transact (fun () -> 
                     let theirs = currentPose.mDeviceToAbsoluteTracking.Trafo
                     deviceToWorld.Value <- theirs * flip.Inverse
                 )
-
+                velocity <- V3d(currentPose.vVelocity.v0, currentPose.vVelocity.v1, currentPose.vVelocity.v2)
+                angularVelocity <- V3d(currentPose.vAngularVelocity.v0, currentPose.vAngularVelocity.v1, currentPose.vAngularVelocity.v2)
+                if index = 2 then printfn "update device velocity to %A" velocity
 
         member x.Type = deviceType
         member x.Index = index
@@ -61,6 +64,8 @@ module VrDevice =
         member x.Axis = axis
         member x.DeviceToWorld = deviceToWorld
         member x.WorldToDevice = worldToDevice
+        member x.Velocity = velocity
+        member x.AngularVelocity = angularVelocity
         
 type InputDevices =
     {

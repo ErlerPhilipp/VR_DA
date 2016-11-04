@@ -16,6 +16,8 @@ module ImmutableScene =
         {
             id              : int
             isManipulable   : bool
+            isGrabbed         : bool
+            wasGrabbed      : bool
             boundingBox     : Box3d
             trafo           : Trafo3d
             model           : ISg
@@ -25,7 +27,6 @@ module ImmutableScene =
 
     type Scene =
         {
-            activeObjects     : pset<Object>
             things            : pset<Object>
             viewTrafo         : Trafo3d
             lastTrafo         : Trafo3d
@@ -95,13 +96,6 @@ module Physics =
                             let info = new BulletSharp.RigidBodyConstructionInfo(m, state, cshape, inertia)
                             let rigidBody = new BulletSharp.RigidBody(info)
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
-
-                            // TODO: kommt auch nachm pick
-//                            printfn "r0 %A" (inner.Forward.R0)
-//                            printfn "r1 %A" (inner.Forward.R1)
-//                            printfn "r2 %A" (inner.Forward.R2)
-//                            printfn "r3 %A" (inner.Forward.R3)
-
                             { 
                                 original = o
                                 body = Some rigidBody 
@@ -115,7 +109,7 @@ module Physics =
             let dispatcher = new CollisionDispatcher(collConf)
             let broad = new DbvtBroadphase()
             let dynWorld = new DiscreteDynamicsWorld(dispatcher, broad, null, collConf)
-            dynWorld.Gravity <- Vector3(0.0f, -1.0f, 0.0f)
+            dynWorld.Gravity <- Vector3(0.0f, -9.81f, 0.0f)
             let scene ={ original = s; collisionConf = collConf; collisionDisp = dispatcher;  broadPhase = broad; dynamicsWorld = dynWorld; bodies = null }
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene
@@ -125,7 +119,26 @@ module Physics =
                 match o.collisionShape, m.body with
                     | Some (collisionShape), Some body -> 
                         //printfn "%A" (o.trafo.Forward.TransformPos(V3d.OOO))
-                        body.SetMassProps(Mass.toFloat o.mass, m.inertia)
+                        //let invMass = if o.mass != Mass.Infinite then 1.0f / Mass.toFloat o.mass else 0.0f
+                        if (o.wasGrabbed && not o.isGrabbed) then // || (body.InvMass <> invMass) then
+                            body.SetMassProps(Mass.toFloat o.mass, m.inertia)
+
+                            // move with hand velocity
+                            let vel = VrDriver.inputDevices.controller2.Velocity
+                            let handVelocity = Vector3(float32 vel.X, float32 vel.Y, float32 vel.Z)
+                            body.LinearVelocity <- handVelocity
+
+                            let angVel = VrDriver.inputDevices.controller2.AngularVelocity
+                            let handAngVelocity = Vector3(float32 angVel.X, float32 angVel.Y, float32 angVel.Z)
+                            body.AngularVelocity <- handAngVelocity
+
+                            //body.ApplyCentralImpulse(handVelocity * Mass.toFloat o.mass)
+                            if o.id = 5 then printfn "released, set velocity to %A" vel
+                            body.Activate()
+                        else if not o.wasGrabbed && o.isGrabbed then
+                            body.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
+                            body.LinearVelocity <- Vector3()
+                            body.AngularVelocity <- Vector3()
 
                         body.WorldTransform <- toMatrix o.trafo
                         m.original <- o
@@ -153,6 +166,7 @@ module Physics =
                         m.dynamicsWorld.RemoveRigidBody(rb)
                         m.bodies.Remove pb |> ignore
                     | None -> ()
+
                    m.bodies.Remove pb |> ignore
 
                 // printfn "%A" (m.bodies)
@@ -167,6 +181,7 @@ module Physics =
                 let objects =
                     [
                         for b in world.bodies do
+                            //if b.original.id = 5 then printfn "%A" (b.body.Value.LinearVelocity)
                             match b.body with
                                 | Some body -> 
                                     match b.original.collisionShape with
@@ -180,7 +195,6 @@ module Physics =
                                     yield b.original
                     ]
 
-//                s
                 { s with
                     things = PersistentHashSet.ofList objects
                 }
@@ -190,9 +204,6 @@ module Physics =
 
 [<AutoOpen>]
 module MutableScene =
-    
-        
-    let assignedInputs = VrDriver.inputAssignment ()
 
     let mutable currentId = 0
     let newId() = 
@@ -209,7 +220,6 @@ module MutableScene =
     type MScene =
         {
             mutable original : Scene
-            mactiveObjects   : cset<MObject>
             mthings          : cset<MObject>
             mviewTrafo       : ModRef<Trafo3d>
             
@@ -232,7 +242,6 @@ module MutableScene =
         static member Create(s : Scene) =
             {
                 original = s
-                mactiveObjects = CSet.ofSeq (PersistentHashSet.toSeq s.activeObjects |> Seq.map Conversion.Create)
                 mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
 
@@ -260,7 +269,7 @@ module MutableScene =
                 Conversion.Update(m.mcontroller2Object.Value, s.controller2Object)
 
                 let table = 
-                    Seq.append m.mthings m.mactiveObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                    m.mthings |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
                 
                 
                 for t in PersistentHashSet.toSeq s.things do
@@ -271,17 +280,7 @@ module MutableScene =
                             let mo = Conversion.Create(t)
                             m.mthings.Add mo |> ignore
                 
-
-                for t in PersistentHashSet.toSeq s.activeObjects do
-                    match table.TryRemove t.id with
-                        | (true, mo) -> 
-                            Conversion.Update(mo, t)
-                        | _ ->
-                            let mo = Conversion.Create(t)
-                            m.mactiveObjects.Add mo |> ignore
-                    ()
-                
-                m.mactiveObjects.ExceptWith table.Values
+                m.mthings.ExceptWith table.Values
             
 
     type Message =
@@ -381,29 +380,23 @@ module MutableScene =
                 
                 let worldLocation = trafo.Forward.C3.XYZ
 
-                let pickedObjs = 
-                    scene.things 
-                        |> PersistentHashSet.toList 
-                        |> List.choose (fun o -> 
-                            if o.isManipulable then
-                                let modelLocation = o.trafo.Backward.TransformPos worldLocation
-                                if o.boundingBox.Contains modelLocation then
-                                    Some o
-                                else
-                                    None
+                let newThings = scene.things |> PersistentHashSet.map (fun o ->
+                
+                        if o.isManipulable then
+                            let modelLocation = o.trafo.Backward.TransformPos worldLocation
+                            if o.boundingBox.Contains modelLocation then
+                                { o with isGrabbed = true}
                             else
-                                None
-                            ) 
-                        |> PersistentHashSet.ofList
+                                o
+                        else
+                            o
 
-                if PersistentHashSet.isEmpty pickedObjs then
-                    scene
-                else
-                    { scene with 
-                        lastTrafo       = trafo
-                        activeObjects   = PersistentHashSet.union scene.activeObjects pickedObjs
-                        things          = PersistentHashSet.difference scene.things pickedObjs
-                    }
+                    ) 
+
+                { scene with 
+                    lastTrafo       = trafo
+                    things          = newThings
+                }
                     
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let direction = t.Forward.TransformDir(V3d.OOI)
@@ -415,22 +408,25 @@ module MutableScene =
                     else
                         t
 
-                if PersistentHashSet.isEmpty scene.activeObjects then
+                if PersistentHashSet.isEmpty scene.things then
                     scene
                 else    
                     let deltaTrafo = scene.lastTrafo.Inverse * trafo
                     { scene with 
-                        activeObjects =
-                            scene.activeObjects |> PersistentHashSet.map (fun a ->
-                                { a with trafo = a.trafo * deltaTrafo }
+                        things =
+                            scene.things |> PersistentHashSet.map (fun a ->
+                                if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                             ) 
                         lastTrafo = trafo
                     }
                     
             | DeviceRelease(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
+                let newThings = scene.things |> PersistentHashSet.map (fun a ->
+                        if not a.isGrabbed then a else { a with isGrabbed = false }
+                    ) 
+
                 { scene with 
-                    activeObjects = PersistentHashSet.empty
-                    things = PersistentHashSet.union scene.activeObjects scene.things 
+                    things = newThings 
                     lastTrafo = Trafo3d.Identity
                 }
 
@@ -452,7 +448,7 @@ module MutableScene =
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 { scene with
                     // only move static things, keep active things like controllers
-                    things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp })
+                    things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp; wasGrabbed = o.isGrabbed })
                 }
 
             | UpdateViewTrafo trafo -> 
@@ -482,6 +478,7 @@ module MutableScene =
 
             perform (TimeElapsed dt)
 
+            VrDriver.updateInputDevices( )
             
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
@@ -527,7 +524,7 @@ module MutableScene =
                    }
 
         let sgs = 
-            ASet.union' [mscene.mthings; mscene.mactiveObjects]
+            mscene.mthings
                 |> ASet.map toSg
                 |> Sg.set
 

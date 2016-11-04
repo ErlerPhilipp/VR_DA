@@ -81,6 +81,8 @@ let main argv =
         {
             id = newId()
             isManipulable = false
+            isGrabbed = false
+            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
@@ -91,6 +93,8 @@ let main argv =
         {
             id = newId()
             isManipulable = false
+            isGrabbed = false
+            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
@@ -101,6 +105,8 @@ let main argv =
         {
             id = newId()
             isManipulable = false
+            isGrabbed = false
+            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
@@ -111,10 +117,11 @@ let main argv =
         {
             id = newId()
             isManipulable = false
+            isGrabbed = false
+            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2))) |> groundEffect
-
             collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> Shape.Plane )
             mass = Infinite
         }
@@ -174,6 +181,8 @@ let main argv =
                     {
                         id = newId()
                         isManipulable = canMove
+                        isGrabbed = false
+                        wasGrabbed = false
                         boundingBox = Box3d.FromCenterAndSize(V3d.Zero, bounds.Size)
                         trafo = Trafo3d.Translation(bounds.Center)
                         model = sg 
@@ -193,7 +202,6 @@ let main argv =
             cam2Object = camObject
             controller1Object = leftHandObject
             controller2Object = rightHandObject
-            activeObjects = PersistentHashSet.empty
             things = PersistentHashSet.ofList objects
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
