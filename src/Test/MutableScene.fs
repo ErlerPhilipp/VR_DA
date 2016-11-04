@@ -448,7 +448,13 @@ module MutableScene =
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 { scene with
                     // only move static things, keep active things like controllers
-                    things = scene.things |> PersistentHashSet.map (fun o -> { o with trafo = o.trafo * dp; wasGrabbed = o.isGrabbed })
+                    things = scene.things |> PersistentHashSet.map (fun o -> 
+                        let newTrafo = if o.isGrabbed then o.trafo else o.trafo * dp
+                        { o with 
+                            trafo = newTrafo; 
+                            wasGrabbed = o.isGrabbed 
+                        }
+                    )
                 }
 
             | UpdateViewTrafo trafo -> 
