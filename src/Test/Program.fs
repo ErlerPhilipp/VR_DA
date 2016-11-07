@@ -20,20 +20,6 @@ open Aardvark.VR
 
 open LogicalScene
 
-// mod bind example:
-//let flag = Mod.init true
-//let heavyComp = Mod.init 20
-//let easyComp = Mod.init 10
-//let switchComp = Mod.bind (fun flagValue -> if flagValue then heavyComp else easyComp) flag
-
-//    let m = firstObj.transformedBB.GetValue()
-//
-//    let transformedBox = Mod.map (fun (t : Trafo3d) -> firstObj.model.bounds.Transformed(t)) firstObj.trafo
-//
-//    transact (fun () -> firstObj.trafo.Value <- Trafo3d.Translation(V3d.OOO))
-//    transact (fun () -> Mod.change firstObj.trafo (Trafo3d.Translation(V3d.OOO)))
-
-
 [<EntryPoint>]
 let main argv =
     Ag.initialize()
@@ -128,7 +114,6 @@ let main argv =
             mass = Infinite
         }
 
-
     let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
         let positions = m.IndexedAttributes.[DefaultSemantic.Positions] |> unbox<V3f[]>
         let index =
@@ -151,8 +136,6 @@ let main argv =
             | _ ->
                 [||]
 
-
-
     let rec createShape (currentTrafo : Trafo3d) (n : Loader.Node) : Triangle3d[] =
         match n with
             | Loader.Empty -> 
@@ -166,7 +149,6 @@ let main argv =
 
             | Loader.Material(_,c) ->
                 createShape currentTrafo c
-
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
@@ -197,20 +179,19 @@ let main argv =
         toObjects false staticModels 
         @  [groundObject]
         
-
     let sceneObj =
         {
             cam1Object = camObject
             cam2Object = camObject
             controller1Object = leftHandObject
             controller2Object = rightHandObject
-            things = PersistentHashSet.ofList objects
+            objects = PersistentHashSet.ofList objects
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
-            lastTrafo = Trafo3d.Identity
-            interactionType = VrTypes.VrInteractionTechnique.VirtualHand
+            lastViewTrafo = Trafo3d.Identity
+            interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
+            gravity = V3d(0.0, -9.81, 0.0)
         }
-
 
     let scene =
         GraphicsScene.createScene sceneObj vrWin
@@ -222,7 +203,6 @@ let main argv =
                 DefaultSurfaces.lighting false |> toEffect
             ]
 
-
     let vrSg = 
         scene
             |> Sg.projTrafo vrWin.Projection
@@ -233,12 +213,6 @@ let main argv =
     let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, vrSg)
     vrWin.RenderTask <- task
     
-    match VrDriver.devices.Length with
-        | 0 -> printfn "Found no device!"
-        | 1 -> printfn "Found only 1 device!"
-        | 2 -> printfn "Found only 1 controller!"
-        | _ -> () //printfn "Found all %A devices." VrDriver.devices.Length
-
     vrWin.Run()
 
     OpenVR.Shutdown()

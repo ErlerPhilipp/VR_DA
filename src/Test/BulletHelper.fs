@@ -24,9 +24,17 @@ type Mass = Infinite | Mass of float32
 module Mass =
     let toFloat =
         function | Mass m   -> m
-                    | Infinite -> 0.0f
+                 | Infinite -> 0.0f
 
-module BulletConversions =
+       
+
+module BulletHelper =
+
+    let toVector3 (v : V3d) = 
+        Vector3(float32 v.X, float32 v.Y, float32 v.Z)
+
+    let toV3d (v : Vector3) = 
+        V3d(float v.X, float v.Y, float v.Z)
         
     let toTrafo (m : Matrix) =
         let m44 = 
@@ -47,12 +55,6 @@ module BulletConversions =
             float32 m.M02, float32 m.M12, float32 m.M22, float32 m.M32,
             float32 m.M03, float32 m.M13, float32 m.M23, float32 m.M33
         )
-
-    let toV3d (v : Vector3) =
-        V3d(float v.X, float v.Y, float v.Z)
-
-    let toVector3 (v : V3d) =
-        Vector3(float32 v.X, float32 v.Y, float32 v.Z)
         
     let rec toCollisionShape (s : Shape) : CollisionShape =
         match s with

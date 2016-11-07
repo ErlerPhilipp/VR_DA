@@ -30,7 +30,6 @@ module VrAxis =
                 if buttonIndex >= EVRButtonId.k_EButton_Axis0 && buttonIndex <= EVRButtonId.k_EButton_Axis4 then
                     let axis = buttonIndex - EVRButtonId.k_EButton_Axis0 |> int
 
-
                     if axis  = index then
                         let eventType = e.eventType |> int |> unbox<EVREventType>
                         transact (fun () ->
@@ -44,7 +43,6 @@ module VrAxis =
                                     up.OnNext()
                                     pressed.Value <- false
                                 | _ -> ()
-
                         )
 
             if touched.Value then

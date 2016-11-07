@@ -7,6 +7,8 @@ open Aardvark.Base
 module VrDriver =
     open VrTypes
     open VrConversions
+    
+    exception VrException of string
 
     let inline fail fmt = 
         Printf.kprintf (fun str -> 
@@ -39,8 +41,6 @@ module VrDriver =
         system.GetRecommendedRenderTargetSize(&width,&height)
         V2i(int width, int height)
         
-    
-
     [<CompiledName("Devices")>]
     let devices =
         [|
@@ -82,21 +82,3 @@ module VrDriver =
         
     let assignedInputs = getInputAssignment ()
     let inputDevices = getInputDevices ()
-
-    let updateInputDevices () =
-
-        let mutable pose = TrackedDevicePose_t()
-        let mutable gamePose = TrackedDevicePose_t()
-            
-        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.hmdId), &pose, &gamePose)
-        inputDevices.hmd.Update (pose)
-        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.controller1Id), &pose, &gamePose)
-        inputDevices.controller1.Update (pose)
-        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.controller2Id), &pose, &gamePose)
-        inputDevices.controller2.Update (pose)
-        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.cam1Id), &pose, &gamePose)
-        inputDevices.cam1.Update (pose)
-        let err = compositor.GetLastPoseForTrackedDeviceIndex ((uint32 assignedInputs.cam1Id), &pose, &gamePose)
-        inputDevices.cam1.Update (pose)
-
-        ()

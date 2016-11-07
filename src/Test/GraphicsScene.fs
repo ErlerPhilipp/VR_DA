@@ -9,30 +9,26 @@ open Aardvark.SceneGraph
 
 module GraphicsScene =
     open LogicalScene
+    open VrInteractions
     open VrWindow
-
-    let mutable currentId = 0
-    let newId() = 
-        currentId <- currentId + 1
-        currentId
 
     type MObject =
         {
-            mutable original : Object
-            mtrafo : ModRef<Trafo3d>
-            mmodel : ModRef<ISg>
+            mutable original    : Object
+            mtrafo              : ModRef<Trafo3d>
+            mmodel              : ModRef<ISg>
         }
 
     type MScene =
         {
-            mutable original : Scene
-            mthings          : cset<MObject>
-            mviewTrafo       : ModRef<Trafo3d>
+            mutable original    : Scene
+            mobjects            : cset<MObject>
+            mviewTrafo          : ModRef<Trafo3d>
             
-            mcam1Object        : ModRef<MObject>
-            mcam2Object        : ModRef<MObject>
-            mcontroller1Object : ModRef<MObject>
-            mcontroller2Object : ModRef<MObject>
+            mcam1Object         : ModRef<MObject>
+            mcam2Object         : ModRef<MObject>
+            mcontroller1Object  : ModRef<MObject>
+            mcontroller2Object  : ModRef<MObject>
         }
 
     type Conversion private() =
@@ -46,7 +42,7 @@ module GraphicsScene =
         static member Create(s : Scene) =
             {
                 original = s
-                mthings = CSet.ofSeq (PersistentHashSet.toSeq s.things |> Seq.map Conversion.Create)
+                mobjects = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
 
                 mcam1Object = s.cam1Object |> Conversion.Create |> Mod.init
@@ -73,18 +69,18 @@ module GraphicsScene =
                 Conversion.Update(m.mcontroller2Object.Value, s.controller2Object)
 
                 let table = 
-                    m.mthings |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                    m.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
                 
                 
-                for t in PersistentHashSet.toSeq s.things do
+                for t in PersistentHashSet.toSeq s.objects do
                     match table.TryRemove t.id with
                         | (true, mo) -> 
                             Conversion.Update(mo, t)
                         | _ ->
                             let mo = Conversion.Create(t)
-                            m.mthings.Add mo |> ignore
+                            m.mobjects.Add mo |> ignore
                 
-                m.mthings.ExceptWith table.Values
+                m.mobjects.ExceptWith table.Values
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =
@@ -107,8 +103,6 @@ module GraphicsScene =
             )
 
             perform (TimeElapsed dt)
-
-            VrDriver.updateInputDevices( )
             
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
@@ -124,8 +118,6 @@ module GraphicsScene =
                 let button = int e.data.controller.button |> unbox<EVRButtonId>
                 let axis = button - EVRButtonId.k_EButton_Axis0 |> int
                 let trafo = trafos.[deviceId]
-
-
 
                 match unbox<EVREventType> (int e.eventType) with
                     | EVREventType.VREvent_ButtonPress -> perform(DevicePress(deviceId, axis, trafo))
@@ -154,7 +146,7 @@ module GraphicsScene =
                    }
 
         let sgs = 
-            mscene.mthings
+            mscene.mobjects
                 |> ASet.map toSg
                 |> Sg.set
 

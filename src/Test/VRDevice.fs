@@ -43,11 +43,6 @@ module VrDevice =
         let mutable angularVelocity = V3d(0.0, 0.0, 0.0)
 
         member x.Update(currentPose : TrackedDevicePose_t) =
-//            if axis.Length > 0 then
-//                let mutable state = VRControllerState_t()
-//                if system.GetControllerState(uint32 index, &state) then
-//                    for a in axis do
-//                        a.Update(e, state)
 
             if currentPose.bPoseIsValid then
                 transact (fun () -> 
@@ -56,7 +51,6 @@ module VrDevice =
                 )
                 velocity <- V3d(currentPose.vVelocity.v0, currentPose.vVelocity.v1, currentPose.vVelocity.v2)
                 angularVelocity <- V3d(currentPose.vAngularVelocity.v0, currentPose.vAngularVelocity.v1, currentPose.vAngularVelocity.v2)
-                if index = 2 then printfn "update device velocity to %A" velocity
 
         member x.Type = deviceType
         member x.Index = index

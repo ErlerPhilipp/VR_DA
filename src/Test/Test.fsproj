@@ -59,7 +59,8 @@
     <Compile Include="VrDevice.fs" />
     <Compile Include="VrDriver.fs" />
     <Compile Include="VrWindow.fs" />
-    <Compile Include="BulletConversions.fs" />
+    <Compile Include="VrInteractions.fs" />
+    <Compile Include="BulletHelper.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
     <Compile Include="GraphicsScene.fs" />

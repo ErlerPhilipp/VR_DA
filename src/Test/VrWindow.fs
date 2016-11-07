@@ -1,23 +1,25 @@
 ﻿namespace Aardvark.VR
 
+open System
+open System.Threading
+
+open OpenTK.Graphics
+open OpenTK.Graphics.OpenGL4
+
 open Valve.VR
 
 open Aardvark.Base
 open Aardvark.Base.Incremental
-open Aardvark.Base.Rendering
 open Aardvark.Application
 open Aardvark.Rendering.GL
-open Aardvark.SceneGraph
-open Aardvark.VR
 
 module VrWindow =
-    open System
-    open System.Threading
-    open Aardvark.Rendering.GL
-    open OpenTK.Graphics
-    open OpenTK.Graphics.OpenGL4
-
     open VrConversions
+    open VrDriver
+    
+    type VrEye =
+        | Left = 1
+        | Right = 2
 
     type BlitWindow(b : ref<Framebuffer>, c : ref<Framebuffer>) =
         inherit OpenTK.GameWindow(
@@ -46,13 +48,13 @@ module VrWindow =
 
         let mutable ctx = Unchecked.defaultof<_>
         let mutable loaded = false
+
         override x.OnLoad(e) =
             base.OnLoad(e)
             ctx <- ContextHandle(x.Context, x.WindowInfo)
             ContextHandle.Current <- Some ctx
             loaded <- true
             
-
         override x.OnRenderFrame(e) =
             if loaded then
                 base.OnRenderFrame(e)
@@ -72,9 +74,6 @@ module VrWindow =
                 check()
                 x.SwapBuffers()
                 lock b (fun () -> Fun.Swap(&b.contents, &c.contents))
-
-
-
 
     type ScreenWindow =
         {
@@ -204,7 +203,16 @@ module VrWindow =
             if not (system.PollNextEvent(&evt, sizeof<VREvent_t> |> uint32)) then
                 evt.trackedDeviceIndex <- 0xFFFFFFFFu
 
-            OpenVR.Compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
+            let mutable renderPose = TrackedDevicePose_t()
+            let mutable gamePose = TrackedDevicePose_t()
+            
+            compositor.WaitGetPoses(renderPoses,gamePoses) |> VrDriver.check
+            
+            inputDevices.hmd.Update (renderPoses.[assignedInputs.hmdId])
+            inputDevices.controller1.Update (renderPoses.[assignedInputs.controller1Id])
+            inputDevices.controller2.Update (renderPoses.[assignedInputs.controller2Id])
+            inputDevices.cam1.Update (renderPoses.[assignedInputs.cam1Id])
+            inputDevices.cam1.Update (renderPoses.[assignedInputs.cam1Id])
 
             let dt = frameWatch.Elapsed
             frameWatch.Restart()
@@ -223,8 +231,6 @@ module VrWindow =
 
             transact (fun () -> time.Value <- DateTime.Now)
 
-        
-
         member x.Projection = projection
         member x.FramebufferSignature = signature
         member x.Runtime = runtime :> IRuntime
@@ -234,7 +240,6 @@ module VrWindow =
             and set t = task <- t
         member x.Sizes = Mod.constant size
         member x.Samples = 1
-
 
         interface IRenderTarget with
             member x.FramebufferSignature = signature
@@ -249,7 +254,6 @@ module VrWindow =
         interface IRenderControl with
             member x.Mouse = failwith ""
             member x.Keyboard = failwith ""
-
 
         member x.Run() =
             let mutable evt = Unchecked.defaultof<_>

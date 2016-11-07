@@ -8,93 +8,50 @@ open Aardvark.SceneGraph
 
 module LogicalScene =
     open VrTypes
+    open VrInteractions
     open VrDriver
         
     let virtualHandColor = Mod.init (C4f.White)
 
+    let mutable currentId = 0
+    let newId() = 
+        currentId <- currentId + 1
+        currentId
+
     type pset<'a> = PersistentHashSet<'a>
     type Object =
         {
-            id              : int
-            isManipulable   : bool
-            isGrabbed       : bool
-            wasGrabbed      : bool
-            boundingBox     : Box3d
-            trafo           : Trafo3d
-            model           : ISg
-            mass            : Mass
-            collisionShape  : Option<Shape> 
+            id                : int
+            isManipulable     : bool
+            isGrabbed         : bool
+            wasGrabbed        : bool
+            boundingBox       : Box3d
+            trafo             : Trafo3d
+            model             : ISg
+            mass              : Mass
+            collisionShape    : Option<Shape> 
         }
 
     type Scene =
         {
-            things            : pset<Object>
+            objects           : pset<Object>
             viewTrafo         : Trafo3d
-            lastTrafo         : Trafo3d
+            lastViewTrafo     : Trafo3d
             
             cam1Object        : Object
             cam2Object        : Object
             controller1Object : Object
             controller2Object : Object
 
-            interactionType   : VrTypes.VrInteractionTechnique
+            interactionType   : VrInteractions.VrInteractionTechnique
+            gravity           : V3d
 
             moveDirection     : V3d
         }
 
         
-    type Message =
-        | Add of Object
-        | Remove of Object
-        | DevicePress of int * int * Trafo3d
-        | DeviceRelease of int * int * Trafo3d
-        | DeviceTouch of int * int * Trafo3d
-        | DeviceUntouch of int * int * Trafo3d
-        | DeviceMove of int * Trafo3d
-        | TimeElapsed of System.TimeSpan
-        | UpdateViewTrafo of Trafo3d
 
-    let change (i : int) (f : 'a -> 'a) (l : list<'a>) =
-        l |> List.mapi (fun ii v -> if ii = i then f v else v)
-
-    let filterIndices (set : Set<int>) (l : list<'a>) =
-        let rec filterIndices (i : int) (set : Set<int>) (l : list<'a>) =
-            match l with
-                | [] -> []
-                | h :: rest ->
-                    if Set.contains i set then h :: filterIndices (i+1) set rest
-                    else filterIndices (i+1) set rest
-        filterIndices 0 set l
-
-        
     let update (scene : Scene) (message : Message) : Scene =
-        match message with
-            | TimeElapsed _ | UpdateViewTrafo _ | DeviceMove _ | DeviceTouch _ | DevicePress _ | DeviceUntouch _ | DeviceRelease _ -> ()
-            | _ -> printfn "%A" message
-
-        let getVirtualHandTrafo (t : Trafo3d) = 
-            if scene.interactionType = VrTypes.VrInteractionTechnique.VirtualHand then
-                t
-            else
-                let handPos = t.Forward.TransformPos V3d.Zero
-                let headPos = scene.viewTrafo.Backward.TransformPos V3d.Zero
-                let chestPos = headPos |> Trafo3d.Translation(0.0, -0.2, 0.0).Forward.TransformPos
-                let chestToHand = handPos - chestPos
-                //printfn "hand: %A, chest: %A" (chestPos) (handPos)
-                let headToHandDist = chestToHand.Length
-                    
-                let linearExtensionLimit = 0.5
-
-                if headToHandDist < linearExtensionLimit then
-                    t
-                else
-                    let quadraticTermFactor = 200.0
-                    let quadraticExtension = headToHandDist - linearExtensionLimit
-                    let gogoAdditionalExtension = max 0.0 quadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
-                    let gogoHandPosOffset = chestToHand.Normalized * gogoAdditionalExtension
-                    let gogoHandTrafo = t * Trafo3d.Translation(gogoHandPosOffset)
-                    //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
-                    gogoHandTrafo
 
         let scene =
             match message with
@@ -104,7 +61,7 @@ module LogicalScene =
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
                     { scene with 
-                        controller2Object = {scene.controller2Object with trafo = getVirtualHandTrafo t}
+                        controller2Object = {scene.controller2Object with trafo = VrInteractions.getVirtualHandTrafo(t, scene.viewTrafo, scene.interactionType)}
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
                     { scene with 
@@ -117,11 +74,10 @@ module LogicalScene =
                 | _ -> 
                     scene
         
-
         match message with
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 0 ->
-                let newInteractionTechnique = VrTypes.nextInteractionTechnique scene.interactionType
-                transact ( fun _ -> Mod.change virtualHandColor (VrTypes.colorForInteractionTechnique newInteractionTechnique) )
+                let newInteractionTechnique = VrInteractions.nextInteractionTechnique scene.interactionType
+                transact ( fun _ -> Mod.change virtualHandColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
                 { scene with
                     interactionType = newInteractionTechnique
                 }
@@ -132,25 +88,21 @@ module LogicalScene =
                         scene.controller2Object.trafo
                     else
                         t
-                
-                let worldLocation = trafo.Forward.C3.XYZ
 
-                let newThings = scene.things |> PersistentHashSet.map (fun o ->
-                
+                let newObjects = scene.objects |> PersistentHashSet.map (fun o ->
                         if o.isManipulable then
-                            let modelLocation = o.trafo.Backward.TransformPos worldLocation
+                            let modelLocation = o.trafo.Backward.TransformPos trafo.Forward.C3.XYZ
                             if o.boundingBox.Contains modelLocation then
                                 { o with isGrabbed = true}
                             else
                                 o
                         else
                             o
-
                     ) 
 
                 { scene with 
-                    lastTrafo       = trafo
-                    things          = newThings
+                    lastViewTrafo   = trafo
+                    objects         = newObjects
                 }
                     
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
@@ -163,26 +115,26 @@ module LogicalScene =
                     else
                         t
 
-                if PersistentHashSet.isEmpty scene.things then
+                if PersistentHashSet.isEmpty scene.objects then
                     scene
                 else    
-                    let deltaTrafo = scene.lastTrafo.Inverse * trafo
+                    let deltaTrafo = scene.lastViewTrafo.Inverse * trafo
                     { scene with 
-                        things =
-                            scene.things |> PersistentHashSet.map (fun a ->
+                        objects =
+                            scene.objects |> PersistentHashSet.map (fun a ->
                                 if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                             ) 
-                        lastTrafo = trafo
+                        lastViewTrafo = trafo
                     }
                     
             | DeviceRelease(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
-                let newThings = scene.things |> PersistentHashSet.map (fun a ->
+                let newObjects = scene.objects |> PersistentHashSet.map (fun a ->
                         if not a.isGrabbed then a else { a with isGrabbed = false }
                     ) 
 
                 { scene with 
-                    things = newThings 
-                    lastTrafo = Trafo3d.Identity
+                    objects = newObjects 
+                    lastViewTrafo = Trafo3d.Identity
                 }
 
             | TimeElapsed(dt) ->
@@ -196,14 +148,12 @@ module LogicalScene =
 
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
 
-                let deathZone = 0.1
-                let axisWithDeathZone = clamp 0.0 1.0 (axisValue * (1.0 + deathZone) - deathZone)
-                //printfn "axisWithDeathZone: %A" axisWithDeathZone
+                let axisWithDeathZone = VrInteractions.getAxisValueWithDeathZone(axisValue)
 
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 { scene with
-                    // only move static things, keep active things like controllers
-                    things = scene.things |> PersistentHashSet.map (fun o -> 
+                    // only move static objects, keep active objects like controllers
+                    objects = scene.objects |> PersistentHashSet.map (fun o -> 
                         let newTrafo = if o.isGrabbed then o.trafo else o.trafo * dp
                         { o with 
                             trafo = newTrafo; 
