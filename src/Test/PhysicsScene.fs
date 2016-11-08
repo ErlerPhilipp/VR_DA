@@ -56,6 +56,14 @@ module PhysicsScene =
                             let inertia = cshape.CalculateLocalInertia(m)
                             let info = new BulletSharp.RigidBodyConstructionInfo(m, state, cshape, inertia)
                             let rigidBody = new BulletSharp.RigidBody(info)
+                            
+                            // keep all rb active to enable collisions with grabbed (static) objects
+                            // TODO: add collisiondispatcher etc, ghost object of grabbed object, activate colliding object if necessary
+                            rigidBody.Activate()
+                            rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
+                            rigidBody.Restitution <- 0.75f
+                            rigidBody.Friction <- 0.25f
+
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             { 
                                 original = o
@@ -92,18 +100,26 @@ module PhysicsScene =
                             let angVel = VrDriver.inputDevices.controller2.AngularVelocity
                             let handAngVelocity = toVector3(angVel)
                             body.AngularVelocity <- handAngVelocity
+                            
+                            // reset to normal state
+//                            body.Activate()
+//                            body.ForceActivationState(ActivationState.ActiveTag)
 
-                            body.Activate()
                         else if not o.wasGrabbed && o.isGrabbed then
                             // deactivate by setting infinite mass
                             body.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
                             body.LinearVelocity <- Vector3()
                             body.AngularVelocity <- Vector3()
 
+                            // keep always active
+//                            body.Activate()
+//                            body.ForceActivationState(ActivationState.DisableDeactivation)
+
                         let newWorldTransform = toMatrix o.trafo
                         if body.WorldTransform <> newWorldTransform then
                             body.WorldTransform <- newWorldTransform
-                            body.Activate()
+                            
+//                            body.Activate()
 
                         m.original <- o
                     | _ -> failwith "not yet implemented...."
@@ -143,7 +159,8 @@ module PhysicsScene =
         match currentWorld with
             | Some world -> 
                 Conversion.Update(world,s)
-                world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds) |> ignore
+                //world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds) |> ignore
+                world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds, 2, 1.0f / 180.0f) |> ignore
 
                 let objects =
                     [

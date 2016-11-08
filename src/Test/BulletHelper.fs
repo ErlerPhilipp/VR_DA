@@ -172,13 +172,12 @@ module BulletHelper =
     type DebugDrawer() = 
         inherit BulletSharp.DebugDraw()
     
-        let mutable debugModeBinding = BulletSharp.DebugDrawModes.DrawWireframe // BulletSharp.DebugDrawModes.All
+        let mutable debugModeBinding = BulletSharp.DebugDrawModes.DrawWireframe//  BulletSharp.DebugDrawModes.None // BulletSharp.DebugDrawModes.All
         let mutable lines  = [||]
         let mutable colors = [||]
 
         let linesMod  = Mod.init [||]
         let colorsMod = Mod.init [||]
-        //let linesSg = Sg.lines (Mod.init C4b.White) (linesMod) 
 
         let pos = (linesMod  |> Mod.map ( fun (a : Line3d[]) -> [| for l in a do yield l.P0.ToV3f(); yield l.P1.ToV3f()|]  ))
         let col = (colorsMod |> Mod.map ( fun (a : V3d[]) -> [| for c in a do yield c.ToC4f().ToC4b(); yield c.ToC4f().ToC4b()|]  ))
@@ -228,8 +227,8 @@ module BulletHelper =
             debugModeBinding <- mode
         
         // optional
-        override x.DrawBox(  bbMin,   bbMax,   trans,   color) = 
-            let trafo = toTrafo trans
+        override x.DrawBox(  bbMin,   bbMax,   transform,   color) = 
+            let trafo = toTrafo transform
             let min = toV3d bbMin
             let max = toV3d bbMax
             let positions = [| min; V3d(min.X, min.Y, max.Z); V3d(min.X, max.Y, min.Z); V3d(max.X, min.Y, min.Z); 
@@ -249,7 +248,13 @@ module BulletHelper =
             x.addLineToStack(positions.[3], positions.[5], toV3d color)
             x.addLineToStack(positions.[0], positions.[1], toV3d color)
             
-        override x.DrawPlane(  planeNormal,  plane,   transform,   color) = ()
+        override x.DrawPlane(  planeNormal,  plane,   transform,   color) = 
+            let trafo = toTrafo transform
+            let normal = trafo.Forward.TransformDir(toV3d planeNormal)
+            let planeOrigin = normal * float plane
+
+
+            ()
 
         override x.DrawAabb(  from,   toPos,   color) = ()
         override x.DrawArc(  center,   normal,   axis,   radiusA,  radiusB,  minAngle,  maxAngle,   color,  drawSect,  stepDegrees) = ()

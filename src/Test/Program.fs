@@ -35,9 +35,9 @@ let main argv =
 
     let manipulableModels =
         [
+            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
             @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 4.0, 0.0), Mass 80.0f
             @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0), Mass 100.0f
-            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
             @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f
         ]
         
@@ -62,6 +62,26 @@ let main argv =
     let groundEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         DefaultSurfaces.constantColor C4f.Gray80 |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
+    let wall1Effect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor C4f.Red |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
+    let wall2Effect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor C4f.Green |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
+    let wall3Effect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor C4f.Blue |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
+    let wall4Effect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor C4f.VRVisGreen |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
 
@@ -112,6 +132,30 @@ let main argv =
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2))) |> groundEffect
             collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> Shape.Plane )
             mass = Infinite
+        }
+    let wall1 = 
+        { groundObject with
+            id = newId()
+            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) |> wall1Effect
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> Shape.Plane )
+        }
+    let wall2 = 
+        { groundObject with
+            id = newId()
+            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) |> wall2Effect
+            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> Shape.Plane )
+        }
+    let wall3 = 
+        { groundObject with
+            id = newId()
+            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) |> wall3Effect
+            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> Shape.Plane )
+        }
+    let wall4 = 
+        { groundObject with
+            id = newId()
+            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) |> wall4Effect
+            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> Shape.Plane )
         }
 
     let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
@@ -175,9 +219,21 @@ let main argv =
                     }
                 )
 
-        toObjects true manipulableModels @ 
+        let manipulableObjects = (toObjects true manipulableModels)
+        
+        let manipulableObjects =
+            [
+                for (o) in manipulableObjects do
+                    for i in 1..25 do
+                        let offset = Trafo3d.Translation(0.0,float i*2.5,0.0)
+                        yield ({o with 
+                                    id = newId()
+                                    trafo = offset * o.trafo})
+            ]
+
+        manipulableObjects @ 
         toObjects false staticModels 
-        @  [groundObject]
+        @  [groundObject; wall1; wall2; wall3; wall4]
         
     let sceneObj =
         {
