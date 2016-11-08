@@ -5,6 +5,7 @@ open BulletSharp.Math
 
 open Aardvark.Base
 open Aardvark.Base.Incremental
+open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
 open System
@@ -25,8 +26,6 @@ module Mass =
     let toFloat =
         function | Mass m   -> m
                  | Infinite -> 0.0f
-
-       
 
 module BulletHelper =
 
@@ -169,3 +168,87 @@ module BulletHelper =
 
 
                 shape :> CollisionShape
+                
+    type DebugDrawer() = 
+        inherit BulletSharp.DebugDraw()
+    
+        let mutable debugModeBinding = BulletSharp.DebugDrawModes.DrawWireframe // BulletSharp.DebugDrawModes.All
+        let mutable lines = [||]
+        let linesMod = Mod.init ([||])
+        let beamSg = Sg.lines (Mod.init C4b.White) (linesMod) 
+        let beamEffect = Sg.effect [
+                            DefaultSurfaces.trafo |> toEffect
+                            DefaultSurfaces.vertexColor |> toEffect
+                            DefaultSurfaces.thickLine |> toEffect
+                        ]
+
+        member this.debugDrawerSg = beamSg |> beamEffect
+    
+        member this.addLineToStack(fromPos : V3d, toPos : V3d) =
+            lines <- Array.append lines [| Line3d(fromPos, toPos) |]
+            ()
+    
+        member this.flush() =
+            transact ( fun _ -> Mod.change linesMod (lines) )
+            lines <- Array.empty
+            ()
+
+        override x.DrawLine(fromPos, toPos, color) = 
+            x.addLineToStack(toV3d fromPos, toV3d toPos)
+
+        override x.DrawLine(fromPos, toPos, fromColor, toColor) = 
+            x.addLineToStack(toV3d fromPos, toV3d toPos)
+
+        override x.Draw3dText(pos, text) = 
+            ()
+
+        override x.ReportErrorWarning(text) = 
+            printfn "BulletDebugDrawer Error: %A" text
+
+        override x.get_DebugMode() = 
+            debugModeBinding
+
+        override x.set_DebugMode(mode) = 
+            debugModeBinding <- mode
+        
+        // optional
+        override x.DrawBox(  bbMin,   bbMax,   trans,   color) = 
+            let trafo = toTrafo trans
+            let min = toV3d bbMin
+            let max = toV3d bbMax
+            let positions = [| min; V3d(min.X, min.Y, max.Z); V3d(min.X, max.Y, min.Z); V3d(max.X, min.Y, min.Z); 
+                                    V3d(max.X, max.Y, min.Z); V3d(max.X, min.Y, max.Z); V3d(min.X, max.Y, max.Z); max |]
+
+            trafo.Forward.TransformPosArray positions
+            x.addLineToStack(positions.[0], positions.[2])
+            x.addLineToStack(positions.[3], positions.[4])
+            x.addLineToStack(positions.[5], positions.[7])
+            x.addLineToStack(positions.[1], positions.[6])
+            x.addLineToStack(positions.[0], positions.[3])
+            x.addLineToStack(positions.[2], positions.[4])
+            x.addLineToStack(positions.[6], positions.[7])
+            x.addLineToStack(positions.[1], positions.[5])
+            x.addLineToStack(positions.[2], positions.[6])
+            x.addLineToStack(positions.[4], positions.[7])
+            x.addLineToStack(positions.[3], positions.[5])
+            x.addLineToStack(positions.[0], positions.[1])
+            
+        override x.DrawPlane(  planeNormal,  plane,   transform,   color) = ()
+
+        override x.DrawAabb(  from,   toPos,   color) = ()
+        override x.DrawArc(  center,   normal,   axis,   radiusA,  radiusB,  minAngle,  maxAngle,   color,  drawSect,  stepDegrees) = ()
+        override x.DrawArc(  center,   normal,   axis,  radiusA,  radiusB,  minAngle,  maxAngle,   color,  drawSect) = ()
+        override x.DrawBox(  bbMin,   bbMax,   color) = ()
+        override x.DrawCapsule( radius,  halfHeight,  upAxis,   transform,   color) = ()
+        override x.DrawCone( radius,  height,  upAxis,   transform,   color) = ()
+        override x.DrawContactPoint(  pointOnB,   normalOnB,  distance,  lifeTime,   color) = ()
+        override x.DrawCylinder( radius,  halfHeight,  upAxis,   transform,   color) = ()
+        //override x.DrawSphere(  p,  radius,   color) = ()
+        //override x.DrawSphere( radius,   transform,   color) = ()
+        //override x.DrawSpherePatch(  center,   up,   axis,  radius, minTh,  maxTh,  minPs,  maxPs,   color,  stepDegrees,  drawCenter) = ()
+        override x.DrawSpherePatch(  center,   up,   axis,  radius, minTh,  maxTh,  minPs,  maxPs,   color,  stepDegrees) = ()
+        override x.DrawSpherePatch(  center,   up,   axis,  radius, minTh,  maxTh,  minPs,  maxPs,   color) = ()
+        override x.DrawTransform(  transform,  orthoLen) = ()
+        override x.DrawTriangle(  v0,   v1,   v2,   color, a) = ()
+        override x.DrawTriangle(  v0,   v1,   v2, a,  b,  c,   color,  alpha) = ()
+

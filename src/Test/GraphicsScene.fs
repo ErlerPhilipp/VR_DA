@@ -102,6 +102,8 @@ module GraphicsScene =
                 Conversion.Update(mscene,scene)
             )
 
+            PhysicsScene.debugDrawer.flush()
+
             perform (TimeElapsed dt)
             
             for i in 0 .. VrDriver.devices.Length-1 do
@@ -150,5 +152,5 @@ module GraphicsScene =
                 |> ASet.map toSg
                 |> Sg.set
 
-        Sg.ofList [sgs; objects]
+        Sg.ofList [sgs; objects; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo mscene.mviewTrafo

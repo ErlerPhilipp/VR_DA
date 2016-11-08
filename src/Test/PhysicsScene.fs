@@ -32,6 +32,7 @@ module PhysicsScene =
         }
 
     let mutable currentWorld = None
+    let debugDrawer = BulletHelper.DebugDrawer()
 
     // Replay changes into physics world....
     type Conversion private() =
@@ -70,6 +71,7 @@ module PhysicsScene =
             let broad = new DbvtBroadphase()
             let dynWorld = new DiscreteDynamicsWorld(dispatcher, broad, null, collConf)
             dynWorld.Gravity <- toVector3(s.gravity)
+            dynWorld.DebugDrawer <- debugDrawer
             let scene = { original = s; collisionConf = collConf; collisionDisp = dispatcher;  broadPhase = broad; dynamicsWorld = dynWorld; bodies = null }
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene
@@ -158,6 +160,8 @@ module PhysicsScene =
                                 | None -> 
                                     yield b.original
                     ]
+
+                world.dynamicsWorld.DebugDrawWorld()
 
                 { s with
                     objects = PersistentHashSet.ofList objects
