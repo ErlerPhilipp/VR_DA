@@ -173,31 +173,47 @@ module BulletHelper =
         inherit BulletSharp.DebugDraw()
     
         let mutable debugModeBinding = BulletSharp.DebugDrawModes.DrawWireframe // BulletSharp.DebugDrawModes.All
-        let mutable lines = [||]
-        let linesMod = Mod.init ([||])
-        let beamSg = Sg.lines (Mod.init C4b.White) (linesMod) 
+        let mutable lines  = [||]
+        let mutable colors = [||]
+
+        let linesMod  = Mod.init [||]
+        let colorsMod = Mod.init [||]
+        //let linesSg = Sg.lines (Mod.init C4b.White) (linesMod) 
+
+        let pos = (linesMod  |> Mod.map ( fun (a : Line3d[]) -> [| for l in a do yield l.P0.ToV3f(); yield l.P1.ToV3f()|]  ))
+        let col = (colorsMod |> Mod.map ( fun (a : V3d[]) -> [| for c in a do yield c.ToC4f().ToC4b(); yield c.ToC4f().ToC4b()|]  ))
+        let idx = (pos       |> Mod.map ( fun a -> Array.init (a |> Array.length) id))
+        let linesSg =
+            Sg.draw IndexedGeometryMode.LineList
+                |> Sg.vertexAttribute (DefaultSemantic.Positions)   pos 
+                |> Sg.vertexAttribute (DefaultSemantic.Colors)      col
+                |> Sg.index                                         idx
+
         let beamEffect = Sg.effect [
                             DefaultSurfaces.trafo |> toEffect
                             DefaultSurfaces.vertexColor |> toEffect
                             DefaultSurfaces.thickLine |> toEffect
                         ]
 
-        member this.debugDrawerSg = beamSg |> beamEffect
+        member this.debugDrawerSg = linesSg |> beamEffect
     
-        member this.addLineToStack(fromPos : V3d, toPos : V3d) =
+        member this.addLineToStack(fromPos : V3d, toPos : V3d, color : V3d) =
             lines <- Array.append lines [| Line3d(fromPos, toPos) |]
+            colors <- Array.append colors [| color |]
             ()
     
         member this.flush() =
             transact ( fun _ -> Mod.change linesMod (lines) )
             lines <- Array.empty
+            transact ( fun _ -> Mod.change colorsMod (colors) )
+            colors <- Array.empty
             ()
 
         override x.DrawLine(fromPos, toPos, color) = 
-            x.addLineToStack(toV3d fromPos, toV3d toPos)
+            x.addLineToStack(toV3d fromPos, toV3d toPos, toV3d color)
 
         override x.DrawLine(fromPos, toPos, fromColor, toColor) = 
-            x.addLineToStack(toV3d fromPos, toV3d toPos)
+            x.addLineToStack(toV3d fromPos, toV3d toPos, toV3d fromColor)
 
         override x.Draw3dText(pos, text) = 
             ()
@@ -220,18 +236,18 @@ module BulletHelper =
                                     V3d(max.X, max.Y, min.Z); V3d(max.X, min.Y, max.Z); V3d(min.X, max.Y, max.Z); max |]
 
             trafo.Forward.TransformPosArray positions
-            x.addLineToStack(positions.[0], positions.[2])
-            x.addLineToStack(positions.[3], positions.[4])
-            x.addLineToStack(positions.[5], positions.[7])
-            x.addLineToStack(positions.[1], positions.[6])
-            x.addLineToStack(positions.[0], positions.[3])
-            x.addLineToStack(positions.[2], positions.[4])
-            x.addLineToStack(positions.[6], positions.[7])
-            x.addLineToStack(positions.[1], positions.[5])
-            x.addLineToStack(positions.[2], positions.[6])
-            x.addLineToStack(positions.[4], positions.[7])
-            x.addLineToStack(positions.[3], positions.[5])
-            x.addLineToStack(positions.[0], positions.[1])
+            x.addLineToStack(positions.[0], positions.[2], toV3d color)
+            x.addLineToStack(positions.[3], positions.[4], toV3d color)
+            x.addLineToStack(positions.[5], positions.[7], toV3d color)
+            x.addLineToStack(positions.[1], positions.[6], toV3d color)
+            x.addLineToStack(positions.[0], positions.[3], toV3d color)
+            x.addLineToStack(positions.[2], positions.[4], toV3d color)
+            x.addLineToStack(positions.[6], positions.[7], toV3d color)
+            x.addLineToStack(positions.[1], positions.[5], toV3d color)
+            x.addLineToStack(positions.[2], positions.[6], toV3d color)
+            x.addLineToStack(positions.[4], positions.[7], toV3d color)
+            x.addLineToStack(positions.[3], positions.[5], toV3d color)
+            x.addLineToStack(positions.[0], positions.[1], toV3d color)
             
         override x.DrawPlane(  planeNormal,  plane,   transform,   color) = ()
 
