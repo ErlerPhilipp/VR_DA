@@ -81,6 +81,8 @@ let main argv =
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 10 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III))) 
+//    let groundSg = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2)))
 
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
@@ -128,94 +130,85 @@ let main argv =
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
 
-    let leftHandObject : LogicalScene.Object = 
-        {
+    let leftHandObject = 
+        { defaultObject with
             id = newId()
-            isManipulable = false
-            isGrabbed = false
-            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
-            collisionShape = None
-            mass = Infinite
-            restitution = 0.75
         }
-    let rightHandObject : LogicalScene.Object = 
-        {
+    let rightHandObject = 
+        { defaultObject with
             id = newId()
-            isManipulable = false
-            isGrabbed = false
-            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
-            collisionShape = None
-            mass = Infinite
-            restitution = 0.75
         }
-    let camObject : LogicalScene.Object = 
-        {
+    let camObject = 
+        { defaultObject with
             id = newId()
-            isManipulable = false
-            isGrabbed = false
-            wasGrabbed = false
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
-            collisionShape = None
-            mass = Infinite
-            restitution = 0.75
         }
-    let groundObject : LogicalScene.Object = 
-        {
+    let groundObject = 
+        let edgeLength = 10.0
+        { defaultObject with
             id = newId()
-            isManipulable = false
-            isGrabbed = false
-            wasGrabbed = false
-            boundingBox = handBox
-            trafo = Trafo3d.Identity
-            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2))) |> groundEffect
-            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> BulletHelper.Shape.Plane )
-            mass = Infinite
+//            trafo = Trafo3d.Identity
+//            model = groundSg |> groundEffect
+//            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> BulletHelper.Shape.Plane )
+            trafo = Trafo3d.Translation(0.0, -edgeLength * 0.5, 0.0)
+            model = groundSg |> groundEffect
+            collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
+            friction = 0.75
             restitution = 0.75
         }
     let wall1 = 
-        { groundObject with
+        { defaultObject with
             id = newId()
+            friction = 0.75
+            restitution = 0.75
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) |> wall1Effect
             collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
-        { groundObject with
+        { defaultObject with
             id = newId()
+            friction = 0.75
+            restitution = 0.75
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) |> wall2Effect
             collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
-        { groundObject with
+        { defaultObject with
             id = newId()
+            friction = 0.75
+            restitution = 0.75
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) |> wall3Effect
             collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
-        { groundObject with
+        { defaultObject with
             id = newId()
+            friction = 0.75
+            restitution = 0.75
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) |> wall4Effect
             collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
     let ball = 
-        {
+        { defaultObject with
             id = newId()
             isManipulable = true
-            isGrabbed = false
-            wasGrabbed = false
-            boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.1213))
+            boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.2426))
             trafo = Trafo3d.Translation(2.0, 0.0, 0.0)
             model = ballSg |> ballEffect
             mass = Mass 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             restitution = 0.85
+            friction = 0.75
+            CcdSpeedThreshold = 0.2
+            CcdSphereRadius = 1.2
         }
 
     let objects =
@@ -238,11 +231,9 @@ let main argv =
                             | Some s ->
                                 s
 
-                    {
+                    { defaultObject with
                         id = newId()
                         isManipulable = canMove
-                        isGrabbed = false
-                        wasGrabbed = false
                         boundingBox = Box3d.FromCenterAndSize(V3d.Zero, bounds.Size)
                         trafo = Trafo3d.Translation(bounds.Center)
                         model = sg 
@@ -263,7 +254,7 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 75)
+        let ballObjects = replicate ([ball], 1)
         
         manipulableObjects @ 
         ballObjects @
@@ -282,7 +273,7 @@ let main argv =
             lastViewTrafo = Trafo3d.Identity
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw = false
+            physicsDebugDraw = true
         }
 
     let scene =

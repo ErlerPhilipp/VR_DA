@@ -34,7 +34,27 @@ module LogicalScene =
 
             mass              : Mass
             restitution       : float
+            friction          : float
+            CcdSpeedThreshold : float
+            CcdSphereRadius   : float
             collisionShape    : Option<BulletHelper.Shape> 
+        }
+
+    let defaultObject = 
+        {
+            id = newId()
+            isManipulable = false
+            isGrabbed     = false
+            wasGrabbed    = false
+            boundingBox   = Box3d.FromCenterAndSize(V3d.Zero, V3d.One)
+            trafo = Trafo3d.Identity
+            model = Sg.group []
+            mass = Mass.Infinite
+            restitution = 0.0
+            friction = 0.0
+            CcdSpeedThreshold = 0.0 // ccd disabled
+            CcdSphereRadius = 0.0
+            collisionShape = None
         }
 
     type Scene =

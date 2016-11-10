@@ -46,7 +46,7 @@ module PhysicsScene =
                         | Infinite ->
                             let info = new BulletSharp.RigidBodyConstructionInfo(0.0f, state, cshape)
                             let rigidBody = new BulletSharp.RigidBody(info)
-                            rigidBody.Friction <- 0.25f
+                            rigidBody.Friction <- float32 o.friction
                             rigidBody.Restitution <- float32 o.restitution
                             scene.dynamicsWorld.AddCollisionObject(rigidBody)
                             { 
@@ -64,7 +64,10 @@ module PhysicsScene =
                             rigidBody.Activate()
                             rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
                             rigidBody.Restitution <- float32 o.restitution
-                            rigidBody.Friction <- 0.25f
+                            rigidBody.Friction <- float32 o.friction
+                            // continuous collision detection
+                            rigidBody.CcdMotionThreshold <- float32 o.CcdSpeedThreshold
+                            rigidBody.CcdSweptSphereRadius <- float32 o.CcdSphereRadius
 
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             { 
