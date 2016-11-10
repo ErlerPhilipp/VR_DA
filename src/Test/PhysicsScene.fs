@@ -46,6 +46,8 @@ module PhysicsScene =
                         | Infinite ->
                             let info = new BulletSharp.RigidBodyConstructionInfo(0.0f, state, cshape)
                             let rigidBody = new BulletSharp.RigidBody(info)
+                            rigidBody.Friction <- 0.25f
+                            rigidBody.Restitution <- float32 o.restitution
                             scene.dynamicsWorld.AddCollisionObject(rigidBody)
                             { 
                                 original = o
@@ -61,7 +63,7 @@ module PhysicsScene =
                             // TODO: add collisiondispatcher etc, ghost object of grabbed object, activate colliding object if necessary
                             rigidBody.Activate()
                             rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
-                            rigidBody.Restitution <- 0.75f
+                            rigidBody.Restitution <- float32 o.restitution
                             rigidBody.Friction <- 0.25f
 
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
@@ -153,6 +155,11 @@ module PhysicsScene =
                 m.dynamicsWorld.GetGravity(&oldGravity)
                 let newGravity = toVector3 s.gravity
                 if oldGravity <> newGravity then m.dynamicsWorld.SetGravity(ref newGravity)
+
+                if s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.DrawWireframe then 
+                    debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.DrawWireframe
+                else if not s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.None then 
+                    debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.None
 
 
     let stepSimulation (dt : System.TimeSpan) (s : Scene) : Scene =

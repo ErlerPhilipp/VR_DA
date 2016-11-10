@@ -22,14 +22,19 @@ module LogicalScene =
     type Object =
         {
             id                : int
+
             isManipulable     : bool
             isGrabbed         : bool
             wasGrabbed        : bool
+
             boundingBox       : Box3d
+
             trafo             : Trafo3d
             model             : ISg
+
             mass              : Mass
-            collisionShape    : Option<Shape> 
+            restitution       : float
+            collisionShape    : Option<BulletHelper.Shape> 
         }
 
     type Scene =
@@ -44,6 +49,8 @@ module LogicalScene =
             controller2Object : Object
 
             interactionType   : VrInteractions.VrInteractionTechnique
+
+            physicsDebugDraw  : bool
             gravity           : V3d
 
             moveDirection     : V3d

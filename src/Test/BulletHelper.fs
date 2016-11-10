@@ -10,15 +10,6 @@ open Aardvark.SceneGraph
 
 open System
 
-type Shape =
-    | Box            of size :  V3d
-    | Sphere         of radius : float
-    | Cylinder       of radius : float * height : float
-    | Plane          of Plane3d
-    | Mesh           of IndexedGeometry
-    | TriangleMesh   of Triangle3d[]
-    | Compound       of list<Trafo3d * Shape>
-
 type Mass = Infinite | Mass of float32
     
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -28,6 +19,15 @@ module Mass =
                  | Infinite -> 0.0f
 
 module BulletHelper =
+
+    type Shape =
+        | Box            of size :  V3d
+        | Sphere         of radius : float
+        | Cylinder       of radius : float * height : float
+        | Plane          of Plane3d
+        | Mesh           of IndexedGeometry
+        | TriangleMesh   of Triangle3d[]
+        | Compound       of list<Trafo3d * Shape>
 
     let toVector3 (v : V3d) = 
         Vector3(float32 v.X, float32 v.Y, float32 v.Z)
@@ -172,7 +172,7 @@ module BulletHelper =
     type DebugDrawer() = 
         inherit BulletSharp.DebugDraw()
     
-        let mutable debugModeBinding = BulletSharp.DebugDrawModes.DrawWireframe//  BulletSharp.DebugDrawModes.None // BulletSharp.DebugDrawModes.All
+        let mutable debugModeBinding = BulletSharp.DebugDrawModes.None
         let mutable lines  = [||]
         let mutable colors = [||]
 
@@ -202,10 +202,12 @@ module BulletHelper =
             ()
     
         member this.flush() =
-            transact ( fun _ -> Mod.change linesMod (lines) )
-            lines <- Array.empty
-            transact ( fun _ -> Mod.change colorsMod (colors) )
-            colors <- Array.empty
+            if linesMod.Value.Length <> lines.Length then 
+                transact ( fun _ -> Mod.change linesMod (lines) )
+                lines <- Array.empty
+            if colorsMod.Value.Length <> colors.Length then 
+                transact ( fun _ -> Mod.change colorsMod (colors) )
+                colors <- Array.empty
             ()
 
         override x.DrawLine(fromPos, toPos, color) = 

@@ -20,6 +20,42 @@ open Aardvark.VR
 
 open LogicalScene
 
+let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
+    let positions = m.IndexedAttributes.[DefaultSemantic.Positions] |> unbox<V3f[]>
+    let index =
+        if isNull m.IndexArray then Array.init positions.Length id
+        else m.IndexArray |> unbox<int[]>
+
+    match m.Mode with
+        | IndexedGeometryMode.TriangleList ->
+            Array.init (index.Length / 3) (fun ti ->
+                Triangle3d(
+                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+0]]),
+                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+1]]),
+                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+2]])
+                )
+            )
+                
+        | IndexedGeometryMode.TriangleStrip ->
+            failwith ""
+
+        | _ ->
+            [||]
+
+let rec createShape (currentTrafo : Trafo3d) (n : Loader.Node) : Triangle3d[] =
+    match n with
+        | Loader.Empty -> 
+            [||]
+        | Loader.Trafo(t,c) -> 
+            createShape (t * currentTrafo) c
+        | Loader.Group(children) ->
+            children |> List.toArray |> Array.collect (createShape currentTrafo)
+        | Loader.Leaf n ->
+            triangles currentTrafo n.geometry
+
+        | Loader.Material(_,c) ->
+            createShape currentTrafo c
+
 [<EntryPoint>]
 let main argv =
     Ag.initialize()
@@ -35,15 +71,17 @@ let main argv =
 
     let manipulableModels =
         [
-            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
-            @"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 4.0, 0.0), Mass 80.0f
-            @"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0), Mass 100.0f
-            @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f
+            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 100.0f, None, 0.5
+            //@"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 4.0, 0.0), Mass 80.0f, None, 0.5
+            //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0), Mass 100.0f, None, 0.5
+            //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5
         ]
         
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
+    let ballSg = Sg.sphere 10 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
                                 DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
@@ -84,6 +122,11 @@ let main argv =
                         DefaultSurfaces.constantColor C4f.VRVisGreen |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
+    let ballEffect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        DefaultSurfaces.constantColor (C4f (0.586, 0.297, 0.172)) |> toEffect
+                        DefaultSurfaces.simpleLighting |> toEffect
+                    ]
 
     let leftHandObject : LogicalScene.Object = 
         {
@@ -96,6 +139,7 @@ let main argv =
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
             collisionShape = None
             mass = Infinite
+            restitution = 0.75
         }
     let rightHandObject : LogicalScene.Object = 
         {
@@ -108,6 +152,7 @@ let main argv =
             model = handSg |> virtualHandEffect
             collisionShape = None
             mass = Infinite
+            restitution = 0.75
         }
     let camObject : LogicalScene.Object = 
         {
@@ -120,6 +165,7 @@ let main argv =
             model = handSg |> handEffect
             collisionShape = None
             mass = Infinite
+            restitution = 0.75
         }
     let groundObject : LogicalScene.Object = 
         {
@@ -130,73 +176,51 @@ let main argv =
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2))) |> groundEffect
-            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> BulletHelper.Shape.Plane )
             mass = Infinite
+            restitution = 0.75
         }
     let wall1 = 
         { groundObject with
             id = newId()
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) |> wall1Effect
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
         { groundObject with
             id = newId()
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) |> wall2Effect
-            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
         { groundObject with
             id = newId()
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) |> wall3Effect
-            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
         { groundObject with
             id = newId()
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) |> wall4Effect
-            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
-
-    let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
-        let positions = m.IndexedAttributes.[DefaultSemantic.Positions] |> unbox<V3f[]>
-        let index =
-            if isNull m.IndexArray then Array.init positions.Length id
-            else m.IndexArray |> unbox<int[]>
-
-        match m.Mode with
-            | IndexedGeometryMode.TriangleList ->
-                Array.init (index.Length / 3) (fun ti ->
-                    Triangle3d(
-                        trafo.Forward.TransformPos (V3d positions.[index.[3*ti+0]]),
-                        trafo.Forward.TransformPos (V3d positions.[index.[3*ti+1]]),
-                        trafo.Forward.TransformPos (V3d positions.[index.[3*ti+2]])
-                    )
-                )
-                
-            | IndexedGeometryMode.TriangleStrip ->
-                failwith ""
-
-            | _ ->
-                [||]
-
-    let rec createShape (currentTrafo : Trafo3d) (n : Loader.Node) : Triangle3d[] =
-        match n with
-            | Loader.Empty -> 
-                [||]
-            | Loader.Trafo(t,c) -> 
-                createShape (t * currentTrafo) c
-            | Loader.Group(children) ->
-                children |> List.toArray |> Array.collect (createShape currentTrafo)
-            | Loader.Leaf n ->
-                triangles currentTrafo n.geometry
-
-            | Loader.Material(_,c) ->
-                createShape currentTrafo c
+    let ball = 
+        {
+            id = newId()
+            isManipulable = true
+            isGrabbed = false
+            wasGrabbed = false
+            boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.1213))
+            trafo = Trafo3d.Translation(2.0, 0.0, 0.0)
+            model = ballSg |> ballEffect
+            mass = Mass 0.625f
+            collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
+            restitution = 0.85
+        }
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
-            l |> List.mapi (fun i (file, (trafo : Trafo3d), mass) ->
+            l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
                     let assimpScene : Loader.Scene = file |> Loader.Assimp.load 
                     let triangles = createShape trafo assimpScene.root
                     let bounds = triangles |> Seq.collect (fun t -> [t.P0; t.P1; t.P2]) |> Box3d
@@ -205,6 +229,14 @@ let main argv =
                         assimpScene 
                             |> Sg.AdapterNode :> ISg 
                             |> Sg.transform (trafo * Trafo3d.Translation(-bounds.Center))
+
+                    let collShape = 
+                        match shape with
+                            | None ->
+                                //Some (triangles |> BulletHelper.TriangleMesh)
+                                Some (BulletHelper.Box (bounds.Size))
+                            | Some s ->
+                                s
 
                     {
                         id = newId()
@@ -215,23 +247,26 @@ let main argv =
                         trafo = Trafo3d.Translation(bounds.Center)
                         model = sg 
                         mass = mass
-                        collisionShape = Some (Box (bounds.Size))
+                        collisionShape = collShape
+                        restitution = restitution
                     }
                 )
 
-        let manipulableObjects = (toObjects true manipulableModels)
-        
-        let manipulableObjects =
+        let replicate (objects : Object list, amount : int) = 
             [
-                for (o) in manipulableObjects do
-                    for i in 1..25 do
-                        let offset = Trafo3d.Translation(0.0,float i*2.5,0.0)
+                for (o) in objects do
+                    for i in 1..amount do
+                        let offset = Trafo3d.Translation(0.0, float i*2.5, 0.0)
                         yield ({o with 
                                     id = newId()
                                     trafo = offset * o.trafo})
             ]
 
+        let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
+        let ballObjects = replicate ([ball], 75)
+        
         manipulableObjects @ 
+        ballObjects @
         toObjects false staticModels 
         @  [groundObject; wall1; wall2; wall3; wall4]
         
@@ -247,6 +282,7 @@ let main argv =
             lastViewTrafo = Trafo3d.Identity
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
+            physicsDebugDraw = false
         }
 
     let scene =
