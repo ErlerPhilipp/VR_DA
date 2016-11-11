@@ -33,10 +33,11 @@ module LogicalScene =
             model             : ISg
 
             mass              : Mass
-            restitution       : float
-            friction          : float
-            CcdSpeedThreshold : float
-            CcdSphereRadius   : float
+            restitution       : float32
+            friction          : float32
+            ccdSpeedThreshold : float32
+            ccdSphereRadius   : float32
+            rollingFriction   : float32
             collisionShape    : Option<BulletHelper.Shape> 
         }
 
@@ -50,10 +51,11 @@ module LogicalScene =
             trafo = Trafo3d.Identity
             model = Sg.group []
             mass = Mass.Infinite
-            restitution = 0.0
-            friction = 0.0
-            CcdSpeedThreshold = 0.0 // ccd disabled
-            CcdSphereRadius = 0.0
+            restitution = 0.0f
+            friction = 1.0f
+            ccdSpeedThreshold = 0.0f // ccd disabled
+            ccdSphereRadius = 0.0f
+            rollingFriction = 0.0f
             collisionShape = None
         }
 
@@ -72,6 +74,8 @@ module LogicalScene =
 
             physicsDebugDraw  : bool
             gravity           : V3d
+            numSubSteps       : int
+            subStepTime       : float
 
             moveDirection     : V3d
         }

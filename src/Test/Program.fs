@@ -151,6 +151,7 @@ let main argv =
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
         }
+    let commonRestitution = 0.8f
     let groundObject = 
         let edgeLength = 10.0
         { defaultObject with
@@ -161,38 +162,38 @@ let main argv =
             trafo = Trafo3d.Translation(0.0, -edgeLength * 0.5, 0.0)
             model = groundSg |> groundEffect
             collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
-            friction = 0.75
-            restitution = 0.75
+            friction = 0.75f
+            restitution = commonRestitution
         }
     let wall1 = 
         { defaultObject with
             id = newId()
-            friction = 0.75
-            restitution = 0.75
+            friction = 0.75f
+            restitution = commonRestitution
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) |> wall1Effect
             collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
         { defaultObject with
             id = newId()
-            friction = 0.75
-            restitution = 0.75
+            friction = 0.75f
+            restitution = commonRestitution
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) |> wall2Effect
             collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
         { defaultObject with
             id = newId()
-            friction = 0.75
-            restitution = 0.75
+            friction = 0.75f
+            restitution = commonRestitution
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) |> wall3Effect
             collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
         { defaultObject with
             id = newId()
-            friction = 0.75
-            restitution = 0.75
+            friction = 0.75f
+            restitution = commonRestitution
             model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) |> wall4Effect
             collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
@@ -205,10 +206,13 @@ let main argv =
             model = ballSg |> ballEffect
             mass = Mass 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
-            restitution = 0.85
-            friction = 0.75
-            CcdSpeedThreshold = 0.2
-            CcdSphereRadius = 1.2
+            restitution = 0.95f
+            friction = 0.75f
+//            ccdSpeedThreshold = 1e-7f
+//            ccdSphereRadius = 100.2f
+            ccdSpeedThreshold = 0.1f
+            ccdSphereRadius = 0.5f
+            //rollingFriction = 500.5f
         }
 
     let objects =
@@ -254,7 +258,7 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 1)
+        let ballObjects = replicate ([ball], 15)
         
         manipulableObjects @ 
         ballObjects @
@@ -274,6 +278,12 @@ let main argv =
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = true
+//            numSubSteps = 11
+//            subStepTime = 1.0 / 900.0
+//            numSubSteps = 3
+//            subStepTime = 1.0 / 180.0
+            numSubSteps = 0
+            subStepTime = 1.0 / 90.0
         }
 
     let scene =
