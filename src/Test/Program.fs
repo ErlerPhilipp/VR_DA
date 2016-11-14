@@ -152,49 +152,40 @@ let main argv =
             friction = 0.75f
             restitution = commonRestitution
         }
-    let wall1 = 
+
+    let wallBase = 
         { defaultObject with
+                friction = 0.75f
+                restitution = commonRestitution
+                model = Sg.fullScreenQuad
+                            //|> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
+                            |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
+                            |> wallEffect
+                            |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
+        }
+    let wall1 = 
+        { wallBase with 
             id = newId()
-            friction = 0.75f
-            restitution = commonRestitution
-            model = Sg.fullScreenQuad
-                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
-                        |> wallEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.0, 0.0, 5.0)))
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
-        { defaultObject with
+        { wallBase with 
             id = newId()
-            friction = 0.75f
-            restitution = commonRestitution
-            model = Sg.fullScreenQuad 
-                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) 
-                        |> wallEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
-            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) 
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
-        { defaultObject with
+        { wallBase with 
             id = newId()
-            friction = 0.75f
-            restitution = commonRestitution
-            model = Sg.fullScreenQuad 
-                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) 
-                        |> wallEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
-            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, 0.0, -5.0))) 
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
-        { defaultObject with
+        { wallBase with 
             id = newId()
-            friction = 0.75f
-            restitution = commonRestitution
-            model = Sg.fullScreenQuad 
-                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) 
-                        |> wallEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
-            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
+            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let ball = 
         { defaultObject with
