@@ -54,7 +54,7 @@ module PhysicsScene =
                         rigidBody.CcdMotionThreshold <- float32 o.ccdSpeedThreshold
                         rigidBody.CcdSweptSphereRadius <- float32 o.ccdSphereRadius
                         rigidBody.RollingFriction <- float32 o.rollingFriction
-                        rigidBody.SetDamping(0.5f, 0.1f)
+                        rigidBody.SetDamping(0.1f, 0.1f)
                         rigidBody
 
                     match o.mass with
@@ -87,6 +87,11 @@ module PhysicsScene =
             let dynWorld = new DiscreteDynamicsWorld(dispatcher, broad, null, collConf)
             dynWorld.Gravity <- toVector3(s.gravity)
             dynWorld.DebugDrawer <- debugDrawer
+
+            // make bounce reliable, no added impulse from penetration
+            dynWorld.SolverInfo.SplitImpulse <- 1
+            dynWorld.SolverInfo.SplitImpulsePenetrationThreshold <- 0.02f
+
             let scene = { original = s; collisionConf = collConf; collisionDisp = dispatcher; broadPhase = broad; dynamicsWorld = dynWorld; bodies = null;  }
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene

@@ -151,7 +151,7 @@ let main argv =
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
         }
-    let commonRestitution = 0.8f
+    let commonRestitution = 0.95f
     let groundObject = 
         let edgeLength = 10.0
         { defaultObject with
@@ -206,7 +206,7 @@ let main argv =
             model = ballSg |> ballEffect
             mass = Mass 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
-            restitution = 0.95f
+            restitution = commonRestitution
             friction = 0.75f
 //            ccdSpeedThreshold = 1e-7f
 //            ccdSphereRadius = 100.2f
