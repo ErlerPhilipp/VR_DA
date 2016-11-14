@@ -64,6 +64,7 @@ module LogicalScene =
             objects           : pset<Object>
             viewTrafo         : Trafo3d
             lastViewTrafo     : Trafo3d
+            deviceOffset      : Trafo3d
             
             cam1Object        : Object
             cam2Object        : Object
@@ -182,15 +183,21 @@ module LogicalScene =
                 let axisWithDeathZone = VrInteractions.getAxisValueWithDeathZone(axisValue)
 
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
-                { scene with
-                    // only move static objects, keep active objects like controllers
-                    objects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        let newTrafo = if o.isGrabbed then o.trafo else o.trafo * dp
+                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
+                        //let newTrafo = if o.isGrabbed then o.trafo * dp.Inverse else o.trafo
+                        let newTrafo = o.trafo
                         { o with 
                             trafo = newTrafo; 
                             wasGrabbed = o.isGrabbed 
                         }
                     )
+                let newSceneTrafo = scene.deviceOffset * dp
+
+                { scene with
+                    // only move static objects, keep active objects like controllers
+                    // TODO: only move devices, keep not grabbed objects
+                    objects = newObjects
+                    deviceOffset = newSceneTrafo
                 }
 
             | UpdateViewTrafo trafo -> 

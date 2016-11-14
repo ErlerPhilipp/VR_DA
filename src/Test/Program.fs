@@ -275,6 +275,7 @@ let main argv =
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastViewTrafo = Trafo3d.Identity
+            deviceOffset = Trafo3d.Identity
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = true
