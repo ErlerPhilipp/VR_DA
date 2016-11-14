@@ -96,7 +96,7 @@ module PhysicsScene =
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene
 
-        static member Update(m : PhysicsBody, o : Object) =
+        static member Update(m : PhysicsBody, o : Object, s : Scene) =
             if not (System.Object.ReferenceEquals(m.original, o)) then
                 
                 match o.collisionShape, m.body with
@@ -107,11 +107,17 @@ module PhysicsScene =
                         if body.CcdSweptSphereRadius <> o.ccdSphereRadius then body.CcdSweptSphereRadius <- o.ccdSphereRadius
                         if body.RollingFriction <> o.rollingFriction then body.RollingFriction <- o.rollingFriction
 
+                        let newWorldTransform = toMatrix o.trafo
+                        let worldTransformChanged = body.WorldTransform <> newWorldTransform
+                        if worldTransformChanged then
+                            body.WorldTransform <- newWorldTransform
+
                         if (o.wasGrabbed && not o.isGrabbed) then
                             body.ClearForces()
                             // activate by setting normal mass
                             body.SetMassProps(Mass.toFloat o.mass, m.inertia)
-
+                            
+                        if (o.wasGrabbed && not o.isGrabbed) || worldTransformChanged then
                             // set object velocity to hand velocity
                             let vel = VrDriver.inputDevices.controller2.Velocity
                             let handVelocity = toVector3(vel)
@@ -136,12 +142,6 @@ module PhysicsScene =
 //                            body.Activate()
 //                            body.ForceActivationState(ActivationState.DisableDeactivation)
 
-                        let newWorldTransform = toMatrix o.trafo
-                        if body.WorldTransform <> newWorldTransform then
-                            body.WorldTransform <- newWorldTransform
-                            
-//                            body.Activate()
-
                         m.original <- o
                     | _ -> failwith "not yet implemented...."
 
@@ -155,7 +155,7 @@ module PhysicsScene =
                 for t in s.objects |> PersistentHashSet.toSeq do
                     match table.TryRemove t.id with
                         | (true, mo) -> 
-                            Conversion.Update(mo, t)
+                            Conversion.Update(mo, t, s)
                         | _ ->
                             let mo = Conversion.Create(t,m)
                             m.bodies.Add mo |> ignore

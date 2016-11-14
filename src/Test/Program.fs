@@ -64,6 +64,8 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
 
+    //printfn "Working dir: %A" (System.IO.Directory.GetCurrentDirectory())
+
     let staticModels =
         [
             //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite
@@ -82,7 +84,6 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 10 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III))) 
-//    let groundSg = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2)))
 
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
@@ -101,27 +102,13 @@ let main argv =
                     ]
     let groundEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.Gray80 |> toEffect
+                        //DefaultSurfaces.constantColor C4f.Gray80 |> toEffect
+                        DefaultSurfaces.diffuseTexture |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
-    let wall1Effect = Sg.effect [
+    let wallEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.Red |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
-                    ]
-    let wall2Effect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.Green |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
-                    ]
-    let wall3Effect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.Blue |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
-                    ]
-    let wall4Effect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.VRVisGreen |> toEffect
+                        DefaultSurfaces.diffuseTexture |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
     let ballEffect = Sg.effect [
@@ -151,16 +138,16 @@ let main argv =
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
         }
+
     let commonRestitution = 0.95f
     let groundObject = 
         let edgeLength = 10.0
         { defaultObject with
             id = newId()
-//            trafo = Trafo3d.Identity
-//            model = groundSg |> groundEffect
-//            collisionShape = Some ( Plane3d(V3d(0,1,0), V3d(0,0,0)) |> BulletHelper.Shape.Plane )
             trafo = Trafo3d.Translation(0.0, -edgeLength * 0.5, 0.0)
-            model = groundSg |> groundEffect
+            model = groundSg 
+                        |> groundEffect 
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
             collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
             friction = 0.75f
             restitution = commonRestitution
@@ -170,7 +157,10 @@ let main argv =
             id = newId()
             friction = 0.75f
             restitution = commonRestitution
-            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) |> wall1Effect
+            model = Sg.fullScreenQuad
+                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
+                        |> wallEffect
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
             collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
@@ -178,7 +168,10 @@ let main argv =
             id = newId()
             friction = 0.75f
             restitution = commonRestitution
-            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) |> wall2Effect
+            model = Sg.fullScreenQuad 
+                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) 
+                        |> wallEffect
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
             collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
@@ -186,7 +179,10 @@ let main argv =
             id = newId()
             friction = 0.75f
             restitution = commonRestitution
-            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) |> wall3Effect
+            model = Sg.fullScreenQuad 
+                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, -5.0))) 
+                        |> wallEffect
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
             collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
@@ -194,7 +190,10 @@ let main argv =
             id = newId()
             friction = 0.75f
             restitution = commonRestitution
-            model = Sg.fullScreenQuad |> Sg.trafo (Mod.constant (Trafo3d.Scale 100.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) |> wall4Effect
+            model = Sg.fullScreenQuad 
+                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float -MathHelper.PiOver2) * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(0.0, 0.0, 5.0))) 
+                        |> wallEffect
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
             collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
     let ball = 
@@ -258,7 +257,7 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 15)
+        let ballObjects = replicate ([ball], 150)
         
         manipulableObjects @ 
         ballObjects @
@@ -276,9 +275,10 @@ let main argv =
             viewTrafo = Trafo3d.Identity
             lastViewTrafo = Trafo3d.Identity
             deviceOffset = Trafo3d.Identity
+            deltaTime = 0.0
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw = true
+            physicsDebugDraw = false
 //            numSubSteps = 11
 //            subStepTime = 1.0 / 900.0
 //            numSubSteps = 3

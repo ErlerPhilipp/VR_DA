@@ -65,6 +65,8 @@ module LogicalScene =
             viewTrafo         : Trafo3d
             lastViewTrafo     : Trafo3d
             deviceOffset      : Trafo3d
+
+            deltaTime         : float
             
             cam1Object        : Object
             cam2Object        : Object
@@ -198,6 +200,7 @@ module LogicalScene =
                     // TODO: only move devices, keep not grabbed objects
                     objects = newObjects
                     deviceOffset = newSceneTrafo
+                    deltaTime = dt.TotalSeconds
                 }
 
             | UpdateViewTrafo trafo -> 
