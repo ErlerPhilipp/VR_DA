@@ -87,6 +87,9 @@ module GraphicsScene =
         let mutable scene = initialScene
         let mscene = Conversion.Create initialScene
 
+        let mutable shouldDoPhysics = true
+
+
         let perform (msg : Message) =
             transact (fun () ->
                 scene <- update scene msg
@@ -97,14 +100,17 @@ module GraphicsScene =
         let oldTrafos = Array.zeroCreate deviceCount
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
 
-            transact (fun () -> 
-                scene <- PhysicsScene.stepSimulation dt scene 
-                Conversion.Update(mscene,scene)
-            )
+            let timeStepThreshold = 0.5
+            if dt.TotalSeconds < timeStepThreshold && scene.enablePhysics then
 
-            PhysicsScene.debugDrawer.flush()
+                transact (fun () -> 
+                    scene <- PhysicsScene.stepSimulation dt scene 
+                    Conversion.Update(mscene,scene)
+                )
 
-            perform (TimeElapsed dt)
+                PhysicsScene.debugDrawer.flush()
+
+                perform (TimeElapsed dt)
             
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]

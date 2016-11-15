@@ -67,6 +67,7 @@ module LogicalScene =
             deviceOffset      : Trafo3d
 
             deltaTime         : float
+            enablePhysics     : bool
             
             cam1Object        : Object
             cam2Object        : Object
@@ -114,6 +115,10 @@ module LogicalScene =
                 transact ( fun _ -> Mod.change virtualHandColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
                 { scene with
                     interactionType = newInteractionTechnique
+                }
+            | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id && a = 0 ->
+                { scene with
+                    enablePhysics = not scene.enablePhysics
                 }
             | DevicePress(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
                 

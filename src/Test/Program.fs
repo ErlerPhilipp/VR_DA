@@ -68,21 +68,21 @@ let main argv =
 
     let staticModels =
         [
-            //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite
+            //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite, None, 0.5f
         ]
 
     let manipulableModels =
         [
-            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 100.0f, None, 0.5
+            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-0.5, 0.0, 0.0), Mass 100.0f, None, 0.5f
             //@"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 4.0, 0.0), Mass 80.0f, None, 0.5
-            //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(2.0, 0.0, 0.0), Mass 100.0f, None, 0.5
-            //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5
+            //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(0.0, 0.0, 0.0), Mass 100.0f, None, 0.5f
+            //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
         
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
-    let ballSg = Sg.sphere 10 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III))) 
 
     let virtualHandEffect = Sg.effect [
@@ -113,7 +113,8 @@ let main argv =
                     ]
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor (C4f (0.586, 0.297, 0.172)) |> toEffect
+                        DefaultSurfaces.diffuseTexture |> toEffect
+                        //DefaultSurfaces.constantColor (C4f (0.586, 0.297, 0.172)) |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
 
@@ -158,7 +159,6 @@ let main argv =
                 friction = 0.75f
                 restitution = commonRestitution
                 model = Sg.fullScreenQuad
-                            //|> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0 * Trafo3d.RotationX (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
                             |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
                             |> wallEffect
                             |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
@@ -167,19 +167,19 @@ let main argv =
         { wallBase with 
             id = newId()
             model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.0, 0.0, 5.0)))
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
         { wallBase with 
             id = newId()
             model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) 
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
         }
     let wall3 = 
         { wallBase with 
             id = newId()
             model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, 0.0, -5.0))) 
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
+            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
         { wallBase with 
@@ -192,8 +192,8 @@ let main argv =
             id = newId()
             isManipulable = true
             boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.2426))
-            trafo = Trafo3d.Translation(2.0, 0.0, 0.0)
-            model = ballSg |> ballEffect
+            trafo = Trafo3d.Translation(-0.0, 0.0, 0.0)
+            model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
             mass = Mass 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             restitution = commonRestitution
@@ -215,13 +215,13 @@ let main argv =
                     let sg = 
                         assimpScene 
                             |> Sg.AdapterNode :> ISg 
-                            |> Sg.transform (trafo * Trafo3d.Translation(-bounds.Center))
+                            |> Sg.transform (trafo)
 
                     let collShape = 
                         match shape with
                             | None ->
-                                //Some (triangles |> BulletHelper.TriangleMesh)
-                                Some (BulletHelper.Box (bounds.Size))
+                                Some (triangles |> BulletHelper.TriangleMesh)
+                                //Some (BulletHelper.Box (bounds.Size))
                             | Some s ->
                                 s
 
@@ -241,7 +241,7 @@ let main argv =
             [
                 for (o) in objects do
                     for i in 1..amount do
-                        let offset = Trafo3d.Translation(0.0, float i*2.5, 0.0)
+                        let offset = Trafo3d.Translation(0.0, float i*2.0, 0.0)
                         yield ({o with 
                                     id = newId()
                                     trafo = offset * o.trafo})
@@ -267,6 +267,7 @@ let main argv =
             lastViewTrafo = Trafo3d.Identity
             deviceOffset = Trafo3d.Identity
             deltaTime = 0.0
+            enablePhysics = true
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = false

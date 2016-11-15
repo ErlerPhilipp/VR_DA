@@ -173,8 +173,8 @@ module BulletHelper =
         inherit BulletSharp.DebugDraw()
     
         let mutable debugModeBinding = BulletSharp.DebugDrawModes.None
-        let mutable lines  = [||]
-        let mutable colors = [||]
+        let lines  = System.Collections.Generic.List()
+        let colors = System.Collections.Generic.List()
 
         let linesMod  = Mod.init [||]
         let colorsMod = Mod.init [||]
@@ -197,17 +197,17 @@ module BulletHelper =
         member this.debugDrawerSg = linesSg |> beamEffect
     
         member this.addLineToStack(fromPos : V3d, toPos : V3d, color : V3d) =
-            lines <- Array.append lines [| Line3d(fromPos, toPos) |]
-            colors <- Array.append colors [| color |]
+            lines.Add(Line3d(fromPos, toPos))
+            colors.Add(color)
             ()
     
         member this.flush() =
-            if linesMod.Value.Length <> lines.Length then 
-                transact ( fun _ -> Mod.change linesMod (lines) )
-                lines <- Array.empty
-            if colorsMod.Value.Length <> colors.Length then 
-                transact ( fun _ -> Mod.change colorsMod (colors) )
-                colors <- Array.empty
+            if linesMod.Value.Length <> lines.Count then 
+                transact ( fun _ -> Mod.change linesMod (lines.ToArray()) )
+                lines.Clear()
+            if colorsMod.Value.Length <> colors.Count then 
+                transact ( fun _ -> Mod.change colorsMod (colors.ToArray()) )
+                colors.Clear()
             ()
 
         override x.DrawLine(fromPos, toPos, color) = 
