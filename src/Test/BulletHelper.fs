@@ -11,12 +11,6 @@ open Aardvark.SceneGraph
 open System
 
 type Mass = Infinite | Mass of float32
-    
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Mass =
-    let toFloat =
-        function | Mass m   -> m
-                 | Infinite -> 0.0f
 
 module BulletHelper =
 

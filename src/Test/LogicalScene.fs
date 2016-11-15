@@ -18,11 +18,14 @@ module LogicalScene =
         currentId <- currentId + 1
         currentId
 
+    type ObjectTypes = Static | Dynamic | Ghost // TODO: | Kinematic
+
     type pset<'a> = PersistentHashSet<'a>
     type Object =
         {
             id                : int
-
+            
+            objectType        : ObjectTypes
             isManipulable     : bool
             isGrabbed         : bool
             wasGrabbed        : bool
@@ -32,7 +35,7 @@ module LogicalScene =
             trafo             : Trafo3d
             model             : ISg
 
-            mass              : Mass
+            mass              : float32
             restitution       : float32
             friction          : float32
             ccdSpeedThreshold : float32
@@ -44,13 +47,14 @@ module LogicalScene =
     let defaultObject = 
         {
             id = newId()
+            objectType    = ObjectTypes.Static
             isManipulable = false
             isGrabbed     = false
             wasGrabbed    = false
             boundingBox   = Box3d.FromCenterAndSize(V3d.Zero, V3d.One)
             trafo = Trafo3d.Identity
             model = Sg.group []
-            mass = Mass.Infinite
+            mass = 0.0f
             restitution = 0.0f
             friction = 1.0f
             ccdSpeedThreshold = 0.0f // ccd disabled

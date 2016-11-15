@@ -128,6 +128,7 @@ let main argv =
     let rightHandObject = 
         { defaultObject with
             id = newId()
+            objectType = ObjectTypes.Static // TODO: ghost
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
@@ -141,6 +142,8 @@ let main argv =
         }
 
     let commonRestitution = 0.95f
+    let commonRollingFriction = 0.01f
+
     let groundObject = 
         let edgeLength = 10.0
         { defaultObject with
@@ -151,12 +154,14 @@ let main argv =
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
             collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
             friction = 0.75f
+            rollingFriction = commonRollingFriction
             restitution = commonRestitution
         }
 
     let wallBase = 
         { defaultObject with
                 friction = 0.75f
+                rollingFriction = commonRollingFriction
                 restitution = commonRestitution
                 model = Sg.fullScreenQuad
                             |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
@@ -190,11 +195,12 @@ let main argv =
     let ball = 
         { defaultObject with
             id = newId()
+            objectType = ObjectTypes.Dynamic
             isManipulable = true
             boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.2426))
             trafo = Trafo3d.Translation(-0.0, 0.0, 0.0)
             model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
-            mass = Mass 0.625f
+            mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             restitution = commonRestitution
             friction = 0.75f
@@ -202,7 +208,7 @@ let main argv =
 //            ccdSphereRadius = 100.2f
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
-            //rollingFriction = 500.5f
+            rollingFriction = commonRollingFriction
         }
 
     let objects =
@@ -248,7 +254,7 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 150)
+        let ballObjects = replicate ([ball], 100)
         
         manipulableObjects @ 
         ballObjects @
@@ -270,13 +276,13 @@ let main argv =
             enablePhysics = true
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             gravity = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw = false
+            physicsDebugDraw = true
 //            numSubSteps = 11
 //            subStepTime = 1.0 / 900.0
-//            numSubSteps = 3
-//            subStepTime = 1.0 / 180.0
-            numSubSteps = 0
-            subStepTime = 1.0 / 90.0
+            numSubSteps = 3
+            subStepTime = 1.0 / 180.0
+//            numSubSteps = 1
+//            subStepTime = 1.0 / 90.0
         }
 
     let scene =
