@@ -7,15 +7,6 @@ open Aardvark.Base
 module VrInteractions =
     open VrTypes
     
-    type Message =
-        | DevicePress of int * int * Trafo3d
-        | DeviceRelease of int * int * Trafo3d
-        | DeviceTouch of int * int * Trafo3d
-        | DeviceUntouch of int * int * Trafo3d
-        | DeviceMove of int * Trafo3d
-        | TimeElapsed of System.TimeSpan
-        | UpdateViewTrafo of Trafo3d
-    
     type VrInteractionTechnique =
         | VirtualHand = 1
         | GoGo = 2

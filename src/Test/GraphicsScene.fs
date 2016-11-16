@@ -45,10 +45,10 @@ module GraphicsScene =
                 mobjects = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
 
-                mcam1Object = s.cam1Object |> Conversion.Create |> Mod.init
-                mcam2Object = s.cam2Object |> Conversion.Create |> Mod.init
-                mcontroller1Object = s.controller1Object |> Conversion.Create |> Mod.init
-                mcontroller2Object = s.controller2Object |> Conversion.Create |> Mod.init
+                mcam1Object = getObjectWithId(s.cam1ObjectId, s.objects) |> Conversion.Create |> Mod.init
+                mcam2Object = getObjectWithId(s.cam2ObjectId, s.objects) |> Conversion.Create |> Mod.init
+                mcontroller1Object = getObjectWithId(s.controller1ObjectId, s.objects) |> Conversion.Create |> Mod.init
+                mcontroller2Object = getObjectWithId(s.controller2ObjectId, s.objects) |> Conversion.Create |> Mod.init
             }
 
         static member Update(m : MObject, o : Object) =
@@ -63,10 +63,10 @@ module GraphicsScene =
 
                 m.mviewTrafo.Value <- s.viewTrafo
                 
-                Conversion.Update(m.mcam1Object.Value, s.cam1Object)
-                Conversion.Update(m.mcam2Object.Value, s.cam2Object)
-                Conversion.Update(m.mcontroller1Object.Value, s.controller1Object)
-                Conversion.Update(m.mcontroller2Object.Value, s.controller2Object)
+                Conversion.Update(m.mcam1Object.Value, getObjectWithId(s.cam1ObjectId, s.objects))
+                Conversion.Update(m.mcam2Object.Value, getObjectWithId(s.cam2ObjectId, s.objects))
+                Conversion.Update(m.mcontroller1Object.Value, getObjectWithId(s.controller1ObjectId, s.objects))
+                Conversion.Update(m.mcontroller2Object.Value, getObjectWithId(s.controller2ObjectId, s.objects))
 
                 let table = 
                     m.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -143,20 +143,10 @@ module GraphicsScene =
                 |> Sg.dynamic
                 |> Sg.trafo t.mtrafo
 
-        let visibleDevices = [mscene.mcontroller1Object.Value; mscene.mcontroller2Object.Value; mscene.mcam1Object.Value; mscene.mcam2Object.Value]
-        let objects = 
-            visibleDevices |> List.map toSg
-                |> Sg.ofList
-                |> Sg.shader {
-                    do! DefaultSurfaces.trafo
-                    do! DefaultSurfaces.vertexColor
-                    do! DefaultSurfaces.simpleLighting
-                   }
-
         let sgs = 
             mscene.mobjects
                 |> ASet.map toSg
                 |> Sg.set
 
-        Sg.ofList [sgs; objects; PhysicsScene.debugDrawer.debugDrawerSg]
+        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo mscene.mviewTrafo

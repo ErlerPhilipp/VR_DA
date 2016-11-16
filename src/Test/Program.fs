@@ -78,8 +78,9 @@ let main argv =
             //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(0.0, 0.0, 0.0), Mass 100.0f, None, 0.5f
             //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
-        
-    let handBox = Box3d.FromCenterAndSize(V3d.OOO, 0.1 * V3d.III)
+    
+    let handBoxEdgeLength = 0.1
+    let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
@@ -128,10 +129,11 @@ let main argv =
     let rightHandObject = 
         { defaultObject with
             id = newId()
-            objectType = ObjectTypes.Static // TODO: ghost
+            objectType = ObjectTypes.Ghost
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
+            collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
         }
     let camObject = 
         { defaultObject with
@@ -254,19 +256,20 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 100)
+        let ballObjects = replicate ([ball], 50)
         
         manipulableObjects @ 
         ballObjects @
         toObjects false staticModels 
-        @  [groundObject; wall1; wall2; wall3; wall4]
+        @ [groundObject; wall1; wall2; wall3; wall4]
+        @ [leftHandObject; rightHandObject; camObject; camObject;]
         
     let sceneObj =
         {
-            cam1Object = camObject
-            cam2Object = camObject
-            controller1Object = leftHandObject
-            controller2Object = rightHandObject
+            cam1ObjectId = camObject.id
+            cam2ObjectId = camObject.id
+            controller1ObjectId = leftHandObject.id
+            controller2ObjectId = rightHandObject.id
             objects = PersistentHashSet.ofList objects
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity

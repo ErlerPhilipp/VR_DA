@@ -65,18 +65,18 @@ module LogicalScene =
 
     type Scene =
         {
-            objects           : pset<Object>
-            viewTrafo         : Trafo3d
-            lastViewTrafo     : Trafo3d
-            deviceOffset      : Trafo3d
+            objects             : pset<Object>
+            viewTrafo           : Trafo3d
+            lastViewTrafo       : Trafo3d
+            deviceOffset        : Trafo3d
 
-            deltaTime         : float
-            enablePhysics     : bool
+            deltaTime           : float
+            enablePhysics       : bool
             
-            cam1Object        : Object
-            cam2Object        : Object
-            controller1Object : Object
-            controller2Object : Object
+            cam1ObjectId        : int
+            cam2ObjectId        : int
+            controller1ObjectId : int
+            controller2ObjectId : int
 
             interactionType   : VrInteractions.VrInteractionTechnique
 
@@ -87,28 +87,58 @@ module LogicalScene =
 
             moveDirection     : V3d
         }
-
         
+    type Message =
+        | DevicePress of int * int * Trafo3d
+        | DeviceRelease of int * int * Trafo3d
+        | DeviceTouch of int * int * Trafo3d
+        | DeviceUntouch of int * int * Trafo3d
+        | DeviceMove of int * Trafo3d
+        | TimeElapsed of System.TimeSpan
+        | UpdateViewTrafo of Trafo3d
+        | Collision of Object * Object
+        
+    let updateObjectstrafoWithId(id : int, objects : pset<Object>, t : Trafo3d) = 
+        let newObjects = objects |> PersistentHashSet.map (fun o -> 
+            if o.id = id then
+                {o with trafo = t}
+            else
+                o
+            ) 
+        newObjects
+
+    let getObjectWithId(id : int, objects : pset<Object>) =
+        let objectWithId = 
+            objects |> PersistentHashSet.fold ( fun found current -> if current.id = id then Some current else found) None
+        
+        match objectWithId with
+            | Some foundObject -> foundObject
+            | None -> failwith(sprintf "Object with id %A not found!" id) 
 
     let update (scene : Scene) (message : Message) : Scene =
 
         let scene =
             match message with
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
+                    let newObjects = updateObjectstrafoWithId(scene.controller1ObjectId, scene.objects, t)
                     { scene with 
-                        controller1Object = {scene.controller1Object with trafo = t}
+                        objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
+                    let virtualHandTrafo = VrInteractions.getVirtualHandTrafo(t, scene.viewTrafo, scene.interactionType)
+                    let newObjects = updateObjectstrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
                     { scene with 
-                        controller2Object = {scene.controller2Object with trafo = VrInteractions.getVirtualHandTrafo(t, scene.viewTrafo, scene.interactionType)}
+                        objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
+                    let newObjects = updateObjectstrafoWithId(scene.cam1ObjectId, scene.objects, t)
                     { scene with 
-                        cam1Object = {scene.cam1Object with trafo = t}
+                        objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
+                    let newObjects = updateObjectstrafoWithId(scene.cam2ObjectId, scene.objects, t)
                     { scene with 
-                        cam2Object = {scene.cam2Object with trafo = t}
+                        objects = newObjects
                     }
                 | _ -> 
                     scene
@@ -128,7 +158,7 @@ module LogicalScene =
                 
                 let trafo = 
                     if deviceId = assignedInputs.controller2Id then
-                        scene.controller2Object.trafo
+                        getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
                     else
                         t
 
@@ -154,7 +184,7 @@ module LogicalScene =
             | DeviceMove(deviceId, t) ->
                 let trafo = 
                     if deviceId = assignedInputs.controller2Id then
-                        scene.controller2Object.trafo
+                        getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
                     else
                         t
 
