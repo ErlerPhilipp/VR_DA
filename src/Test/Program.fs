@@ -7,8 +7,11 @@ open Valve.VR
 open OpenTK
 open OpenTK.Graphics
 
+open FShade
+
 open Aardvark.Base
 open Aardvark.Base.Rendering
+open Aardvark.Base.Rendering.Effects
 open Aardvark.Application
 open Aardvark.Rendering.GL
 open Aardvark.Application.WinForms
@@ -55,6 +58,18 @@ let rec createShape (currentTrafo : Trafo3d) (n : Loader.Node) : Triangle3d[] =
 
         | Loader.Material(_,c) ->
             createShape currentTrafo c
+            
+                    
+type UniformScope with
+    member x.isHighlighted : bool = x?isHighlighted
+
+let highlight (v : Vertex) =
+    fragment {
+        if uniform.isHighlighted then
+            return v.c + 0.3
+        else
+            return v.c
+    }
 
 [<EntryPoint>]
 let main argv =
@@ -117,7 +132,9 @@ let main argv =
                         DefaultSurfaces.diffuseTexture |> toEffect
                         //DefaultSurfaces.constantColor (C4f (0.586, 0.297, 0.172)) |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
+                        highlight |> toEffect
                     ]
+
 
     let leftHandObject = 
         { defaultObject with
@@ -134,6 +151,7 @@ let main argv =
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
             collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
+            isColliding = false
         }
     let camObject = 
         { defaultObject with

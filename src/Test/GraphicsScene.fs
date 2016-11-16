@@ -17,6 +17,7 @@ module GraphicsScene =
             mutable original    : Object
             mtrafo              : ModRef<Trafo3d>
             mmodel              : ModRef<ISg>
+            misGrabbable        : ModRef<bool>
         }
 
     type MScene =
@@ -37,6 +38,7 @@ module GraphicsScene =
                 original = o
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
+                misGrabbable = Mod.init o.isGrabbable
             }
 
         static member Create(s : Scene) =
@@ -56,6 +58,7 @@ module GraphicsScene =
                 m.original <- o
                 m.mmodel.Value <- o.model
                 m.mtrafo.Value <- o.trafo
+                m.misGrabbable.Value <- o.isGrabbable
 
         static member Update(m : MScene, s : Scene) =
             if not (System.Object.ReferenceEquals(m.original, s)) then
@@ -99,6 +102,8 @@ module GraphicsScene =
         let deviceCount = VrDriver.devices.Length
         let oldTrafos = Array.zeroCreate deviceCount
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
+    
+            perform StartFrame
 
             let timeStepThreshold = 0.5
             if dt.TotalSeconds < timeStepThreshold && scene.enablePhysics then
@@ -109,9 +114,9 @@ module GraphicsScene =
                 )
 
                 PhysicsScene.debugDrawer.flush()
+                    
+            perform (TimeElapsed dt)
 
-                perform (TimeElapsed dt)
-            
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
                 if oldTrafos.[i] <> t then
@@ -133,7 +138,6 @@ module GraphicsScene =
                     | EVREventType.VREvent_ButtonTouch -> perform(DeviceTouch(deviceId, axis, trafo))
                     | EVREventType.VREvent_ButtonUntouch -> perform(DeviceUntouch(deviceId, axis, trafo))
                     | _ -> () //printfn "%A" (e.eventType)
-    
             ()
 
         win.Update <- update
@@ -141,6 +145,7 @@ module GraphicsScene =
         let toSg (t : MObject) =
             t.mmodel
                 |> Sg.dynamic
+                |> Sg.uniform "isHighlighted" t.misGrabbable
                 |> Sg.trafo t.mtrafo
 
         let sgs = 

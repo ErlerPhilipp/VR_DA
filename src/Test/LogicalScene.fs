@@ -18,7 +18,11 @@ module LogicalScene =
         currentId <- currentId + 1
         currentId
 
-    type ObjectTypes = Static | Dynamic | Ghost // TODO: | Kinematic
+    type ObjectTypes = 
+        | Static  // static collider, never moving
+        | Dynamic // moved by physics
+        | Ghost   // tracks its collisions
+        // TODO: | Kinematic // not moved by physics but by game logic
 
     type pset<'a> = PersistentHashSet<'a>
     type Object =
@@ -26,7 +30,9 @@ module LogicalScene =
             id                : int
             
             objectType        : ObjectTypes
+            isColliding       : bool
             isManipulable     : bool
+            isGrabbable       : bool
             isGrabbed         : bool
             wasGrabbed        : bool
 
@@ -48,7 +54,9 @@ module LogicalScene =
         {
             id = newId()
             objectType    = ObjectTypes.Static
+            isColliding   = true
             isManipulable = false
+            isGrabbable   = false
             isGrabbed     = false
             wasGrabbed    = false
             boundingBox   = Box3d.FromCenterAndSize(V3d.Zero, V3d.One)
@@ -94,6 +102,7 @@ module LogicalScene =
         | DeviceTouch of int * int * Trafo3d
         | DeviceUntouch of int * int * Trafo3d
         | DeviceMove of int * Trafo3d
+        | StartFrame
         | TimeElapsed of System.TimeSpan
         | UpdateViewTrafo of Trafo3d
         | Collision of Object * Object
@@ -166,7 +175,7 @@ module LogicalScene =
                         if o.isManipulable then
                             let modelLocation = o.trafo.Backward.TransformPos trafo.Forward.C3.XYZ
                             if o.boundingBox.Contains modelLocation then
-                                { o with isGrabbed = true}
+                                { o with isGrabbed = true; }
                             else
                                 o
                         else
@@ -210,6 +219,15 @@ module LogicalScene =
                     lastViewTrafo = Trafo3d.Identity
                 }
 
+            | StartFrame ->
+                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
+                        { o with 
+                            isGrabbable = false
+                        }
+                    )
+
+                { scene with objects = newObjects}
+
             | TimeElapsed(dt) ->
                 let maxSpeed = 10.0
                     
@@ -225,18 +243,15 @@ module LogicalScene =
 
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        //let newTrafo = if o.isGrabbed then o.trafo * dp.Inverse else o.trafo
                         let newTrafo = o.trafo
                         { o with 
                             trafo = newTrafo; 
-                            wasGrabbed = o.isGrabbed 
+                            wasGrabbed = o.isGrabbed
                         }
                     )
                 let newSceneTrafo = scene.deviceOffset * dp
 
                 { scene with
-                    // only move static objects, keep active objects like controllers
-                    // TODO: only move devices, keep not grabbed objects
                     objects = newObjects
                     deviceOffset = newSceneTrafo
                     deltaTime = dt.TotalSeconds
@@ -244,5 +259,13 @@ module LogicalScene =
 
             | UpdateViewTrafo trafo -> 
                 { scene with viewTrafo = trafo }
+            
+            | Collision (ghost, collider) ->
+                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
+                        let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id 
+                        if collidingWithController then printfn "Ghost %A collides with %A" ghost.id collider.id
+                        if collidingWithController then { o with isGrabbable = true } else o
+                    )
+                { scene with objects = newObjects }
 
             | _ -> scene

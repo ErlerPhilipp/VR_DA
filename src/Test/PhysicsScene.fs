@@ -48,14 +48,23 @@ module PhysicsScene =
                     let cshape = toCollisionShape collisionShape
                     let state = new BulletSharp.DefaultMotionState(toMatrix o.trafo)
 
+                    let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
+                        if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
+                        collObj.UserObject <- o
+                        collObj.UserIndex <- o.id
+                        collObj.Friction <- float32 o.friction
+                        collObj.RollingFriction <- float32 o.rollingFriction
+                        collObj.CollisionShape <- cshape
+                        collObj.WorldTransform <- toMatrix o.trafo
+                        collObj.Restitution <- float32 o.restitution
+                        // continuous collision detection
+                        collObj.CcdMotionThreshold <- float32 o.ccdSpeedThreshold
+                        collObj.CcdSweptSphereRadius <- float32 o.ccdSphereRadius
+
                     match o.objectType with
                         | ObjectTypes.Static ->
                             let collObj = new BulletSharp.CollisionObject()
-                            collObj.CollisionShape <- cshape
-                            collObj.UserObject <- o
-                            collObj.UserIndex <- o.id
-                            collObj.WorldTransform <- toMatrix o.trafo
-                            //collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.KinematicObject
+                            setProperties(collObj, o)
                             scene.dynamicsWorld.AddCollisionObject(collObj)
                             { 
                                 original = o
@@ -67,19 +76,12 @@ module PhysicsScene =
                             let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
                             
                             let rigidBody = new BulletSharp.RigidBody(info)
-                            rigidBody.Friction <- float32 o.friction
-                            rigidBody.Restitution <- float32 o.restitution
                             // keep all rb active to enable collisions with grabbed (static) objects
                             // TODO: add collisiondispatcher etc, ghost object of grabbed object, activate colliding object if necessary
                             rigidBody.Activate()
                             rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
-                            // continuous collision detection
-                            rigidBody.CcdMotionThreshold <- float32 o.ccdSpeedThreshold
-                            rigidBody.CcdSweptSphereRadius <- float32 o.ccdSphereRadius
-                            rigidBody.RollingFriction <- float32 o.rollingFriction
                             rigidBody.SetDamping(0.1f, 0.1f)
-                            rigidBody.UserObject <- o
-                            rigidBody.UserIndex <- o.id
+                            setProperties(rigidBody, o)
 
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             { 
@@ -89,10 +91,7 @@ module PhysicsScene =
                             }
                         | ObjectTypes.Ghost ->
                             let ghost = new BulletSharp.PairCachingGhostObject()
-                            ghost.CollisionShape <- cshape
-                            ghost.UserObject <- o
-                            ghost.UserIndex <- o.id
-                            ghost.CollisionFlags <- ghost.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
+                            setProperties(ghost, o)
                             scene.dynamicsWorld.AddCollisionObject(ghost)
                             { 
                                 original = o
@@ -242,6 +241,9 @@ module PhysicsScene =
                 world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds, s.numSubSteps, float32 s.subStepTime) |> ignore
                 simulationSw.Stop()
 //                System.Console.WriteLine(simulationSw.MicroTime.ToString())
+                
+                let mutable messages : list<Message> = []
+
                 let objects =
                     [
                         for b in world.bodies do
@@ -264,7 +266,8 @@ module PhysicsScene =
                                     for i in 0..(numOverlappingObjects - 1) do
                                         let userObject = collisionObject.GetOverlappingObject(i).UserObject :?> Object
                                         if userObject.objectType = ObjectTypes.Dynamic then
-                                            printfn "collision with ghost: %A" userObject.id
+                                            //printfn "collision with ghost: %A" userObject.id
+                                            messages <- messages @ [Collision(b.original, userObject)]
                                     yield b.original
                                 | CollisionObject.NoObject -> 
                                     yield b.original
@@ -272,9 +275,12 @@ module PhysicsScene =
 
                 world.dynamicsWorld.DebugDrawWorld()
 
-                { s with
-                    objects = PersistentHashSet.ofList objects
-                }
+                let mutable newScene = { s with objects = PersistentHashSet.ofList objects }
+
+                for message in messages do
+                    newScene <- LogicalScene.update newScene message
+
+                newScene
             | None -> 
                 currentWorld <- Conversion.Create s |> Some
                 s
