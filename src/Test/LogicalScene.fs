@@ -165,25 +165,14 @@ module LogicalScene =
                 }
             | DevicePress(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
                 
-                let trafo = 
-                    if deviceId = assignedInputs.controller2Id then
-                        getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
-                    else
-                        t
-
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o ->
-                        if o.isManipulable then
-                            let modelLocation = o.trafo.Backward.TransformPos trafo.Forward.C3.XYZ
-                            if o.boundingBox.Contains modelLocation then
-                                { o with isGrabbed = true; }
-                            else
-                                o
+                        if o.isManipulable && o.isGrabbable then
+                            { o with isGrabbed = true; }
                         else
                             o
                     ) 
 
                 { scene with 
-                    lastViewTrafo   = trafo
                     objects         = newObjects
                 }
                     
