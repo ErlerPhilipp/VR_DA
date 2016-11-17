@@ -99,7 +99,11 @@ let main argv =
     let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
-    let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III))) 
+    let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III)))
+
+    let objectBoxEdgeLength = 0.25
+    let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
+    let boxSg = Sg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
@@ -230,6 +234,24 @@ let main argv =
             ccdSphereRadius = 0.5f
             rollingFriction = commonRollingFriction
         }
+    let box = 
+        { defaultObject with
+            id = newId()
+            objectType = ObjectTypes.Dynamic
+            isManipulable = true
+            boundingBox = objectBox
+            trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
+            model = boxSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
+            mass = 0.625f
+            collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box )
+            restitution = commonRestitution
+            friction = 0.75f
+//            ccdSpeedThreshold = 1e-7f
+//            ccdSphereRadius = 100.2f
+            ccdSpeedThreshold = 0.1f
+            ccdSphereRadius = 0.5f
+            rollingFriction = commonRollingFriction
+        }
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
@@ -274,10 +296,11 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 50)
+        let ballObjects = replicate ([ball], 25)
+        let boxObjects = replicate ([box], 25)
         
         manipulableObjects @ 
-        ballObjects @
+        ballObjects @ boxObjects @
         toObjects false staticModels 
         @ [groundObject; wall1; wall2; wall3; wall4]
         @ [leftHandObject; rightHandObject; camObject; camObject;]
