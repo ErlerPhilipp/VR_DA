@@ -108,7 +108,7 @@ module LogicalScene =
         | UpdateViewTrafo of Trafo3d
         | Collision of Object * Object
         
-    let updateObjectstrafoWithId(id : int, objects : pset<Object>, t : Trafo3d) = 
+    let updateObjectsTrafoWithId(id : int, objects : pset<Object>, t : Trafo3d) = 
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
                 {o with trafo = t}
@@ -130,24 +130,24 @@ module LogicalScene =
         let scene =
             match message with
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
-                    let newObjects = updateObjectstrafoWithId(scene.controller1ObjectId, scene.objects, t)
+                    let newObjects = updateObjectsTrafoWithId(scene.controller1ObjectId, scene.objects, t)
                     { scene with 
                         objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
                     let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
-                    let newObjects = updateObjectstrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
+                    let newObjects = updateObjectsTrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
                     { scene with 
                         objects = newObjects
                         armExtensionFactor = extension
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
-                    let newObjects = updateObjectstrafoWithId(scene.cam1ObjectId, scene.objects, t)
+                    let newObjects = updateObjectsTrafoWithId(scene.cam1ObjectId, scene.objects, t)
                     { scene with 
                         objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
-                    let newObjects = updateObjectstrafoWithId(scene.cam2ObjectId, scene.objects, t)
+                    let newObjects = updateObjectsTrafoWithId(scene.cam2ObjectId, scene.objects, t)
                     { scene with 
                         objects = newObjects
                     }
@@ -178,15 +178,13 @@ module LogicalScene =
                     objects         = newObjects
                 }
                     
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
+                { scene with viewTrafo = t.Inverse }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 { scene with moveDirection = direction }
-            | DeviceMove(deviceId, t) ->
-                let trafo = 
-                    if deviceId = assignedInputs.controller2Id then
-                        getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
-                    else
-                        t
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
+                let trafo = getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
 
                 if PersistentHashSet.isEmpty scene.objects then
                     scene
@@ -247,9 +245,6 @@ module LogicalScene =
                     deviceOffset = newSceneTrafo
                     deltaTime = dt.TotalSeconds
                 }
-
-            | UpdateViewTrafo trafo -> 
-                { scene with viewTrafo = trafo }
             
             | Collision (ghost, collider) ->
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 

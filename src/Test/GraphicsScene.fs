@@ -121,10 +121,7 @@ module GraphicsScene =
                 let t = trafos.[i]
                 if oldTrafos.[i] <> t then
                     oldTrafos.[i] <- t
-                    if i = VrDriver.assignedInputs.hmdId then 
-                        perform (UpdateViewTrafo(scene.deviceOffset * t.Inverse)) 
-                    else 
-                        perform (DeviceMove(i, t * scene.deviceOffset.Inverse))
+                    perform (DeviceMove(i, t * scene.deviceOffset.Inverse))
                 
             if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
                 let deviceId = e.trackedDeviceIndex |> int
