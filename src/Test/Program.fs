@@ -319,6 +319,7 @@ let main argv =
             deltaTime = 0.0
             enablePhysics = true
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
+            armExtensionFactor = 1.0
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = true
 //            numSubSteps = 11

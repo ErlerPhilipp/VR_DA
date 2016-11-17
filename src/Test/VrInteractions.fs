@@ -22,10 +22,12 @@ module VrInteractions =
             | VrInteractionTechnique.VirtualHand -> C4f.White
             | VrInteractionTechnique.GoGo -> C4f.Green
             | _ -> C4f.White
+            
+    let gogoQuadraticTermFactor = 200.0
 
-    let getVirtualHandTrafo (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, interactionType : VrInteractionTechnique) = 
+    let getVirtualHandTrafoAndExtensionFactor (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, interactionType : VrInteractionTechnique) = 
         if interactionType = VrInteractionTechnique.VirtualHand then
-            realHandTrafo
+            (realHandTrafo, 1.0)
         else
             let handPos = realHandTrafo.Forward.TransformPos V3d.Zero
             let headPos = realHeadTrafo.Backward.TransformPos V3d.Zero
@@ -37,15 +39,14 @@ module VrInteractions =
             let linearExtensionLimit = 0.5
 
             if headToHandDist < linearExtensionLimit then
-                realHandTrafo
+                (realHandTrafo, 1.0)
             else
-                let quadraticTermFactor = 200.0
                 let quadraticExtension = headToHandDist - linearExtensionLimit
-                let gogoAdditionalExtension = max 0.0 quadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
+                let gogoAdditionalExtension = max 0.0 gogoQuadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
                 let gogoHandPosOffset = chestToHand.Normalized * gogoAdditionalExtension
                 let gogoHandTrafo = realHandTrafo * Trafo3d.Translation(gogoHandPosOffset)
                 //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
-                gogoHandTrafo
+                (gogoHandTrafo, gogoAdditionalExtension)
 
     let getAxisValueWithDeathZone (value : float) = 
         let deathZone = 0.1

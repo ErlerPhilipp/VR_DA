@@ -86,14 +86,15 @@ module LogicalScene =
             controller1ObjectId : int
             controller2ObjectId : int
 
-            interactionType   : VrInteractions.VrInteractionTechnique
+            interactionType    : VrInteractions.VrInteractionTechnique
+            armExtensionFactor : float
 
-            physicsDebugDraw  : bool
-            gravity           : V3d
-            numSubSteps       : int
-            subStepTime       : float
+            physicsDebugDraw   : bool
+            gravity            : V3d
+            numSubSteps        : int
+            subStepTime        : float
 
-            moveDirection     : V3d
+            moveDirection      : V3d
         }
         
     type Message =
@@ -134,10 +135,11 @@ module LogicalScene =
                         objects = newObjects
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                    let virtualHandTrafo = VrInteractions.getVirtualHandTrafo(t, scene.viewTrafo, scene.interactionType)
+                    let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
                     let newObjects = updateObjectstrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
                     { scene with 
                         objects = newObjects
+                        armExtensionFactor = extension
                     }
                 | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
                     let newObjects = updateObjectstrafoWithId(scene.cam1ObjectId, scene.objects, t)
@@ -252,7 +254,7 @@ module LogicalScene =
             | Collision (ghost, collider) ->
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
                         let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id 
-                        if collidingWithController then printfn "Ghost %A collides with %A" ghost.id collider.id
+                        //if collidingWithController then printfn "Ghost %A collides with %A" ghost.id collider.id
                         if collidingWithController then { o with isGrabbable = true } else o
                     )
                 { scene with objects = newObjects }

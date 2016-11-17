@@ -134,8 +134,7 @@ module PhysicsScene =
                         if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
 
                         let newWorldTransform = toMatrix o.trafo
-                        let worldTransformChanged = collisionObject.WorldTransform <> newWorldTransform
-                        if worldTransformChanged then
+                        if collisionObject.WorldTransform <> newWorldTransform then
                             collisionObject.WorldTransform <- newWorldTransform
 
                         if (o.wasGrabbed && not o.isGrabbed) then
@@ -143,14 +142,16 @@ module PhysicsScene =
                             // activate by setting normal mass
                             collisionObject.SetMassProps(o.mass, m.inertia)
 //                            collisionObject.CollisionFlags <- BulletSharp.CollisionFlags.None
-                            
-                        if (o.wasGrabbed && not o.isGrabbed) || worldTransformChanged then
+
                             // set object velocity to hand velocity
                             let vel = VrDriver.inputDevices.controller2.Velocity
                             let handVelocity = 
                                 match s.interactionType with
                                     | VrInteractions.VrInteractionTechnique.VirtualHand -> toVector3(vel)
-                                    | VrInteractions.VrInteractionTechnique.GoGo -> toVector3(vel * s.armExtensionFactor)
+                                    | VrInteractions.VrInteractionTechnique.GoGo -> 
+                                        // TODO: make more accurate, function of difference with last step
+                                        //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
+                                        toVector3(vel * s.armExtensionFactor)
                                     | _ -> failwith "not implemented"
 
                             collisionObject.LinearVelocity <- handVelocity
