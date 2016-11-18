@@ -43,21 +43,21 @@ module GraphicsScene =
                 mviewTrafo = Mod.init s.viewTrafo
             }
 
-        static member Update(m : MObject, o : Object) =
-            if not (System.Object.ReferenceEquals(m.original, o)) then
-                m.original <- o
-                m.mmodel.Value <- o.model
-                m.mtrafo.Value <- o.trafo
-                m.misGrabbable.Value <- o.isGrabbable
+        static member Update(mo : MObject, o : Object) =
+            if not (System.Object.ReferenceEquals(mo.original, o)) then
+                mo.original <- o
+                mo.mmodel.Value <- o.model
+                mo.mtrafo.Value <- o.trafo
+                mo.misGrabbable.Value <- o.isGrabbable
 
-        static member Update(m : MScene, s : Scene) =
-            if not (System.Object.ReferenceEquals(m.original, s)) then
-                m.original <- s
+        static member Update(ms : MScene, s : Scene) =
+            if not (System.Object.ReferenceEquals(ms.original, s)) then
+                ms.original <- s
 
-                m.mviewTrafo.Value <- s.viewTrafo
+                ms.mviewTrafo.Value <- s.viewTrafo
 
                 let table = 
-                    m.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                    ms.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
                 
                 for t in PersistentHashSet.toSeq s.objects do
                     match table.TryRemove t.id with
@@ -65,9 +65,9 @@ module GraphicsScene =
                             Conversion.Update(mo, t)
                         | _ ->
                             let mo = Conversion.Create(t)
-                            m.mobjects.Add mo |> ignore
+                            ms.mobjects.Add mo |> ignore
                 
-                m.mobjects.ExceptWith table.Values
+                ms.mobjects.ExceptWith table.Values
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =

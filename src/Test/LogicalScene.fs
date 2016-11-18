@@ -19,10 +19,10 @@ module LogicalScene =
         currentId
 
     type ObjectTypes = 
-        | Static  // static collider, never moving
-        | Dynamic // moved by physics
-        | Ghost   // tracks its collisions
-        // TODO: | Kinematic // not moved by physics but by game logic
+        | Static        // static collider, never moving
+        | Dynamic       // moved by physics
+        | Ghost         // tracks its collisions
+        // TODO: necessary? | Kinematic     // not moved by physics but by game logic
 
     type pset<'a> = PersistentHashSet<'a>
     type Object =

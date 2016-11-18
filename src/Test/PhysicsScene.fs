@@ -10,9 +10,9 @@ module PhysicsScene =
     open BulletSharp.Math
 
     type CollisionObject =
-        | StaticBody     of collObj : BulletSharp.CollisionObject
-        | RigidBody      of rb      : BulletSharp.RigidBody
-        | Ghost          of ghost   : BulletSharp.PairCachingGhostObject
+        | StaticBody     of collObj     : BulletSharp.CollisionObject
+        | RigidBody      of rb          : BulletSharp.RigidBody
+        | Ghost          of ghost       : BulletSharp.PairCachingGhostObject
         | NoObject
     
     [<ReferenceEquality;NoComparison>]
@@ -21,8 +21,26 @@ module PhysicsScene =
             mutable original    : Object
             collisionObject     : CollisionObject
             inertia             : Vector3
+            mutable trafo       : Matrix
         }
+        
+    type MyMotionState() =
+        inherit MotionState()
 
+        let mutable body = None
+        member this.init(newBody : PhysicsBody) =
+            body <- Some newBody
+
+        override this.GetWorldTransform(worldTrans : Matrix byref) = 
+            match body with
+                | Some body -> worldTrans <- body.trafo
+                | None -> worldTrans <- Matrix()
+
+        override this.SetWorldTransform(worldTrans : Matrix byref) = 
+            match body with
+                | Some body -> body.trafo <- worldTrans
+                | None -> ()
+            
     
     [<ReferenceEquality;NoComparison>]
     type PhysicsWorld =
@@ -43,63 +61,71 @@ module PhysicsScene =
     // Replay changes into physics world....
     type Conversion private() =
         static member Create(o : Object, scene : PhysicsWorld) : PhysicsBody =
-            match o.collisionShape with
-                | Some (collisionShape) -> 
-                    let cshape = toCollisionShape collisionShape
-                    let state = new BulletSharp.DefaultMotionState(toMatrix o.trafo)
+            let initialTrafo = o.trafo |> toMatrix
+            let state = new MyMotionState()
 
-                    let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
-                        if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
-                        collObj.UserObject <- o
-                        collObj.UserIndex <- o.id
-                        collObj.Friction <- float32 o.friction
-                        collObj.RollingFriction <- float32 o.rollingFriction
-                        collObj.CollisionShape <- cshape
-                        collObj.WorldTransform <- toMatrix o.trafo
-                        collObj.Restitution <- float32 o.restitution
-                        // continuous collision detection
-                        collObj.CcdMotionThreshold <- float32 o.ccdSpeedThreshold
-                        collObj.CcdSweptSphereRadius <- float32 o.ccdSphereRadius
+            let body = 
+                match o.collisionShape with
+                    | Some (collisionShape) -> 
+                        let cshape = toCollisionShape collisionShape
 
-                    match o.objectType with
-                        | ObjectTypes.Static ->
-                            let collObj = new BulletSharp.CollisionObject()
-                            setProperties(collObj, o)
-                            scene.dynamicsWorld.AddCollisionObject(collObj)
-                            { 
-                                original = o
-                                collisionObject = StaticBody collObj 
-                                inertia = Vector3.Zero
-                            }
-                        | ObjectTypes.Dynamic -> 
-                            let inertia = cshape.CalculateLocalInertia(o.mass)
-                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
+                        let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
+                            if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
+                            collObj.UserObject <- o
+                            collObj.UserIndex <- o.id
+                            collObj.Friction <- float32 o.friction
+                            collObj.RollingFriction <- float32 o.rollingFriction
+                            collObj.CollisionShape <- cshape
+                            collObj.WorldTransform <- toMatrix o.trafo
+                            collObj.Restitution <- float32 o.restitution
+                            // continuous collision detection
+                            collObj.CcdMotionThreshold <- float32 o.ccdSpeedThreshold
+                            collObj.CcdSweptSphereRadius <- float32 o.ccdSphereRadius
+
+                        match o.objectType with
+                            | ObjectTypes.Static ->
+                                let collObj = new BulletSharp.CollisionObject()
+                                setProperties(collObj, o)
+                                scene.dynamicsWorld.AddCollisionObject(collObj)
+                                { 
+                                    original = o
+                                    collisionObject = StaticBody collObj 
+                                    inertia = Vector3.Zero
+                                    trafo = initialTrafo
+                                }
+                            | ObjectTypes.Dynamic -> 
+                                let inertia = cshape.CalculateLocalInertia(o.mass)
+                                let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
                             
-                            let rigidBody = new BulletSharp.RigidBody(info)
-                            // keep all rb active to enable collisions with grabbed (static) objects
-                            // TODO: add collisiondispatcher etc, ghost object of grabbed object, activate colliding object if necessary
-                            rigidBody.Activate()
-                            rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
-                            rigidBody.SetDamping(0.1f, 0.1f)
-                            setProperties(rigidBody, o)
-
-                            scene.dynamicsWorld.AddRigidBody(rigidBody)
-                            { 
-                                original = o
-                                collisionObject = RigidBody rigidBody 
-                                inertia = inertia
-                            }
-                        | ObjectTypes.Ghost ->
-                            let ghost = new BulletSharp.PairCachingGhostObject()
-                            setProperties(ghost, o)
-                            scene.dynamicsWorld.AddCollisionObject(ghost)
-                            { 
-                                original = o
-                                collisionObject = Ghost ghost 
-                                inertia = Vector3.Zero
-                            }
-
-                | None -> { original = o; collisionObject = CollisionObject.NoObject; inertia = Vector3.Zero }
+                                let rigidBody = new BulletSharp.RigidBody(info)
+                                // keep all rb active to enable collisions with grabbed (static) objects
+                                // TODO: add collisiondispatcher etc, ghost object of grabbed object, activate colliding object if necessary
+                                rigidBody.Activate()
+                                rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
+                                rigidBody.SetDamping(0.1f, 0.1f)
+                                setProperties(rigidBody, o)
+                                
+                                scene.dynamicsWorld.AddRigidBody(rigidBody)
+                                { 
+                                    original = o
+                                    collisionObject = RigidBody rigidBody 
+                                    inertia = inertia
+                                    trafo = initialTrafo
+                                }
+                            | ObjectTypes.Ghost ->
+                                let ghost = new BulletSharp.PairCachingGhostObject()
+                                setProperties(ghost, o)
+                                scene.dynamicsWorld.AddCollisionObject(ghost)
+                                { 
+                                    original = o
+                                    collisionObject = Ghost ghost 
+                                    inertia = Vector3.Zero
+                                    trafo = initialTrafo
+                                }
+                    | None -> { original = o; collisionObject = CollisionObject.NoObject; inertia = Vector3.Zero; trafo = initialTrafo }
+                            
+            state.init body
+            body
 
         static member Create(s : Scene) : PhysicsWorld =
             let collConf = new DefaultCollisionConfiguration()
@@ -122,11 +148,15 @@ module PhysicsScene =
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene
 
-        static member Update(m : PhysicsBody, o : Object, s : Scene) =
-            if not (System.Object.ReferenceEquals(m.original, o)) then
-                m.original <- o
+        static member Update(pb : PhysicsBody, o : Object, s : Scene) =
+            if not (System.Object.ReferenceEquals(pb.original, o)) then
+                pb.original <- o
+
+                let newWorldTransform = toMatrix o.trafo
+                if pb.trafo <> newWorldTransform then
+                    pb.trafo <- newWorldTransform
                 
-                match m.collisionObject with
+                match pb.collisionObject with
                     | CollisionObject.RigidBody collisionObject -> 
                         if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
                         if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution
@@ -138,11 +168,12 @@ module PhysicsScene =
                         if collisionObject.WorldTransform <> newWorldTransform then
                             collisionObject.WorldTransform <- newWorldTransform
 
+                        // release grab
                         if (o.wasGrabbed && not o.isGrabbed) then
                             collisionObject.ClearForces()
                             // activate by setting normal mass
-                            collisionObject.SetMassProps(o.mass, m.inertia)
-//                            collisionObject.CollisionFlags <- BulletSharp.CollisionFlags.None
+                            collisionObject.SetMassProps(o.mass, pb.inertia)
+                            collisionObject.CollisionFlags <- collisionObject.CollisionFlags &&& ~~~(BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject)
 
                             // set object velocity to hand velocity
                             let vel = VrDriver.inputDevices.controller2.Velocity
@@ -164,12 +195,13 @@ module PhysicsScene =
                             // reset to normal state
 //                            collisionObject.Activate()
 //                            collisionObject.ForceActivationState(ActivationState.ActiveTag)
-
+                        
+                        // grab
                         else if not o.wasGrabbed && o.isGrabbed then
                             collisionObject.ClearForces()
                             // deactivate by setting infinite mass
                             collisionObject.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
-//                            collisionObject.CollisionFlags <- BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
+                            collisionObject.CollisionFlags <- collisionObject.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
 
                             collisionObject.LinearVelocity <- Vector3()
                             collisionObject.AngularVelocity <- Vector3()
@@ -185,53 +217,56 @@ module PhysicsScene =
                         if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
 
                         let newWorldTransform = toMatrix o.trafo
-                        let worldTransformChanged = collisionObject.WorldTransform <> newWorldTransform
-                        if worldTransformChanged then
+                        if collisionObject.WorldTransform <> newWorldTransform then
                             collisionObject.WorldTransform <- newWorldTransform
                         // TODO: make static objects grabbable?
                     | CollisionObject.Ghost collisionObject -> 
-                        let newWorldTransform = toMatrix o.trafo
-                        let worldTransformChanged = collisionObject.WorldTransform <> newWorldTransform
-                        if worldTransformChanged then
-                            collisionObject.WorldTransform <- newWorldTransform
-                    | CollisionObject.NoObject -> 
-                        ()
+                        if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
+                        if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution
+                        if collisionObject.CcdMotionThreshold <> o.ccdSpeedThreshold then collisionObject.CcdMotionThreshold <- o.ccdSpeedThreshold
+                        if collisionObject.CcdSweptSphereRadius <> o.ccdSphereRadius then collisionObject.CcdSweptSphereRadius <- o.ccdSphereRadius
+                        if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
 
-        static member Update(m : PhysicsWorld, s : Scene) =
-            if not (System.Object.ReferenceEquals(m.original, s)) then
-                m.original <- s
+                        let newWorldTransform = toMatrix o.trafo
+                        if collisionObject.WorldTransform <> newWorldTransform then
+                            collisionObject.WorldTransform <- newWorldTransform
+                    | CollisionObject.NoObject -> ()
+
+        static member Update(pw : PhysicsWorld, s : Scene) =
+            if not (System.Object.ReferenceEquals(pw.original, s)) then
+                pw.original <- s
                 
                 let table = 
-                    m.bodies |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                    pw.bodies |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
                 
                 for t in s.objects |> PersistentHashSet.toSeq do
                     match table.TryRemove t.id with
                         | (true, mo) -> 
                             Conversion.Update(mo, t, s)
                         | _ ->
-                            let mo = Conversion.Create(t,m)
-                            m.bodies.Add mo |> ignore
+                            let mo = Conversion.Create(t,pw)
+                            pw.bodies.Add mo |> ignore
 
                 for pb in table.Values do
                    // remove from world 
                    match pb.collisionObject with
                     | CollisionObject.RigidBody collisionObject -> 
-                        m.dynamicsWorld.RemoveRigidBody(collisionObject)
-                        m.bodies.Remove pb |> ignore
+                        pw.dynamicsWorld.RemoveRigidBody(collisionObject)
+                        pw.bodies.Remove pb |> ignore
                     | CollisionObject.StaticBody collisionObject -> 
-                        m.dynamicsWorld.RemoveCollisionObject(collisionObject)
-                        m.bodies.Remove pb |> ignore
+                        pw.dynamicsWorld.RemoveCollisionObject(collisionObject)
+                        pw.bodies.Remove pb |> ignore
                     | CollisionObject.Ghost collisionObject -> 
-                        m.dynamicsWorld.RemoveCollisionObject(collisionObject)
-                        m.bodies.Remove pb |> ignore
+                        pw.dynamicsWorld.RemoveCollisionObject(collisionObject)
+                        pw.bodies.Remove pb |> ignore
                     | CollisionObject.NoObject -> ()
 
-                   m.bodies.Remove pb |> ignore
+                   pw.bodies.Remove pb |> ignore
 
                 let mutable oldGravity = Vector3.Zero
-                m.dynamicsWorld.GetGravity(&oldGravity)
+                pw.dynamicsWorld.GetGravity(&oldGravity)
                 let newGravity = toVector3 s.gravity
-                if oldGravity <> newGravity then m.dynamicsWorld.SetGravity(ref newGravity)
+                if oldGravity <> newGravity then pw.dynamicsWorld.SetGravity(ref newGravity)
 
                 if s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.DrawWireframe then 
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.DrawWireframe
@@ -254,16 +289,14 @@ module PhysicsScene =
                 let objects =
                     [
                         for b in world.bodies do
+                            
                             match b.collisionObject with
                                 | CollisionObject.RigidBody rigidBody -> 
-                                    match b.original.collisionShape with
-                                        | Some (c) -> 
-                                            let newTrafo = toTrafo rigidBody.WorldTransform
-                                            //printfn "rigidBody %A pos: %A" (b.original.id) (newTrafo.Forward.TransformPos(V3d()))
-
-                                            yield { b.original with trafo = newTrafo }
-                                        | None ->
-                                            yield b.original
+                                    let newTrafo = b.trafo |> toTrafo
+                                    if b.original.trafo <> newTrafo then
+                                        yield { b.original with trafo = newTrafo }
+                                    else
+                                        yield b.original
 
                                 // those shouldn't be moved by the physics
                                 | CollisionObject.StaticBody collisionObject -> 

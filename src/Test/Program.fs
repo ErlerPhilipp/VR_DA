@@ -292,8 +292,8 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 1)
-        let boxObjects = replicate ([box], 1)
+        let ballObjects = replicate ([ball], 25)
+        let boxObjects = replicate ([box], 25)
         
         manipulableObjects @ 
         ballObjects @ boxObjects @
