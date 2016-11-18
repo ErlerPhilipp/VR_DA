@@ -100,6 +100,8 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III)))
+    
+    let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
     let objectBoxEdgeLength = 0.25
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
@@ -141,7 +143,6 @@ let main argv =
     let leftHandObject = 
         { defaultObject with
             id = newId()
-            boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
             isColliding = false
@@ -150,7 +151,6 @@ let main argv =
         { defaultObject with
             id = newId()
             objectType = ObjectTypes.Ghost
-            boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> virtualHandEffect
             collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
@@ -159,18 +159,13 @@ let main argv =
     let camObject1 = 
         { defaultObject with
             id = newId()
-            boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
             isColliding = false
         }
     let camObject2 = 
-        { defaultObject with
+        { camObject1 with
             id = newId()
-            boundingBox = handBox
-            trafo = Trafo3d.Identity
-            model = handSg |> handEffect
-            isColliding = false
         }
 
     let commonRestitution = 0.95f
@@ -229,7 +224,6 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
-            boundingBox = Box3d.FromCenterAndSize(V3d.Zero, V3d(0.2426))
             trafo = Trafo3d.Translation(-0.0, 0.0, 0.0)
             model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
             mass = 0.625f
@@ -245,7 +239,6 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
-            boundingBox = objectBox
             trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
             model = boxSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
             mass = 0.625f
@@ -280,7 +273,6 @@ let main argv =
                     { defaultObject with
                         id = newId()
                         isManipulable = canMove
-                        boundingBox = Box3d.FromCenterAndSize(V3d.Zero, bounds.Size)
                         trafo = Trafo3d.Translation(bounds.Center)
                         model = sg 
                         mass = mass

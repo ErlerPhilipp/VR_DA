@@ -124,6 +124,7 @@ module PhysicsScene =
 
         static member Update(m : PhysicsBody, o : Object, s : Scene) =
             if not (System.Object.ReferenceEquals(m.original, o)) then
+                m.original <- o
                 
                 match m.collisionObject with
                     | CollisionObject.RigidBody collisionObject -> 
@@ -176,8 +177,6 @@ module PhysicsScene =
                             // keep always active
 //                            collisionObject.Activate()
 //                            collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
-
-                        m.original <- o
                     | CollisionObject.StaticBody collisionObject -> 
                         if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
                         if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution

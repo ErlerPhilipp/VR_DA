@@ -36,8 +36,6 @@ module LogicalScene =
             isGrabbed         : bool
             wasGrabbed        : bool
 
-            boundingBox       : Box3d
-
             trafo             : Trafo3d
             model             : ISg
 
@@ -59,7 +57,6 @@ module LogicalScene =
             isGrabbable   = false
             isGrabbed     = false
             wasGrabbed    = false
-            boundingBox   = Box3d.FromCenterAndSize(V3d.Zero, V3d.One)
             trafo = Trafo3d.Identity
             model = Sg.group []
             mass = 0.0f
