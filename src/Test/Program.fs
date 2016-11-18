@@ -122,7 +122,6 @@ let main argv =
                     ]
     let groundEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
-                        //DefaultSurfaces.constantColor C4f.Gray80 |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                     ]
@@ -134,7 +133,6 @@ let main argv =
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        //DefaultSurfaces.constantColor (C4f (0.586, 0.297, 0.172)) |> toEffect
                         DefaultSurfaces.simpleLighting |> toEffect
                         highlight |> toEffect
                     ]
@@ -146,6 +144,7 @@ let main argv =
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
+            isColliding = false
         }
     let rightHandObject = 
         { defaultObject with
@@ -157,12 +156,21 @@ let main argv =
             collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
             isColliding = false
         }
-    let camObject = 
+    let camObject1 = 
         { defaultObject with
             id = newId()
             boundingBox = handBox
             trafo = Trafo3d.Identity
             model = handSg |> handEffect
+            isColliding = false
+        }
+    let camObject2 = 
+        { defaultObject with
+            id = newId()
+            boundingBox = handBox
+            trafo = Trafo3d.Identity
+            model = handSg |> handEffect
+            isColliding = false
         }
 
     let commonRestitution = 0.95f
@@ -292,25 +300,25 @@ let main argv =
             ]
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 25)
-        let boxObjects = replicate ([box], 25)
+        let ballObjects = replicate ([ball], 1)
+        let boxObjects = replicate ([box], 1)
         
         manipulableObjects @ 
         ballObjects @ boxObjects @
         toObjects false staticModels 
         @ [groundObject; wall1; wall2; wall3; wall4]
-        @ [leftHandObject; rightHandObject; camObject; camObject;]
+        @ [leftHandObject; rightHandObject; camObject1; camObject2;]
         
     let sceneObj =
         {
-            cam1ObjectId = camObject.id
-            cam2ObjectId = camObject.id
+            cam1ObjectId = camObject1.id
+            cam2ObjectId = camObject2.id
             controller1ObjectId = leftHandObject.id
             controller2ObjectId = rightHandObject.id
             objects = PersistentHashSet.ofList objects
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
-            lastViewTrafo = Trafo3d.Identity
+            lastContr2Trafo = Trafo3d.Identity
             deviceOffset = Trafo3d.Identity
             deltaTime = 0.0
             enablePhysics = true

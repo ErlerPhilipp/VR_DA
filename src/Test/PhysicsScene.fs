@@ -250,7 +250,7 @@ module PhysicsScene =
                 simulationSw.Stop()
 //                System.Console.WriteLine(simulationSw.MicroTime.ToString())
                 
-                let mutable messages : list<Message> = []
+                let mutable messages = System.Collections.Generic.List()
 
                 let objects =
                     [
@@ -305,7 +305,7 @@ module PhysicsScene =
                                                                 hasContact <- true
 
                                             if hasContact then
-                                                messages <- messages @ [Collision(b.original, collidingObject)]
+                                                messages.Add (Collision(b.original, collidingObject))
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects

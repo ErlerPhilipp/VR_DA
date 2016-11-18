@@ -75,7 +75,7 @@ module LogicalScene =
         {
             objects             : pset<Object>
             viewTrafo           : Trafo3d
-            lastViewTrafo       : Trafo3d
+            lastContr2Trafo     : Trafo3d
             deviceOffset        : Trafo3d
 
             deltaTime           : float
@@ -127,34 +127,35 @@ module LogicalScene =
 
     let update (scene : Scene) (message : Message) : Scene =
 
-        let scene =
-            match message with
-                | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
-                    let newObjects = updateObjectsTrafoWithId(scene.controller1ObjectId, scene.objects, t)
-                    { scene with 
-                        objects = newObjects
-                    }
-                | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                    let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
-                    let newObjects = updateObjectsTrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
-                    { scene with 
-                        objects = newObjects
-                        armExtensionFactor = extension
-                    }
-                | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
-                    let newObjects = updateObjectsTrafoWithId(scene.cam1ObjectId, scene.objects, t)
-                    { scene with 
-                        objects = newObjects
-                    }
-                | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
-                    let newObjects = updateObjectsTrafoWithId(scene.cam2ObjectId, scene.objects, t)
-                    { scene with 
-                        objects = newObjects
-                    }
-                | _ -> 
-                    scene
-        
         match message with
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
+                { scene with viewTrafo = t.Inverse }
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
+                let newObjects = updateObjectsTrafoWithId(scene.controller1ObjectId, scene.objects, t)
+                let direction = t.Forward.TransformDir(V3d.OOI)
+                { scene with 
+                    objects = newObjects
+                    moveDirection = direction
+                }
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
+                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
+                let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
+                let newObjects = updateObjectsTrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
+                                 |> PersistentHashSet.map (fun a ->
+                                    if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
+                                 )
+                { scene with 
+                    objects = newObjects
+                    armExtensionFactor = extension
+                    lastContr2Trafo = virtualHandTrafo
+                }
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
+                let newObjects = updateObjectsTrafoWithId(scene.cam1ObjectId, scene.objects, t)
+                { scene with objects = newObjects }
+            | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
+                let newObjects = updateObjectsTrafoWithId(scene.cam2ObjectId, scene.objects, t)
+                { scene with objects = newObjects }
+
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 0 ->
                 let newInteractionTechnique = VrInteractions.nextInteractionTechnique scene.interactionType
                 transact ( fun _ -> Mod.change virtualHandColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
@@ -174,29 +175,7 @@ module LogicalScene =
                             o
                     ) 
 
-                { scene with 
-                    objects         = newObjects
-                }
-                    
-            | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
-                { scene with viewTrafo = t.Inverse }
-            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
-                let direction = t.Forward.TransformDir(V3d.OOI)
-                { scene with moveDirection = direction }
-            | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                let trafo = getObjectWithId(scene.controller2ObjectId, scene.objects).trafo
-
-                if PersistentHashSet.isEmpty scene.objects then
-                    scene
-                else    
-                    let deltaTrafo = scene.lastViewTrafo.Inverse * trafo
-                    { scene with 
-                        objects =
-                            scene.objects |> PersistentHashSet.map (fun a ->
-                                if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
-                            ) 
-                        lastViewTrafo = trafo
-                    }
+                { scene with objects = newObjects }
                     
             | DeviceRelease(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
                 let newObjects = scene.objects |> PersistentHashSet.map (fun a ->
@@ -205,7 +184,7 @@ module LogicalScene =
 
                 { scene with 
                     objects = newObjects 
-                    lastViewTrafo = Trafo3d.Identity
+                    lastContr2Trafo = Trafo3d.Identity
                 }
 
             | StartFrame ->
@@ -232,9 +211,7 @@ module LogicalScene =
 
                 let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        let newTrafo = o.trafo
                         { o with 
-                            trafo = newTrafo; 
                             wasGrabbed = o.isGrabbed
                         }
                     )
