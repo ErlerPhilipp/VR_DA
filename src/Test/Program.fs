@@ -15,8 +15,11 @@ open Aardvark.SceneGraph.IO
 open Aardvark.VR
 
 open LogicalScene
+
+open Primitives
 open SGHelper
 open TextureTiling
+open Lighting
 
 [<EntryPoint>]
 let main argv =
@@ -25,8 +28,6 @@ let main argv =
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
-
-    //printfn "Working dir: %A" (System.IO.Directory.GetCurrentDirectory())
 
     let staticModels =
         [
@@ -41,18 +42,22 @@ let main argv =
             //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
     
+    let trackingAreaSize = 5.0
+    let wallThickness = 1.0
+
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
-    let handSg = Sg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
+    let handSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
-    let groundSg = Sg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, 10.0 * V3d.III)))
+    let groundSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
+    let wallSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
     let objectBoxEdgeLength = 0.25
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
-    let boxSg = Sg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
+    let boxSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
     let groundNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", true) :> ITexture))
     let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture groundNormalSampler
@@ -80,20 +85,20 @@ let main argv =
                         TextureTiling.Effect
                         DefaultSurfaces.normalMap |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.lighting false |> toEffect
+                        Lighting.Effect false
                     ]
     let wallEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         TextureTiling.Effect
-//                        DefaultSurfaces.normalMap |> toEffect
+                        DefaultSurfaces.normalMap |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.lighting false |> toEffect
+                        Lighting.Effect false
                     ]
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         TextureTiling.Effect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.lighting false |> toEffect
+                        Lighting.Effect true
                         highlight |> toEffect
                     ]
 
@@ -130,16 +135,15 @@ let main argv =
     let commonRollingFriction = 0.01f
 
     let groundObject = 
-        let edgeLength = 10.0
         { defaultObject with
             id = newId()
-            trafo = Trafo3d.Translation(0.0, -edgeLength * 0.5, 0.0)
+            trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = groundSg 
                         |> groundEffect 
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
                         |> groundNormalMap
             tilingFactor = V2d(4.0, 4.0)
-            collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
             friction = 0.75f
             rollingFriction = commonRollingFriction
             restitution = commonRestitution
@@ -150,36 +154,39 @@ let main argv =
             friction = 0.75f
             rollingFriction = commonRollingFriction
             restitution = commonRestitution
-            model = Sg.fullScreenQuad
-                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
+            model = wallSg
                         |> wallEffect
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
-//                        |> wallNormalMap
+                        |> wallNormalMap
             tilingFactor = V2d(3.0, 3.0)
         }
     let wall1 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.0, 0.0, -5.0)))
-            collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize * 0.5 - wallThickness, -trackingAreaSize * 0.5)
+            model = wallBase.model
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaSize, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall2 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.Translation(5.0, 0.0, 0.0))) 
-            collisionShape = Some ( Plane3d(V3d(-1,0,0), V3d(5,0,0)) |> BulletHelper.Shape.Plane )
+            trafo = Trafo3d.RotationY (float -MathHelper.PiOver2) * Trafo3d.Translation(trackingAreaSize * 0.5, trackingAreaSize * 0.5 - wallThickness, 0.0)
+            model = wallBase.model
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaSize, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall3 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, 0.0, 5.0))) 
-            collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
+            trafo = Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, trackingAreaSize * 0.5 - wallThickness, trackingAreaSize * 0.5)
+            model = wallBase.model
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaSize, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall4 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.Translation(-5.0, 0.0, 0.0))) 
-            collisionShape = Some ( Plane3d(V3d(1,0,0), V3d(-5,0,0)) |> BulletHelper.Shape.Plane )
+            trafo = Trafo3d.RotationY (float MathHelper.PiOver2) * Trafo3d.Translation(-trackingAreaSize * 0.5, trackingAreaSize * 0.5 - wallThickness, 0.0)
+            model = wallBase.model
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaSize, wallThickness) |> BulletHelper.Shape.Box )
         }
     let ball = 
         { defaultObject with

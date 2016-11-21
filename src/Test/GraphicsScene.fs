@@ -128,7 +128,6 @@ module GraphicsScene =
                 |> Sg.dynamic
                 |> Sg.uniform "isHighlighted" t.misGrabbable
                 |> Sg.uniform "tilingFactor" t.mtilingFactor
-                |> Sg.uniform "HasSpecularColorTexture" (Mod.constant false)
                 |> Sg.trafo t.mtrafo
 
         let sgs = 
