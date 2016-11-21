@@ -169,7 +169,29 @@ module TextureTiling =
     
     let Effect = 
         toEffect textureTiling
-        
+       
+module NormalMap =
+ 
+    let private normalSampler =
+        sampler2d {
+            texture uniform?NormalMapTexture
+            filter Filter.MinMagMipLinear
+            addressU SamplerStateModule.WrapMode.Wrap
+            addressV SamplerStateModule.WrapMode.Wrap
+        }
+
+    let internal normalMap (v : Vertex) =
+        fragment {
+            let texColor = normalSampler.Sample(v.tc).XYZ
+            let texNormal = (2.0 * texColor - V3d.III) |> Vec.normalize
+
+            let n = v.n.Normalized * texNormal.Z + v.b.Normalized * texNormal.X + v.t.Normalized * texNormal.Y |> Vec.normalize
+            
+            return { v with n = n }
+        }
+
+    let Effect = 
+        toEffect normalMap
 
 module Lighting = 
 
@@ -200,6 +222,7 @@ module Lighting =
             let l = ambient + (1.0 - ambient) * diffuse * attenuation
 
             return V4d(v.c.XYZ * l + attenuation * pown s specularExponent, v.c.W)
+//            return V4d(n, v.c.W)
         }
 
     let Effect (twoSided : bool)= 

@@ -18,6 +18,7 @@ open LogicalScene
 
 open Primitives
 open SGHelper
+open NormalMap
 open TextureTiling
 open Lighting
 
@@ -84,7 +85,7 @@ let main argv =
     let normalDiffuseEffect = Sg.effect [
                                     DefaultSurfaces.trafo |> toEffect
                                     TextureTiling.Effect
-                                    DefaultSurfaces.normalMap |> toEffect
+                                    NormalMap.Effect
                                     DefaultSurfaces.diffuseTexture |> toEffect
                                     Lighting.Effect false
                                 ]
@@ -127,8 +128,7 @@ let main argv =
     let lightObject =
         { defaultObject with
             id = newId()
-            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness * 2.0, 0.0) * Trafo3d.Translation(0.5, 0.0, 0.0)
-            //model = lightSg |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.5, 0.0, 0.0))) |> constColorEffect
+            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness, 0.0)
             model = lightSg |>  constColorEffect
         }
 
@@ -279,7 +279,7 @@ let main argv =
             interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
             armExtensionFactor = 1.0
             gravity = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw = true
+            physicsDebugDraw = false
 //            numSubSteps = 11
 //            subStepTime = 1.0 / 900.0
             numSubSteps = 3
