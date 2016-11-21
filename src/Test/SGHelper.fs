@@ -175,24 +175,31 @@ module Lighting =
 
     type UniformScope with
         member x.HasSpecularColorTexture : bool = x?HasSpecularColorTexture
+        member x.SpecularExponent : int = x?SpecularExponent
+        member x.AmbientFactor : float = x?AmbientFactor
+        member x.LinearAttenuation : float = x?LinearAttenuation
 
     let internal lighting (twoSided : bool) (v : Vertex) =
         fragment {
             let n = v.n |> Vec.normalize
-            let c = uniform.LightLocation - v.wp.XYZ |> Vec.normalize
+            let fragmentToLight = uniform.LightLocation - v.wp.XYZ
+            let distToLight = fragmentToLight.Length
+            let c = fragmentToLight |> Vec.normalize
             let l = c
             let h = c
+            let specularExponent = uniform.SpecularExponent
+            let attenuation = (1.0 - distToLight * uniform.LinearAttenuation) |> clamp 0.0 1.0
 
-            let ambient = 0.1
+            let ambient = uniform.AmbientFactor
             let diffuse = 
                 if twoSided then Vec.dot l n |> abs
                 else Vec.dot l n |> max 0.0
 
             let s = Vec.dot h n |> abs
 
-            let l = ambient + (1.0 - ambient) * diffuse
+            let l = ambient + (1.0 - ambient) * diffuse * attenuation
 
-            return V4d(v.c.XYZ * l + pown s 32, v.c.W)
+            return V4d(v.c.XYZ * l + attenuation * pown s specularExponent, v.c.W)
         }
 
     let Effect (twoSided : bool)= 

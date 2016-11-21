@@ -135,6 +135,9 @@ module GraphicsScene =
                 |> ASet.map toSg
                 |> Sg.set
                 |> Sg.uniform "LightLocation" mscene.mlightPos
+                |> Sg.uniform "SpecularExponent" (Mod.constant 16)
+                |> Sg.uniform "AmbientFactor" (Mod.constant 0.2)
+                |> Sg.uniform "LinearAttenuation" (Mod.constant 0.3)
 
         Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo mscene.mviewTrafo
