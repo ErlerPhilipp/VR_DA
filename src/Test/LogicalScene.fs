@@ -85,7 +85,7 @@ module LogicalScene =
             controller1ObjectId : int
             controller2ObjectId : int
 
-            lightPos            : V3d
+            lightId             : int
 
             interactionType     : VrInteractions.VrInteractionTechnique
             armExtensionFactor  : float
@@ -109,7 +109,7 @@ module LogicalScene =
         | UpdateViewTrafo of Trafo3d
         | Collision of Object * Object
         
-    let updateObjectsTrafoWithId(id : int, objects : pset<Object>, t : Trafo3d) = 
+    let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>) = 
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
                 {o with trafo = t}
@@ -117,6 +117,24 @@ module LogicalScene =
                 o
             ) 
         newObjects
+
+    let transformTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>) = 
+        let newObjects = objects |> PersistentHashSet.map (fun o -> 
+            if o.id = id then
+                {o with trafo = o.trafo * t}
+            else
+                o
+            ) 
+        newObjects
+
+    let getTrafoOfFirstObjectWithId(id : int, objects : pset<Object>) = 
+        let filteredObjects = objects |> PersistentHashSet.filter (fun o -> 
+                o.id = id
+            )
+        if PersistentHashSet.isEmpty filteredObjects then
+            failwith "Id not found!"
+        else
+            (PersistentHashSet.toList filteredObjects).[0].trafo
 
     let getObjectWithId(id : int, objects : pset<Object>) =
         let objectWithId = 
@@ -132,7 +150,7 @@ module LogicalScene =
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
                 { scene with viewTrafo = t.Inverse }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
-                let newObjects = updateObjectsTrafoWithId(scene.controller1ObjectId, scene.objects, t)
+                let newObjects = setTrafoOfObjectsWithId(scene.controller1ObjectId, t, scene.objects)
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 { scene with 
                     objects = newObjects
@@ -142,21 +160,25 @@ module LogicalScene =
                 let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
                 let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
                 let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
-                let newObjects = updateObjectsTrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
+                let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
                                  |> PersistentHashSet.map (fun a ->
                                     if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                                  )
+
+//                // attach light to grabbing hand
+//                let lightPos = virtualHandTrafo
+//                let newObjects = setTrafoOfObjectsWithId(scene.lightId, lightPos, newObjects)
+
                 { scene with 
                     objects = newObjects
                     armExtensionFactor = extension
-                    lightPos = virtualHandPos
                     lastContr2Trafo = virtualHandTrafo
                 }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
-                let newObjects = updateObjectsTrafoWithId(scene.cam1ObjectId, scene.objects, t)
+                let newObjects = setTrafoOfObjectsWithId(scene.cam1ObjectId, t, scene.objects)
                 { scene with objects = newObjects }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
-                let newObjects = updateObjectsTrafoWithId(scene.cam2ObjectId, scene.objects, t)
+                let newObjects = setTrafoOfObjectsWithId(scene.cam2ObjectId, t, scene.objects)
                 { scene with objects = newObjects }
 
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 0 ->
@@ -219,6 +241,9 @@ module LogicalScene =
                         }
                     )
                 let newSceneTrafo = scene.deviceOffset * dp
+                
+                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
+                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
 
                 { scene with
                     objects = newObjects

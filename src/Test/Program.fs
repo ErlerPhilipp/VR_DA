@@ -52,6 +52,7 @@ let main argv =
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
+    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -70,30 +71,23 @@ let main argv =
                                 DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
                                 DefaultSurfaces.simpleLighting |> toEffect
                             ]
-    let handEffect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        DefaultSurfaces.constantColor C4f.White |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
-                    ]
+    let constColorEffect = Sg.effect [
+                                DefaultSurfaces.trafo |> toEffect
+                                DefaultSurfaces.constantColor C4f.White |> toEffect
+                                DefaultSurfaces.simpleLighting |> toEffect
+                            ]
     let beamEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         DefaultSurfaces.vertexColor |> toEffect
                         DefaultSurfaces.thickLine |> toEffect
                     ]
-    let groundEffect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        TextureTiling.Effect
-                        DefaultSurfaces.normalMap |> toEffect
-                        DefaultSurfaces.diffuseTexture |> toEffect
-                        Lighting.Effect false
-                    ]
-    let wallEffect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
-                        TextureTiling.Effect
-                        DefaultSurfaces.normalMap |> toEffect
-                        DefaultSurfaces.diffuseTexture |> toEffect
-                        Lighting.Effect false
-                    ]
+    let normalDiffuseEffect = Sg.effect [
+                                    DefaultSurfaces.trafo |> toEffect
+                                    TextureTiling.Effect
+                                    DefaultSurfaces.normalMap |> toEffect
+                                    DefaultSurfaces.diffuseTexture |> toEffect
+                                    Lighting.Effect false
+                                ]
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
                         TextureTiling.Effect
@@ -107,7 +101,7 @@ let main argv =
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-            model = Sg.ofList [handSg |> handEffect; beamSg |> beamEffect]
+            model = Sg.ofList [handSg |> constColorEffect; beamSg |> beamEffect]
             isColliding = false
         }
     let rightHandObject = 
@@ -123,12 +117,19 @@ let main argv =
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-            model = handSg |> handEffect
+            model = handSg |> constColorEffect
             isColliding = false
         }
     let camObject2 = 
         { camObject1 with
             id = newId()
+        }
+    let lightObject =
+        { defaultObject with
+            id = newId()
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness * 2.0, 0.0) * Trafo3d.Translation(0.5, 0.0, 0.0)
+            //model = lightSg |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.5, 0.0, 0.0))) |> constColorEffect
+            model = lightSg |>  constColorEffect
         }
 
     let commonRestitution = 0.95f
@@ -139,7 +140,7 @@ let main argv =
             id = newId()
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = groundSg 
-                        |> groundEffect 
+                        |> normalDiffuseEffect 
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
                         |> groundNormalMap
             tilingFactor = V2d(4.0, 4.0)
@@ -155,7 +156,7 @@ let main argv =
             rollingFriction = commonRollingFriction
             restitution = commonRestitution
             model = wallSg
-                        |> wallEffect
+                        |> normalDiffuseEffect
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
                         |> wallNormalMap
             tilingFactor = V2d(3.0, 3.0)
@@ -258,7 +259,7 @@ let main argv =
         manipulableObjects @ 
         ballObjects @ boxObjects @
         toObjects false staticModels 
-        @ [groundObject; wall1; wall2; wall3; wall4]
+        @ [groundObject; wall1; wall2; wall3; wall4; lightObject]
         @ [leftHandObject; rightHandObject; camObject1; camObject2;]
         
     let sceneObj =
@@ -268,7 +269,7 @@ let main argv =
             controller1ObjectId = leftHandObject.id
             controller2ObjectId = rightHandObject.id
             objects = PersistentHashSet.ofList objects
-            lightPos = V3d()
+            lightId = lightObject.id
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastContr2Trafo = Trafo3d.Identity

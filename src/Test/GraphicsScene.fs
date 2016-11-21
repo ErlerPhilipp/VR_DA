@@ -40,11 +40,12 @@ module GraphicsScene =
             }
 
         static member Create(s : Scene) =
+            let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.lightId, s.objects).Forward.TransformPos(V3d())
             {
                 original = s
                 mobjects = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
-                mlightPos = Mod.init s.lightPos
+                mlightPos = Mod.init (lightPos)
             }
 
         static member Update(mo : MObject, o : Object) =
@@ -56,11 +57,13 @@ module GraphicsScene =
 
         static member Update(ms : MScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
+                let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.lightId, s.objects).Forward.TransformPos(V3d())
+
                 ms.original <- s
 
                 ms.mviewTrafo.Value <- s.viewTrafo
 
-                ms.mlightPos.Value <- s.lightPos
+                ms.mlightPos.Value <- lightPos
 
                 let table = 
                     ms.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
