@@ -18,6 +18,7 @@ module GraphicsScene =
             mtrafo              : ModRef<Trafo3d>
             mmodel              : ModRef<ISg>
             misGrabbable        : ModRef<bool>
+            mtilingFactor       : ModRef<V2d>
         }
 
     type MScene =
@@ -25,6 +26,7 @@ module GraphicsScene =
             mutable original    : Scene
             mobjects            : cset<MObject>
             mviewTrafo          : ModRef<Trafo3d>
+            mlightPos           : ModRef<V3d>
         }
 
     type Conversion private() =
@@ -34,6 +36,7 @@ module GraphicsScene =
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
                 misGrabbable = Mod.init o.isGrabbable
+                mtilingFactor = Mod.init o.tilingFactor
             }
 
         static member Create(s : Scene) =
@@ -41,6 +44,7 @@ module GraphicsScene =
                 original = s
                 mobjects = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
+                mlightPos = Mod.init s.lightPos
             }
 
         static member Update(mo : MObject, o : Object) =
@@ -55,6 +59,8 @@ module GraphicsScene =
                 ms.original <- s
 
                 ms.mviewTrafo.Value <- s.viewTrafo
+
+                ms.mlightPos.Value <- s.lightPos
 
                 let table = 
                     ms.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -121,12 +127,15 @@ module GraphicsScene =
             t.mmodel
                 |> Sg.dynamic
                 |> Sg.uniform "isHighlighted" t.misGrabbable
+                |> Sg.uniform "tilingFactor" t.mtilingFactor
+                |> Sg.uniform "HasSpecularColorTexture" (Mod.constant false)
                 |> Sg.trafo t.mtrafo
 
         let sgs = 
             mscene.mobjects
                 |> ASet.map toSg
                 |> Sg.set
+                |> Sg.uniform "LightLocation" mscene.mlightPos
 
         Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo mscene.mviewTrafo

@@ -34,7 +34,7 @@
     <OutputPath>..\..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x64</PlatformTarget>
     <DocumentationFile>
     </DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
@@ -64,6 +64,7 @@
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
     <Compile Include="GraphicsScene.fs" />
+    <Compile Include="SGHelper.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

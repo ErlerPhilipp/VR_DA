@@ -38,6 +38,7 @@ module LogicalScene =
 
             trafo             : Trafo3d
             model             : ISg
+            tilingFactor      : V2d
 
             mass              : float32
             restitution       : float32
@@ -59,6 +60,7 @@ module LogicalScene =
             wasGrabbed    = false
             trafo = Trafo3d.Identity
             model = Sg.group []
+            tilingFactor = V2d(1.0, 1.0)
             mass = 0.0f
             restitution = 0.0f
             friction = 1.0f
@@ -83,15 +85,17 @@ module LogicalScene =
             controller1ObjectId : int
             controller2ObjectId : int
 
-            interactionType    : VrInteractions.VrInteractionTechnique
-            armExtensionFactor : float
+            lightPos            : V3d
 
-            physicsDebugDraw   : bool
-            gravity            : V3d
-            numSubSteps        : int
-            subStepTime        : float
+            interactionType     : VrInteractions.VrInteractionTechnique
+            armExtensionFactor  : float
 
-            moveDirection      : V3d
+            physicsDebugDraw    : bool
+            gravity             : V3d
+            numSubSteps         : int
+            subStepTime         : float
+
+            moveDirection       : V3d
         }
         
     type Message =
@@ -136,6 +140,7 @@ module LogicalScene =
                 }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
                 let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
+                let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
                 let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
                 let newObjects = updateObjectsTrafoWithId(scene.controller2ObjectId, scene.objects, virtualHandTrafo)
                                  |> PersistentHashSet.map (fun a ->
@@ -144,6 +149,7 @@ module LogicalScene =
                 { scene with 
                     objects = newObjects
                     armExtensionFactor = extension
+                    lightPos = virtualHandPos
                     lastContr2Trafo = virtualHandTrafo
                 }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->

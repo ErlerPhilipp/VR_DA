@@ -5,71 +5,18 @@ module VRTestApp
 open Valve.VR
 
 open OpenTK
-open OpenTK.Graphics
 
-open FShade
-
+open Aardvark.Application.WinForms
 open Aardvark.Base
 open Aardvark.Base.Rendering
-open Aardvark.Base.Rendering.Effects
-open Aardvark.Application
-open Aardvark.Rendering.GL
-open Aardvark.Application.WinForms
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.SceneGraph.IO
-open Aardvark.SceneGraph.Semantics
 open Aardvark.VR
 
 open LogicalScene
-
-let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
-    let positions = m.IndexedAttributes.[DefaultSemantic.Positions] |> unbox<V3f[]>
-    let index =
-        if isNull m.IndexArray then Array.init positions.Length id
-        else m.IndexArray |> unbox<int[]>
-
-    match m.Mode with
-        | IndexedGeometryMode.TriangleList ->
-            Array.init (index.Length / 3) (fun ti ->
-                Triangle3d(
-                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+0]]),
-                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+1]]),
-                    trafo.Forward.TransformPos (V3d positions.[index.[3*ti+2]])
-                )
-            )
-                
-        | IndexedGeometryMode.TriangleStrip ->
-            failwith ""
-
-        | _ ->
-            [||]
-
-let rec createShape (currentTrafo : Trafo3d) (n : Loader.Node) : Triangle3d[] =
-    match n with
-        | Loader.Empty -> 
-            [||]
-        | Loader.Trafo(t,c) -> 
-            createShape (t * currentTrafo) c
-        | Loader.Group(children) ->
-            children |> List.toArray |> Array.collect (createShape currentTrafo)
-        | Loader.Leaf n ->
-            triangles currentTrafo n.geometry
-
-        | Loader.Material(_,c) ->
-            createShape currentTrafo c
-            
-                    
-type UniformScope with
-    member x.isHighlighted : bool = x?isHighlighted
-
-let highlight (v : Vertex) =
-    fragment {
-        if uniform.isHighlighted then
-            return v.c + 0.3
-        else
-            return v.c
-    }
+open SGHelper
+open TextureTiling
 
 [<EntryPoint>]
 let main argv =
@@ -107,6 +54,12 @@ let main argv =
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
     let boxSg = Sg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
+    let groundNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", true) :> ITexture))
+    let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture groundNormalSampler
+
+    let wallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", true) :> ITexture))
+    let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture wallNormalSampler
+
     let virtualHandEffect = Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
                                 DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
@@ -124,18 +77,23 @@ let main argv =
                     ]
     let groundEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
+                        TextureTiling.Effect
+                        DefaultSurfaces.normalMap |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
+                        DefaultSurfaces.lighting false |> toEffect
                     ]
     let wallEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
+                        TextureTiling.Effect
+//                        DefaultSurfaces.normalMap |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
+                        DefaultSurfaces.lighting false |> toEffect
                     ]
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
+                        TextureTiling.Effect
                         DefaultSurfaces.diffuseTexture |> toEffect
-                        DefaultSurfaces.simpleLighting |> toEffect
+                        DefaultSurfaces.lighting false |> toEffect
                         highlight |> toEffect
                     ]
 
@@ -179,6 +137,8 @@ let main argv =
             model = groundSg 
                         |> groundEffect 
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
+                        |> groundNormalMap
+            tilingFactor = V2d(4.0, 4.0)
             collisionShape = Some ( V3d(edgeLength) |> BulletHelper.Shape.Box )
             friction = 0.75f
             rollingFriction = commonRollingFriction
@@ -187,18 +147,20 @@ let main argv =
 
     let wallBase = 
         { defaultObject with
-                friction = 0.75f
-                rollingFriction = commonRollingFriction
-                restitution = commonRestitution
-                model = Sg.fullScreenQuad
-                            |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
-                            |> wallEffect
-                            |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
+            friction = 0.75f
+            rollingFriction = commonRollingFriction
+            restitution = commonRestitution
+            model = Sg.fullScreenQuad
+                        |> Sg.trafo (Mod.constant (Trafo3d.Scale 5.0)) 
+                        |> wallEffect
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
+//                        |> wallNormalMap
+            tilingFactor = V2d(3.0, 3.0)
         }
     let wall1 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.0, 0.0, 5.0)))
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.Translation(0.0, 0.0, -5.0)))
             collisionShape = Some ( Plane3d(V3d(0,0,-1), V3d(0,0,5)) |> BulletHelper.Shape.Plane )
         }
     let wall2 = 
@@ -210,7 +172,7 @@ let main argv =
     let wall3 = 
         { wallBase with 
             id = newId()
-            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, 0.0, -5.0))) 
+            model = wallBase.model |> Sg.trafo (Mod.constant (Trafo3d.RotationY (float MathHelper.Pi) * Trafo3d.Translation(0.0, 0.0, 5.0))) 
             collisionShape = Some ( Plane3d(V3d(0,0,1), V3d(0,0,-5)) |> BulletHelper.Shape.Plane )
         }
     let wall4 = 
@@ -226,6 +188,7 @@ let main argv =
             isManipulable = true
             trafo = Trafo3d.Translation(-0.0, 0.0, 0.0)
             model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
+            tilingFactor = V2d(0.2, 1.0)
             mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             restitution = commonRestitution
@@ -281,16 +244,6 @@ let main argv =
                     }
                 )
 
-        let replicate (objects : Object list, amount : int) = 
-            [
-                for (o) in objects do
-                    for i in 1..amount do
-                        let offset = Trafo3d.Translation(0.0, float i*2.0, 0.0)
-                        yield ({o with 
-                                    id = newId()
-                                    trafo = offset * o.trafo})
-            ]
-
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
         let ballObjects = replicate ([ball], 25)
         let boxObjects = replicate ([box], 25)
@@ -308,6 +261,7 @@ let main argv =
             controller1ObjectId = leftHandObject.id
             controller2ObjectId = rightHandObject.id
             objects = PersistentHashSet.ofList objects
+            lightPos = V3d()
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastContr2Trafo = Trafo3d.Identity
