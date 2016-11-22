@@ -14,6 +14,57 @@ open System
 open LogicalScene
 
 module Primitives = 
+    let calcTangentsFromVertices (indices : int[], texPos : V2f[], normals : V3f[], positions : V3f[]) =
+
+        let indices = if isNull indices then Array.init positions.Length id else indices
+
+        let tangents = Array.zeroCreate positions.Length
+        let bitangents = Array.zeroCreate positions.Length
+
+        for bi in 0 .. 3 .. indices.Length - 3 do
+            let i0 = indices.[bi + 0]
+            let i1 = indices.[bi + 1]
+            let i2 = indices.[bi + 2]
+
+            let v0 = positions.[i0]
+            let v1 = positions.[i1]
+            let v2 = positions.[i2]
+
+            let uv0 = texPos.[i0]
+            let uv1 = texPos.[i1]
+            let uv2 = texPos.[i2]
+
+            let deltaPos0 = v1 - v0
+            let deltaPos1 = v2 - v0
+                    
+            let deltaUV0 = uv1 - uv0
+            let deltaUV1 = uv2 - uv0
+
+            let r = 1.0f / (deltaUV0.X * deltaUV1.Y - deltaUV0.Y * deltaUV1.X)
+            let triTangent = (deltaPos0 * deltaUV1.Y - deltaPos1 * deltaUV0.Y) * r
+            let triBiTangent = (deltaPos1 * deltaUV0.X - deltaPos0 * deltaUV1.X) * r
+
+            tangents.[i0] <- tangents.[i0] + triTangent
+            tangents.[i1] <- tangents.[i1] + triTangent
+            tangents.[i2] <- tangents.[i2] + triTangent
+
+            bitangents.[i0] <- bitangents.[i0] + triBiTangent
+            bitangents.[i1] <- bitangents.[i1] + triBiTangent
+            bitangents.[i2] <- bitangents.[i2] + triBiTangent
+
+        for i in 0 .. tangents.Length-1 do
+            let t = tangents.[i].Normalized
+            let b = bitangents.[i].Normalized
+
+            let n = normals.[i] |> Vec.normalize
+            let t = t - (Vec.dot n t) * n |> Vec.normalize
+            let b = b - (Vec.dot n b) * n - (Vec.dot t b) * t |> Vec.normalize
+
+            tangents.[i] <- t
+            bitangents.[i] <- b
+
+        (tangents, bitangents)
+
     let unitBox =
         let box = Box3d.Unit
         let indices =
@@ -49,47 +100,31 @@ module Primitives =
                 -V3f.OOI;
             |]
 
-        let tangents = 
-            [| 
-                V3f.OIO;
-                V3f.OOI;
-                -V3f.IOO;
-
-                -V3f.OIO;
-                -V3f.OOI;
-                V3f.IOO;
-            |]
-
-        let bitangents = 
-            [| 
-                V3f.OOI;
-                -V3f.IOO;
-                -V3f.OIO;
-
-                -V3f.OOI;
-                V3f.IOO;
-                V3f.OIO;
-            |]
-
         let texcoords =
             [|
                 V2f.OO; V2f.IO; V2f.II;  V2f.OO; V2f.II; V2f.OI
             |]
+
+        let positions = indices |> Array.map (fun i -> positions.[i])
+        let texcoords = indices |> Array.mapi (fun ti _ -> texcoords.[ti % 6])
+        let normals = indices |> Array.mapi (fun ti _ -> normals.[ti / 6])
+
+        let (tangents, bitangents) = calcTangentsFromVertices (null, texcoords, normals, positions)
 
         IndexedGeometry(
             Mode = IndexedGeometryMode.TriangleList,
 
             IndexedAttributes =
                 SymDict.ofList [
-                    DefaultSemantic.Positions, indices |> Array.map (fun i -> positions.[i]) :> Array
-                    DefaultSemantic.Normals, indices |> Array.mapi (fun ti _ -> normals.[ti / 6]) :> Array
-                    DefaultSemantic.DiffuseColorVTangents, indices |> Array.mapi (fun ti _ -> tangents.[ti / 6]) :> Array
-                    DefaultSemantic.DiffuseColorUTangents, indices |> Array.mapi (fun ti _ -> bitangents.[ti / 6]) :> Array
-                    DefaultSemantic.DiffuseColorCoordinates, indices |> Array.mapi (fun ti _ -> texcoords.[ti % 6]) :> Array
+                    DefaultSemantic.Positions, positions :> Array
+                    DefaultSemantic.DiffuseColorCoordinates, texcoords :> Array
+                    DefaultSemantic.Normals, normals :> Array
+                    DefaultSemantic.DiffuseColorUTangents, tangents :> Array
+                    DefaultSemantic.DiffuseColorVTangents, bitangents :> Array
                 ]
         )
         
-    let unitBoxSG = Sg.ofIndexedGeometry Primitives.unitBox
+    let unitBoxSG = Sg.ofIndexedGeometry unitBox
     
     let box (color : IMod<C4b>) (bounds : IMod<Box3d>) =
         let trafo = bounds |> Mod.map (fun box -> Trafo3d.Scale(box.Size) * Trafo3d.Translation(box.Min))
@@ -147,7 +182,7 @@ module SGHelper =
                     
     type UniformScope with
         member x.isHighlighted : bool = x?isHighlighted
-        member x.tilingFactor : V2f = x?tilingFactor
+        member x.tilingFactor : V2d = x?tilingFactor
 
     let highlight (v : Vertex) =
         fragment {
@@ -158,10 +193,10 @@ module SGHelper =
         }
 
 module TextureTiling = 
-    
+    open SGHelper
     let internal textureTiling (v : Vertex) =
         vertex {
-            let tilingFactor = uniform?tilingFactor
+            let tilingFactor = uniform.tilingFactor
             return { v with
                         tc = v.tc * tilingFactor
                    }
@@ -222,7 +257,6 @@ module Lighting =
             let l = ambient + (1.0 - ambient) * diffuse * attenuation
 
             return V4d(v.c.XYZ * l + attenuation * pown s specularExponent, v.c.W)
-//            return V4d(n, v.c.W)
         }
 
     let Effect (twoSided : bool)= 
