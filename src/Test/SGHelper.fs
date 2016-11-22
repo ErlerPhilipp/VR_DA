@@ -132,6 +132,128 @@ module Primitives =
         unitBoxSG
             |> Sg.vertexBufferValue DefaultSemantic.Colors color
             |> Sg.trafo trafo
+            
+module Sphere =
+        
+    let private cube = 
+        let V3d(x : int,y : int,z : int) = V3d(x,y,z).Normalized
+        [|
+            // +Z
+            Triangle3d(V3d(1, 1, 1), V3d(-1, -1, 1), V3d(1, -1, 1))
+            Triangle3d(V3d(-1, -1, 1), V3d(1, 1, 1), V3d(-1, 1, 1))
+
+            // -Z
+            Triangle3d(V3d(-1, -1, -1), V3d(1, 1, -1), V3d(1, -1, -1))
+            Triangle3d(V3d(1, 1, -1), V3d(-1, -1, -1), V3d(-1, 1, -1))
+
+
+            // +Y
+            Triangle3d(V3d(-1, 1, -1), V3d(1, 1, 1), V3d(1, 1, -1))
+            Triangle3d(V3d(1, 1, 1), V3d(-1, 1, -1), V3d(-1, 1, 1))
+
+            // -Y
+            Triangle3d(V3d(1, -1, 1), V3d(-1, -1, -1), V3d(1, -1, -1))
+            Triangle3d(V3d(-1, -1, -1), V3d(1, -1, 1), V3d(-1, -1, 1))
+
+            // +X
+            Triangle3d(V3d(1, 1, 1), V3d(1, -1, -1), V3d(1, 1, -1))
+            Triangle3d(V3d(1, -1, -1), V3d(1, 1, 1), V3d(1, -1, 1))
+
+            // -X
+            Triangle3d(V3d(-1, -1, -1), V3d(-1, 1, 1), V3d(-1, 1, -1))
+            Triangle3d(V3d(-1, 1, 1), V3d(-1, -1, -1), V3d(-1, -1, 1))
+
+        |]
+
+    let private subdivide (tris : Triangle3d[]) =
+        [|
+            for t in tris do
+                let mid = 0.5 * (t.P0 + t.P1) |> Vec.normalize
+
+                yield Triangle3d(t.P1, t.P2, mid)
+                yield Triangle3d(t.P2, t.P0, mid)
+        |]
+
+    let private sphereGeometry (tris : Triangle3d[]) =
+        let positions : V3f[] = Array.zeroCreate (3 * tris.Length)
+        let normals : V3f[]  = Array.zeroCreate (3 * tris.Length)
+        let coords : V2f[]  = Array.zeroCreate (3 * tris.Length)
+
+        let mutable i = 0
+        for (t : Triangle3d) in tris do
+            let p0 = t.P0
+            let p1 = t.P1
+            let p2 = t.P2
+            positions.[i + 0] <- V3f p0
+            positions.[i + 1] <- V3f p1
+            positions.[i + 2] <- V3f p2
+            normals.[i + 0] <- V3f p0.Normalized
+            normals.[i + 1] <- V3f p1.Normalized
+            normals.[i + 2] <- V3f p2.Normalized
+//            coords.[i + 0] <- p0.SphericalFromCartesian() |> V2f
+//            coords.[i + 1] <- p1.SphericalFromCartesian() |> V2f
+//            coords.[i + 2] <- p2.SphericalFromCartesian() |> V2f
+
+            let uvFromV3d(surfacePoint : V3d) = 
+                let n = surfacePoint.Normalized
+                let u = (atan2 n.Z n.X) / (2.0 * Math.PI) + 0.5
+                let v = -(asin n.Y) / (Math.PI) + 0.5
+                V2f(u, v)
+            coords.[i + 0] <- uvFromV3d p0
+            coords.[i + 1] <- uvFromV3d p1
+            coords.[i + 2] <- uvFromV3d p2
+
+            i <- i + 3
+        let geometry = 
+            IndexedGeometry(
+                Mode = IndexedGeometryMode.TriangleList,
+                IndexedAttributes =
+                    SymDict.ofList [
+                        DefaultSemantic.Positions, positions :> Array
+                        DefaultSemantic.Normals, normals :> Array
+                        DefaultSemantic.DiffuseColorCoordinates, coords :> Array
+                    ]
+            )
+
+        geometry
+
+
+    let private spheres =
+        Seq.initInfinite id
+            |> Seq.scan (fun last _ -> subdivide last) cube
+            |> Seq.map sphereGeometry
+            |> Seq.cache
+
+
+//        let rec private sphere =
+//            Seq.initInfinite id
+//                |> Seq.scan (fun last _ -> subdivide last) cube
+//                |> Seq.map sphereGeometry
+//                |> Seq.cache
+
+    let private sgs =
+        spheres |> Seq.map Sg.ofIndexedGeometry |> Seq.cache
+
+    let get (level : int) =
+        spheres |> Seq.item level
+
+    let getSg (level : int) =
+        sgs |> Seq.item level
+
+    let unitSphere (level : int) (color : IMod<C4b>) =
+        getSg level
+            |> Sg.vertexBufferValue DefaultSemantic.Colors (color |> Mod.map (fun c -> c.ToC4f() |> V4f))
+
+    let sphere (level : int) (color : IMod<C4b>) (radius : IMod<float>)  =
+        getSg level
+            |> Sg.vertexBufferValue DefaultSemantic.Colors (color |> Mod.map (fun c -> c.ToC4f() |> V4f))
+            |> Sg.trafo (radius |> Mod.map Trafo3d.Scale)
+
+    let unitSphere' (level : int) (color : C4b) =
+        unitSphere level (Mod.constant color)
+
+    let sphere' (level : int) (color : C4b) (radius : float) =
+        sphere level (Mod.constant color) (Mod.constant radius)
 
 module SGHelper = 
     let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =

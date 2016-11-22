@@ -17,6 +17,7 @@ open Aardvark.VR
 open LogicalScene
 
 open Primitives
+open Sphere
 open SGHelper
 open NormalMap
 open TextureTiling
@@ -50,10 +51,10 @@ let main argv =
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
-    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballSg = Sphere.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
-    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
+    let lightSg = Sphere.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -91,7 +92,6 @@ let main argv =
                                 ]
     let ballEffect = Sg.effect [
                         DefaultSurfaces.trafo |> toEffect
-                        TextureTiling.Effect
                         DefaultSurfaces.diffuseTexture |> toEffect
                         Lighting.Effect true
                         highlight |> toEffect
@@ -194,9 +194,8 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
-            trafo = Trafo3d.Translation(-0.0, 0.0, 0.0)
+            trafo = Trafo3d.Identity
             model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
-            tilingFactor = V2d(0.2, 1.0)
             mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             restitution = commonRestitution
