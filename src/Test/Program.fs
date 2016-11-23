@@ -49,18 +49,18 @@ let main argv =
 
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
-    let handSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant handBox) 
+    let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
-    let groundSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
-    let wallSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
+    let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
+    let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
     let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
     let objectBoxEdgeLength = 0.25
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
-    let boxSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant objectBox)
+    let boxSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
     let groundNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", true) :> ITexture))
     let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture groundNormalSampler
@@ -90,6 +90,14 @@ let main argv =
                                     DefaultSurfaces.diffuseTexture |> toEffect
                                     Lighting.Effect false
                                 ]
+    let boxEffect = Sg.effect [
+                        DefaultSurfaces.trafo |> toEffect
+                        TextureTiling.Effect
+                        NormalMap.Effect
+                        DefaultSurfaces.diffuseTexture |> toEffect
+                        Lighting.Effect true
+                        highlight |> toEffect
+                    ]
     let ballEffect = Sg.effect [
                         SphereTexture.vertex |> toEffect
                         DefaultSurfaces.trafo |> toEffect
@@ -212,7 +220,7 @@ let main argv =
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
-            model = boxSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
+            model = boxSg |> boxEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true |> wallNormalMap
             mass = 0.625f
             collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box )
             restitution = 0.1f

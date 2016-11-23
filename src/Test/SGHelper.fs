@@ -13,8 +13,8 @@ open System
 
 open LogicalScene
 
-module Primitives = 
-    let calcTangentsFromVertices (indices : int[], texPos : V2f[], normals : V3f[], positions : V3f[]) =
+module BoxSg = 
+    let private calcTangentsFromVertices (indices : int[], texPos : V2f[], normals : V3f[], positions : V3f[]) =
 
         let indices = if isNull indices then Array.init positions.Length id else indices
 
@@ -65,7 +65,7 @@ module Primitives =
 
         (tangents, bitangents)
 
-    let unitBox =
+    let private unitBox =
         let box = Box3d.Unit
         let indices =
             [|
@@ -124,7 +124,7 @@ module Primitives =
                 ]
         )
         
-    let unitBoxSG = Sg.ofIndexedGeometry unitBox
+    let private unitBoxSG = Sg.ofIndexedGeometry unitBox
     
     let box (color : IMod<C4b>) (bounds : IMod<Box3d>) =
         let trafo = bounds |> Mod.map (fun box -> Trafo3d.Scale(box.Size) * Trafo3d.Translation(box.Min))
@@ -132,213 +132,6 @@ module Primitives =
         unitBoxSG
             |> Sg.vertexBufferValue DefaultSemantic.Colors color
             |> Sg.trafo trafo
-            
-module Sphere =
-        
-    let private cube = 
-        let V3d(x : int,y : int,z : int) = V3d(x,y,z).Normalized
-        [|
-            // +Z
-            Triangle3d(V3d(1, 1, 1), V3d(-1, -1, 1), V3d(1, -1, 1))
-            Triangle3d(V3d(-1, -1, 1), V3d(1, 1, 1), V3d(-1, 1, 1))
-
-            // -Z
-            Triangle3d(V3d(-1, -1, -1), V3d(1, 1, -1), V3d(1, -1, -1))
-            Triangle3d(V3d(1, 1, -1), V3d(-1, -1, -1), V3d(-1, 1, -1))
-
-
-            // +Y
-            Triangle3d(V3d(-1, 1, -1), V3d(1, 1, 1), V3d(1, 1, -1))
-            Triangle3d(V3d(1, 1, 1), V3d(-1, 1, -1), V3d(-1, 1, 1))
-
-            // -Y
-            Triangle3d(V3d(1, -1, 1), V3d(-1, -1, -1), V3d(1, -1, -1))
-            Triangle3d(V3d(-1, -1, -1), V3d(1, -1, 1), V3d(-1, -1, 1))
-
-            // +X
-            Triangle3d(V3d(1, 1, 1), V3d(1, -1, -1), V3d(1, 1, -1))
-            Triangle3d(V3d(1, -1, -1), V3d(1, 1, 1), V3d(1, -1, 1))
-
-            // -X
-            Triangle3d(V3d(-1, -1, -1), V3d(-1, 1, 1), V3d(-1, 1, -1))
-            Triangle3d(V3d(-1, 1, 1), V3d(-1, -1, -1), V3d(-1, -1, 1))
-
-        |]
-
-    let private subdivide (tris : Triangle3d[]) =
-        [|
-            for t in tris do
-                let mid = 0.5 * (t.P0 + t.P1) |> Vec.normalize
-
-                yield Triangle3d(t.P1, t.P2, mid)
-                yield Triangle3d(t.P2, t.P0, mid)
-        |]
-
-    let split (plane : Plane3d) (t : Triangle3d) =
-        let p0 = t.P0
-        let p1 = t.P1
-        let p2 = t.P2
-        
-        let mutable p01 = V3d.Zero
-        let mutable p12 = V3d.Zero
-        let mutable p20 = V3d.Zero
-
-        let i01 = plane.IntersectsLine(p0, p1, Constant.NegativeTinyValue, &p01)
-        let i12 = plane.IntersectsLine(p1, p2, Constant.NegativeTinyValue, &p12)
-        let i20 = plane.IntersectsLine(p2, p0, Constant.NegativeTinyValue, &p20)
-
-        match i01, i12, i20 with
-            | false, false, false
-            | true,  true,  true ->
-                [| t |]
-
-            | false, false, true ->
-                [|
-                    Triangle3d(p1, p20, p0)
-                    Triangle3d(p1, p2, p20)
-                |]
-
-
-            | false, true,  false ->
-                [|
-                    Triangle3d(p0, p1, p12)
-                    Triangle3d(p0, p12, p2)
-                |]
-
-            | true,  false,  false ->
-                [|
-                    Triangle3d(p2, p0, p01)
-                    Triangle3d(p2, p01, p1)
-                |]
-
-            | true, true, false ->
-                [|
-                    Triangle3d(p01, p1, p12)
-                    Triangle3d(p12, p2, p0)
-                    Triangle3d(p01, p12, p0)
-                |]
-            | true, false, true ->
-                [|
-                    Triangle3d(p01, p20, p0)
-                    Triangle3d(p01, p1, p2)
-                    Triangle3d(p01, p2, p20)
-                |]
-            | false, true, true ->
-                [|
-                    Triangle3d(p20, p12, p2)
-                    Triangle3d(p20, p0, p1)
-                    Triangle3d(p12, p20, p1)
-                |]
-
-
-    let private sphereGeometry (tris : Triangle3d[]) =
-
-
-        let uvFromV3d(surfacePoint : V3d) = 
-            let v = surfacePoint.SphericalFromCartesian()
-            V2d(v.X / Constant.PiTimesTwo, 0.5 * (v.Y / Constant.Pi) + 0.5) |> V2f
-
-        let plane = Plane3d(V3d.OIO, 0.0)
-        let tris =
-            tris |> Array.collect (fun t ->
-                if t.P0.X >= 0.0 || t.P1.X >= 0.0 || t.P2.X >= 0.0 then
-                    split plane t
-                else
-                    [|t|]
-
-            )
-
-        let positions : V3f[] = Array.zeroCreate (3 * tris.Length)
-        let normals : V3f[]  = Array.zeroCreate (3 * tris.Length)
-        let coords : V2f[]  = Array.zeroCreate (3 * tris.Length)
-
-        let mutable i = 0
-        for (t : Triangle3d) in tris do
-            let p0 = t.P0
-            let p1 = t.P1
-            let p2 = t.P2
-            positions.[i + 0] <- V3f p0
-            positions.[i + 1] <- V3f p1
-            positions.[i + 2] <- V3f p2
-            normals.[i + 0] <- V3f p0.Normalized
-            normals.[i + 1] <- V3f p1.Normalized
-            normals.[i + 2] <- V3f p2.Normalized
-
-            let endTriangle = (t.P0.X >= 0.0 || t.P1.X >= 0.0 || t.P2.X >= 0.0) && (t.P0.Y < 0.0 || t.P1.Y < 0.0 || t.P2.Y < 0.0)
-
-            let uv0 = uvFromV3d p0
-            let uv1 = uvFromV3d p1
-            let uv2 = uvFromV3d p2
-            let uv0 = 
-                if endTriangle && Fun.IsTiny(t.P0.Y) then V2f(1.0f, uv0.Y)
-                else uv0
-
-            let uv1 = 
-                if endTriangle && Fun.IsTiny(t.P1.Y) then V2f(1.0f, uv1.Y)
-                else uv1
-
-            let uv2 = 
-                if endTriangle && Fun.IsTiny(t.P2.Y) then V2f(1.0f, uv2.Y)
-                else uv2
-
-
-
-
-            coords.[i + 0] <- uv0
-            coords.[i + 1] <- uv1
-            coords.[i + 2] <- uv2
-
-            i <- i + 3
-        let geometry = 
-            IndexedGeometry(
-                Mode = IndexedGeometryMode.TriangleList,
-                IndexedAttributes =
-                    SymDict.ofList [
-                        DefaultSemantic.Positions, positions :> Array
-                        DefaultSemantic.Normals, normals :> Array
-                        DefaultSemantic.DiffuseColorCoordinates, coords :> Array
-                    ]
-            )
-
-        geometry
-
-
-    let private spheres =
-        Seq.initInfinite id
-            |> Seq.scan (fun last _ -> subdivide last) cube
-            |> Seq.map sphereGeometry
-            |> Seq.cache
-
-
-//        let rec private sphere =
-//            Seq.initInfinite id
-//                |> Seq.scan (fun last _ -> subdivide last) cube
-//                |> Seq.map sphereGeometry
-//                |> Seq.cache
-
-    let private sgs =
-        spheres |> Seq.map Sg.ofIndexedGeometry |> Seq.cache
-
-    let get (level : int) =
-        spheres |> Seq.item level
-
-    let getSg (level : int) =
-        sgs |> Seq.item level
-
-    let unitSphere (level : int) (color : IMod<C4b>) =
-        getSg level
-            |> Sg.vertexBufferValue DefaultSemantic.Colors (color |> Mod.map (fun c -> c.ToC4f() |> V4f))
-
-    let sphere (level : int) (color : IMod<C4b>) (radius : IMod<float>)  =
-        getSg level
-            |> Sg.vertexBufferValue DefaultSemantic.Colors (color |> Mod.map (fun c -> c.ToC4f() |> V4f))
-            |> Sg.trafo (radius |> Mod.map Trafo3d.Scale)
-
-    let unitSphere' (level : int) (color : C4b) =
-        unitSphere level (Mod.constant color)
-
-    let sphere' (level : int) (color : C4b) (radius : float) =
-        sphere level (Mod.constant color) (Mod.constant radius)
 
 module SGHelper = 
     let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
