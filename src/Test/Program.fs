@@ -51,10 +51,10 @@ let main argv =
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = Primitives.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
-    let ballSg = Sphere.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = Primitives.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
-    let lightSg = Sphere.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
+    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -91,7 +91,9 @@ let main argv =
                                     Lighting.Effect false
                                 ]
     let ballEffect = Sg.effect [
+                        SphereTexture.vertex |> toEffect
                         DefaultSurfaces.trafo |> toEffect
+                        SphereTexture.fragment |> toEffect
                         DefaultSurfaces.diffuseTexture |> toEffect
                         Lighting.Effect true
                         highlight |> toEffect

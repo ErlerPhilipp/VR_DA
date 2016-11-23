@@ -174,7 +174,80 @@ module Sphere =
                 yield Triangle3d(t.P2, t.P0, mid)
         |]
 
+    let split (plane : Plane3d) (t : Triangle3d) =
+        let p0 = t.P0
+        let p1 = t.P1
+        let p2 = t.P2
+        
+        let mutable p01 = V3d.Zero
+        let mutable p12 = V3d.Zero
+        let mutable p20 = V3d.Zero
+
+        let i01 = plane.IntersectsLine(p0, p1, Constant.NegativeTinyValue, &p01)
+        let i12 = plane.IntersectsLine(p1, p2, Constant.NegativeTinyValue, &p12)
+        let i20 = plane.IntersectsLine(p2, p0, Constant.NegativeTinyValue, &p20)
+
+        match i01, i12, i20 with
+            | false, false, false
+            | true,  true,  true ->
+                [| t |]
+
+            | false, false, true ->
+                [|
+                    Triangle3d(p1, p20, p0)
+                    Triangle3d(p1, p2, p20)
+                |]
+
+
+            | false, true,  false ->
+                [|
+                    Triangle3d(p0, p1, p12)
+                    Triangle3d(p0, p12, p2)
+                |]
+
+            | true,  false,  false ->
+                [|
+                    Triangle3d(p2, p0, p01)
+                    Triangle3d(p2, p01, p1)
+                |]
+
+            | true, true, false ->
+                [|
+                    Triangle3d(p01, p1, p12)
+                    Triangle3d(p12, p2, p0)
+                    Triangle3d(p01, p12, p0)
+                |]
+            | true, false, true ->
+                [|
+                    Triangle3d(p01, p20, p0)
+                    Triangle3d(p01, p1, p2)
+                    Triangle3d(p01, p2, p20)
+                |]
+            | false, true, true ->
+                [|
+                    Triangle3d(p20, p12, p2)
+                    Triangle3d(p20, p0, p1)
+                    Triangle3d(p12, p20, p1)
+                |]
+
+
     let private sphereGeometry (tris : Triangle3d[]) =
+
+
+        let uvFromV3d(surfacePoint : V3d) = 
+            let v = surfacePoint.SphericalFromCartesian()
+            V2d(v.X / Constant.PiTimesTwo, 0.5 * (v.Y / Constant.Pi) + 0.5) |> V2f
+
+        let plane = Plane3d(V3d.OIO, 0.0)
+        let tris =
+            tris |> Array.collect (fun t ->
+                if t.P0.X >= 0.0 || t.P1.X >= 0.0 || t.P2.X >= 0.0 then
+                    split plane t
+                else
+                    [|t|]
+
+            )
+
         let positions : V3f[] = Array.zeroCreate (3 * tris.Length)
         let normals : V3f[]  = Array.zeroCreate (3 * tris.Length)
         let coords : V2f[]  = Array.zeroCreate (3 * tris.Length)
@@ -190,18 +263,30 @@ module Sphere =
             normals.[i + 0] <- V3f p0.Normalized
             normals.[i + 1] <- V3f p1.Normalized
             normals.[i + 2] <- V3f p2.Normalized
-//            coords.[i + 0] <- p0.SphericalFromCartesian() |> V2f
-//            coords.[i + 1] <- p1.SphericalFromCartesian() |> V2f
-//            coords.[i + 2] <- p2.SphericalFromCartesian() |> V2f
 
-            let uvFromV3d(surfacePoint : V3d) = 
-                let n = surfacePoint.Normalized
-                let u = (atan2 n.Z n.X) / (2.0 * Math.PI) + 0.5
-                let v = -(asin n.Y) / (Math.PI) + 0.5
-                V2f(u, v)
-            coords.[i + 0] <- uvFromV3d p0
-            coords.[i + 1] <- uvFromV3d p1
-            coords.[i + 2] <- uvFromV3d p2
+            let endTriangle = (t.P0.X >= 0.0 || t.P1.X >= 0.0 || t.P2.X >= 0.0) && (t.P0.Y < 0.0 || t.P1.Y < 0.0 || t.P2.Y < 0.0)
+
+            let uv0 = uvFromV3d p0
+            let uv1 = uvFromV3d p1
+            let uv2 = uvFromV3d p2
+            let uv0 = 
+                if endTriangle && Fun.IsTiny(t.P0.Y) then V2f(1.0f, uv0.Y)
+                else uv0
+
+            let uv1 = 
+                if endTriangle && Fun.IsTiny(t.P1.Y) then V2f(1.0f, uv1.Y)
+                else uv1
+
+            let uv2 = 
+                if endTriangle && Fun.IsTiny(t.P2.Y) then V2f(1.0f, uv2.Y)
+                else uv2
+
+
+
+
+            coords.[i + 0] <- uv0
+            coords.[i + 1] <- uv1
+            coords.[i + 2] <- uv2
 
             i <- i + 3
         let geometry = 
@@ -383,3 +468,27 @@ module Lighting =
 
     let Effect (twoSided : bool)= 
         toEffect (lighting twoSided)
+
+module SphereTexture =
+
+    type Vertex =
+        {
+            [<Position>] pos : V4d
+            [<TexCoord>] tc : V2d
+            [<Semantic("VertexPosition")>] vertexPos : V3d
+        }
+
+    let vertex (v : Vertex) =
+        vertex {
+            return { v with vertexPos = v.pos.XYZ }
+        }
+
+    let fragment (v : Vertex) =
+        fragment {
+            let pos = v.vertexPos
+
+            let s = (atan2 pos.Y pos.X + Constant.Pi) / Constant.PiTimesTwo
+            let t = 0.5 + asin (pos.Z / pos.Length) / Constant.Pi
+
+            return { v with tc = V2d(s,t) }
+        }
