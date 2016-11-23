@@ -119,6 +119,26 @@ module PhysicsScene =
                                 inertia = Vector3.Zero
                                 trafo = initialTrafo
                             }
+                        | ObjectTypes.Kinematic ->
+                            let inertia = cshape.CalculateLocalInertia(o.mass)
+                            let state = new MyMotionState()
+                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
+                            
+                            let rigidBody = new BulletSharp.RigidBody(info)
+                            rigidBody.SetDamping(0.1f, 0.1f)
+                            setProperties(rigidBody, o)
+                            rigidBody.CollisionFlags <- rigidBody.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
+                            rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
+                                
+                            scene.dynamicsWorld.AddRigidBody(rigidBody)
+                            let body =  { 
+                                            original = o
+                                            collisionObject = RigidBody rigidBody 
+                                            inertia = inertia
+                                            trafo = initialTrafo
+                                        } 
+                            state.init body
+                            body
                 | None -> { original = o; collisionObject = CollisionObject.NoObject; inertia = Vector3.Zero; trafo = initialTrafo }
 
 

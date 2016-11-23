@@ -22,7 +22,7 @@ module LogicalScene =
         | Static        // static collider, never moving
         | Dynamic       // moved by physics
         | Ghost         // tracks its collisions
-        // TODO: necessary? | Kinematic     // not moved by physics but by game logic
+        | Kinematic     // not moved by physics but by game logic
 
     type pset<'a> = PersistentHashSet<'a>
     type Object =
@@ -84,6 +84,7 @@ module LogicalScene =
             cam2ObjectId        : int
             controller1ObjectId : int
             controller2ObjectId : int
+            headId              : int
 
             lightId             : int
 
@@ -148,7 +149,11 @@ module LogicalScene =
 
         match message with
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
-                { scene with viewTrafo = t.Inverse }
+                let newObjects = setTrafoOfObjectsWithId(scene.headId, t, scene.objects)
+                { scene with 
+                    objects = newObjects
+                    viewTrafo = t.Inverse
+                }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let newObjects = setTrafoOfObjectsWithId(scene.controller1ObjectId, t, scene.objects)
                 let direction = t.Forward.TransformDir(V3d.OOI)

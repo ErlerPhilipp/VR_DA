@@ -54,7 +54,7 @@ let main argv =
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
-    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1) 
+    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1)
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -229,6 +229,21 @@ let main argv =
             ccdSphereRadius = 0.5f
             rollingFriction = commonRollingFriction
         }
+    let headCollider = 
+        { defaultObject with
+            id = newId()
+            objectType = ObjectTypes.Kinematic
+            isManipulable = false
+            trafo = Trafo3d.Identity
+            //model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
+            model = Sg.ofList []
+            collisionShape = Some (BulletHelper.Shape.Sphere 0.20)
+            restitution = commonRestitution
+            friction = 0.75f
+            ccdSpeedThreshold = 0.1f
+            ccdSphereRadius = 0.5f
+            rollingFriction = commonRollingFriction
+        }
 
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
@@ -269,7 +284,7 @@ let main argv =
         ballObjects @ boxObjects @
         toObjects false staticModels 
         @ [groundObject; wall1; wall2; wall3; wall4; lightObject]
-        @ [leftHandObject; rightHandObject; camObject1; camObject2;]
+        @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
         
     let sceneObj =
         {
@@ -277,6 +292,7 @@ let main argv =
             cam2ObjectId = camObject2.id
             controller1ObjectId = leftHandObject.id
             controller2ObjectId = rightHandObject.id
+            headId = headCollider.id
             objects = PersistentHashSet.ofList objects
             lightId = lightObject.id
             moveDirection = V3d.Zero
