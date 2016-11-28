@@ -63,6 +63,7 @@
     <Compile Include="BulletHelper.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
+    <Compile Include="ShadowVolumes.fs" />
     <Compile Include="GraphicsScene.fs" />
     <Compile Include="SGHelper.fs" />
     <Compile Include="Program.fs" />

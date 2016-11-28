@@ -52,10 +52,10 @@ let main argv =
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
-    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballSg = Sg.sphere 4 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
-    let lightSg = Sg.sphere 6 (Mod.constant C4b.White) (Mod.constant 0.1)
+    let lightSg = Sg.sphere 4 (Mod.constant C4b.White) (Mod.constant 0.1)
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -100,7 +100,7 @@ let main argv =
                         TextureTiling.Effect
                         NormalMap.Effect
                         defaultDiffuseTextureEffect
-                        Lighting.Effect true
+                        Lighting.Effect false
                         Highlight.Effect
                     ]
     let ballEffect = Sg.effect [
@@ -108,7 +108,7 @@ let main argv =
                         defaultTrafoEffect
                         SphereTexture.fragment |> toEffect
                         defaultDiffuseTextureEffect
-                        Lighting.Effect true
+                        Lighting.Effect false
                         Highlight.Effect
                     ]
 
@@ -143,6 +143,7 @@ let main argv =
     let lightObject =
         { defaultObject with
             id = newId()
+            castsShadow = false
             trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness, 0.0)
             model = lightSg |>  constColorEffect
         }
@@ -153,6 +154,7 @@ let main argv =
     let groundObject = 
         { defaultObject with
             id = newId()
+            castsShadow = false
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = groundSg 
                         |> normalDiffuseEffect 
@@ -167,6 +169,7 @@ let main argv =
 
     let wallBase = 
         { defaultObject with
+            castsShadow = false
             friction = 0.75f
             rollingFriction = commonRollingFriction
             restitution = commonRestitution
@@ -236,6 +239,7 @@ let main argv =
         }
     let headCollider = 
         { defaultObject with
+            castsShadow = false
             id = newId()
             objectType = ObjectTypes.Kinematic
             isManipulable = false
@@ -282,8 +286,8 @@ let main argv =
                 )
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 25)
-        let boxObjects = replicate ([box], 25)
+        let ballObjects = replicate ([ball], 1)
+        let boxObjects = replicate ([box], 5)
         
         manipulableObjects @ 
         ballObjects @ boxObjects @
@@ -310,12 +314,8 @@ let main argv =
             armExtensionFactor = 1.0
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = false
-//            numSubSteps = 11
-//            subStepTime = 1.0 / 900.0
             numSubSteps = 3
             subStepTime = 1.0 / 180.0
-//            numSubSteps = 1
-//            subStepTime = 1.0 / 90.0
         }
 
     let scene =

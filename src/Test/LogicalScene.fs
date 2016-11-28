@@ -29,6 +29,7 @@ module LogicalScene =
         {
             id                : int
             
+            castsShadow       : bool
             objectType        : ObjectTypes
             isColliding       : bool
             isManipulable     : bool
@@ -52,6 +53,7 @@ module LogicalScene =
     let defaultObject = 
         {
             id = newId()
+            castsShadow   = true
             objectType    = ObjectTypes.Static
             isColliding   = true
             isManipulable = false
@@ -247,8 +249,8 @@ module LogicalScene =
                     )
                 let newSceneTrafo = scene.deviceOffset * dp
                 
-                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
-                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
+//                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
+//                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
 
                 { scene with
                     objects = newObjects

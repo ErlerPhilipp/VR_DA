@@ -187,7 +187,7 @@ module Highlight =
     let highlight (v : Vertex) =
         fragment {
             if uniform.isHighlighted then
-                return v.c + 0.25
+                return v.c * 1.5
             else
                 return v.c
         }

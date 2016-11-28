@@ -7,6 +7,8 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
+open ShadowVolumes
+
 module GraphicsScene =
     open LogicalScene
     open VrInteractions
@@ -132,11 +134,31 @@ module GraphicsScene =
                 |> Sg.uniform "isHighlighted" t.misGrabbable
                 |> Sg.uniform "tilingFactor" t.mtilingFactor
                 |> Sg.trafo t.mtrafo
-
-        let sgs = 
+        
+        let objectsInScene = 
             mscene.mobjects
                 |> ASet.map toSg
                 |> Sg.set
+                
+        let toShadowCasterSg (t : MObject) =
+            if t.original.castsShadow then
+                t.mmodel
+                    |> Sg.dynamic
+                    |> Sg.uniform "isHighlighted" t.misGrabbable
+                    |> Sg.uniform "tilingFactor" t.mtilingFactor
+                    |> Sg.trafo t.mtrafo
+            else
+                Sg.ofList []
+
+        let shadowCasterInScene = 
+            mscene.mobjects
+                |> ASet.map toShadowCasterSg
+                |> Sg.set
+
+        let sgs = 
+            objectsInScene
+                |> Sg.fillMode ShadowVolumes.mode
+                |> Sg.andAlso (ShadowVolumes.shadows (shadowCasterInScene))
                 |> Sg.uniform "LightLocation" mscene.mlightPos
                 |> Sg.uniform "SpecularExponent" (Mod.constant 16)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.2)
