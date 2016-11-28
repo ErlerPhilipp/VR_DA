@@ -55,7 +55,7 @@ let main argv =
     let ballSg = Sg.sphere 4 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
-    let lightSg = Sg.sphere 4 (Mod.constant C4b.White) (Mod.constant 0.1)
+    let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
     
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -144,7 +144,8 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness, 0.0)
+//            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness, 0.0)
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness, 0.0)
             model = lightSg |>  constColorEffect
         }
 
@@ -244,7 +245,6 @@ let main argv =
             objectType = ObjectTypes.Kinematic
             isManipulable = false
             trafo = Trafo3d.Identity
-            //model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\Basketball texture.jpg" true
             model = Sg.ofList []
             collisionShape = Some (BulletHelper.Shape.Sphere 0.20)
             restitution = commonRestitution

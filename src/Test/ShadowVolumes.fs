@@ -885,11 +885,7 @@ module ShadowVolumes =
 
     let shadows (sceneGraph : ISg) =
         Sg.group' [ 
-
-            let color = C4f(0.0,0.0,0.0,0.0)
-
             yield shadowVolumes (sceneGraph)
-
             yield
                 Sg.fullScreenQuad
                     |> Sg.pass final
@@ -900,7 +896,6 @@ module ShadowVolumes =
                     |> Sg.effect [
                         DefaultSurfaces.constantColor (C4f(0.0,0.0,0.0,0.8)) |> toEffect
                     ]
-
         ]
         
     let mode = Mod.init FillMode.Fill

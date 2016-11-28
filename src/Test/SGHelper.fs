@@ -187,7 +187,7 @@ module Highlight =
     let highlight (v : Vertex) =
         fragment {
             if uniform.isHighlighted then
-                return v.c * 1.5
+                return v.c * 3.0
             else
                 return v.c
         }
@@ -252,17 +252,19 @@ module Lighting =
             let h = c
             let specularExponent = uniform.SpecularExponent
             let attenuation = (1.0 - distToLight * uniform.LinearAttenuation) |> clamp 0.0 1.0
-
+            
             let ambient = uniform.AmbientFactor
             let diffuse = 
                 if twoSided then Vec.dot l n |> abs
                 else Vec.dot l n |> max 0.0
+                
+            let s = Vec.dot h n |> max 0.0
 
-            let s = Vec.dot h n |> abs
-
-            let l = ambient + (1.0 - ambient) * diffuse * attenuation
-
-            return V4d(v.c.XYZ * l + attenuation * pown s specularExponent, v.c.W)
+            let l = ambient + (1.0 - ambient) * diffuse
+            
+            return V4d((v.c.XYZ * l + pown s specularExponent) * attenuation, v.c.W)
+            //return V4d(v.c.XYZ * l * attenuation, v.c.W)
+            //return V4d(v.n * 0.5 + 0.5, 1.0)
         }
 
     let Effect (twoSided : bool)= 
