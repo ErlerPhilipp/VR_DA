@@ -22,6 +22,7 @@ open SGHelper
 open NormalMap
 open TextureTiling
 open Lighting
+open Highlight
 
 [<EntryPoint>]
 let main argv =
@@ -68,43 +69,47 @@ let main argv =
     let wallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", true) :> ITexture))
     let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture wallNormalSampler
 
+    let defaultTrafoEffect = DefaultSurfaces.trafo |> toEffect
+    let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
+    let defaultDiffuseTextureEffect = DefaultSurfaces.diffuseTexture |> toEffect
+
     let virtualHandEffect = Sg.effect [
-                                DefaultSurfaces.trafo |> toEffect
+                                defaultTrafoEffect
                                 DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
-                                DefaultSurfaces.simpleLighting |> toEffect
+                                defaultSimpleLightingEffect
                             ]
     let constColorEffect = Sg.effect [
-                                DefaultSurfaces.trafo |> toEffect
+                                defaultTrafoEffect
                                 DefaultSurfaces.constantColor C4f.White |> toEffect
-                                DefaultSurfaces.simpleLighting |> toEffect
+                                defaultSimpleLightingEffect
                             ]
     let beamEffect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
+                        defaultTrafoEffect
                         DefaultSurfaces.vertexColor |> toEffect
                         DefaultSurfaces.thickLine |> toEffect
                     ]
     let normalDiffuseEffect = Sg.effect [
-                                    DefaultSurfaces.trafo |> toEffect
+                                    defaultTrafoEffect
                                     TextureTiling.Effect
                                     NormalMap.Effect
-                                    DefaultSurfaces.diffuseTexture |> toEffect
+                                    defaultDiffuseTextureEffect
                                     Lighting.Effect false
                                 ]
     let boxEffect = Sg.effect [
-                        DefaultSurfaces.trafo |> toEffect
+                        defaultTrafoEffect
                         TextureTiling.Effect
                         NormalMap.Effect
-                        DefaultSurfaces.diffuseTexture |> toEffect
+                        defaultDiffuseTextureEffect
                         Lighting.Effect true
-                        highlight |> toEffect
+                        Highlight.Effect
                     ]
     let ballEffect = Sg.effect [
                         SphereTexture.vertex |> toEffect
-                        DefaultSurfaces.trafo |> toEffect
+                        defaultTrafoEffect
                         SphereTexture.fragment |> toEffect
-                        DefaultSurfaces.diffuseTexture |> toEffect
+                        defaultDiffuseTextureEffect
                         Lighting.Effect true
-                        highlight |> toEffect
+                        Highlight.Effect
                     ]
 
 
@@ -316,9 +321,9 @@ let main argv =
     let scene =
         GraphicsScene.createScene sceneObj vrWin
             |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
+                defaultTrafoEffect
                 DefaultSurfaces.constantColor C4f.White |> toEffect
-                DefaultSurfaces.diffuseTexture |> toEffect
+                defaultDiffuseTextureEffect
                 DefaultSurfaces.normalMap |> toEffect
                 DefaultSurfaces.lighting false |> toEffect
             ]

@@ -179,10 +179,10 @@ module SGHelper =
                                 id = newId()
                                 trafo = offset * o.trafo})
         ]
-                    
+
+module Highlight =
     type UniformScope with
         member x.isHighlighted : bool = x?isHighlighted
-        member x.tilingFactor : V2d = x?tilingFactor
 
     let highlight (v : Vertex) =
         fragment {
@@ -191,9 +191,15 @@ module SGHelper =
             else
                 return v.c
         }
+    
+    let Effect = 
+        toEffect highlight
 
 module TextureTiling = 
-    open SGHelper
+
+    type UniformScope with
+        member x.tilingFactor : V2d = x?tilingFactor
+
     let internal textureTiling (v : Vertex) =
         vertex {
             let tilingFactor = uniform.tilingFactor
