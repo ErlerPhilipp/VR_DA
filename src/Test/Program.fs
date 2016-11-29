@@ -31,10 +31,16 @@ let main argv =
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
-
+    
+    let trackingAreaSize = 4.6
+    let goalAreaSize = 6.0
+    let wallThickness = 1.0
+    let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
+    
     let staticModels =
         [
             //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite, None, 0.5f
+            @"..\..\resources\models\basketball\hoop.obj", Trafo3d.Scale 2.0 * Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(0.0, -0.5, 0.0), 0.0f, None, 0.5f
         ]
 
     let manipulableModels =
@@ -44,11 +50,6 @@ let main argv =
             //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(0.0, 0.0, 0.0), Mass 100.0f, None, 0.5f
             //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
-    
-    let trackingAreaSize = 4.6
-    let goalAreaSize = 6.0
-    let wallThickness = 1.0
-    let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
@@ -346,14 +347,13 @@ let main argv =
                         match shape with
                             | None ->
                                 Some (triangles |> BulletHelper.TriangleMesh)
-                                //Some (BulletHelper.Box (bounds.Size))
                             | Some s ->
                                 s
 
                     { defaultObject with
                         id = newId()
                         isManipulable = canMove
-                        trafo = Trafo3d.Translation(bounds.Center)
+                        trafo = Trafo3d.Identity
                         model = sg 
                         mass = mass
                         collisionShape = collShape

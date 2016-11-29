@@ -174,7 +174,7 @@ module SGHelper =
         [
             for (o) in objects do
                 for i in 1..amount do
-                    let offset = Trafo3d.Translation(0.0, float i*2.0, 0.0)
+                    let offset = Trafo3d.Translation(0.0, float i*0.5, 0.0)
                     yield ({o with 
                                 id = newId()
                                 trafo = offset * o.trafo})
