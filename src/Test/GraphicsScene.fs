@@ -162,7 +162,7 @@ module GraphicsScene =
                 |> Sg.uniform "LightLocation" mscene.mlightPos
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
-                |> Sg.uniform "LinearAttenuation" (Mod.constant 0.15)
+                |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
 
         Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo mscene.mviewTrafo
