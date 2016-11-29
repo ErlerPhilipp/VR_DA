@@ -54,6 +54,7 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 4 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
+    let ceilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaSize, wallThickness))))
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
     
@@ -65,6 +66,9 @@ let main argv =
 
     let groundNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", true) :> ITexture))
     let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture groundNormalSampler
+
+    let ceilingNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", true) :> ITexture))
+    let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture ceilingNormalSampler
 
     let wallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", true) :> ITexture))
     let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture wallNormalSampler
@@ -144,8 +148,8 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-//            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness, 0.0)
-            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness, 0.0)
+//            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness * 2.0, 0.0)
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness * 2.0, 0.0)
             model = lightSg |>  constColorEffect
         }
 
@@ -161,6 +165,22 @@ let main argv =
                         |> normalDiffuseEffect 
                         |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
                         |> groundNormalMap
+            tilingFactor = V2d(4.0, 4.0)
+            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
+            friction = 0.75f
+            rollingFriction = commonRollingFriction
+            restitution = commonRestitution
+        }
+
+    let ceilingObject = 
+        { defaultObject with
+            id = newId()
+            castsShadow = false
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize - 0.5 * wallThickness, 0.0)
+            model = ceilingSg 
+                        |> normalDiffuseEffect 
+                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg" true
+                        |> ceilingNormalMap
             tilingFactor = V2d(4.0, 4.0)
             collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
             friction = 0.75f
@@ -292,7 +312,7 @@ let main argv =
         manipulableObjects @ 
         ballObjects @ boxObjects @
         toObjects false staticModels 
-        @ [groundObject; wall1; wall2; wall3; wall4; lightObject]
+        @ [groundObject; ceilingObject; wall1; wall2; wall3; wall4; lightObject]
         @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
         
     let sceneObj =
