@@ -342,7 +342,7 @@ module PhysicsScene =
                                                         if not hasContact then
                                                             let contactPoint = manifold.GetContactPoint(contactPointIndex)
                                                             let dist = contactPoint.Distance
-                                                            let maxPenetrationDepth = 0.0f
+                                                            let maxPenetrationDepth = -0.001f
                                                             if dist < -maxPenetrationDepth then
                                                                 hasContact <- true
 

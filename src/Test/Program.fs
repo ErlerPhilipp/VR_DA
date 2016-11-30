@@ -32,8 +32,8 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
-    let trackingAreaSize = 4.6
-    let goalAreaSize = 6.0
+    let trackingAreaSize = 3.7
+    let goalAreaSize = 5.5
     let wallThickness = 1.0
     let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
@@ -240,6 +240,7 @@ let main argv =
     let goalRoomGroundObject = 
         { defaultCollider with
             id = newId()
+            objectType = ObjectTypes.Ghost
             castsShadow = false
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
             model = goalRoomGroundSg 
@@ -408,6 +409,7 @@ let main argv =
             lightId = lightObject.id
             lowerHoopTriggerId = lowerHoopTrigger.id
             upperHoopTriggerId = upperHoopTrigger.id
+            groundObjectId = goalRoomGroundObject.id
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastContr2Trafo = Trafo3d.Identity

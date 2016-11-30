@@ -34,6 +34,7 @@ module GraphicsScene =
 
     let getScoredState (o : Object) =
         if o.hasScored then 3
+        elif o.willReset then 1
         //elif o.hitLowerTrigger then 2
         //elif o.hitUpperTrigger then 1
         else 0
