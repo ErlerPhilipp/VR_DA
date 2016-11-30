@@ -170,18 +170,21 @@ module PhysicsScene =
                 let newWorldTransform = toMatrix o.trafo
                 if pb.trafo <> newWorldTransform then
                     pb.trafo <- newWorldTransform
+
+                let updateCollisionObjectSettings(co : BulletSharp.CollisionObject, o : Object) =
+                    if co.Friction <> o.friction then co.Friction <- o.friction
+                    if co.Restitution <> o.restitution then co.Restitution <- o.restitution
+                    if co.CcdMotionThreshold <> o.ccdSpeedThreshold then co.CcdMotionThreshold <- o.ccdSpeedThreshold
+                    if co.CcdSweptSphereRadius <> o.ccdSphereRadius then co.CcdSweptSphereRadius <- o.ccdSphereRadius
+                    if co.RollingFriction <> o.rollingFriction then co.RollingFriction <- o.rollingFriction
+                    
+                    let newWorldTransform = toMatrix o.trafo
+                    if co.WorldTransform <> newWorldTransform then
+                        co.WorldTransform <- newWorldTransform
                 
                 match pb.collisionObject with
                     | CollisionObject.RigidBody collisionObject -> 
-                        if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
-                        if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution
-                        if collisionObject.CcdMotionThreshold <> o.ccdSpeedThreshold then collisionObject.CcdMotionThreshold <- o.ccdSpeedThreshold
-                        if collisionObject.CcdSweptSphereRadius <> o.ccdSphereRadius then collisionObject.CcdSweptSphereRadius <- o.ccdSphereRadius
-                        if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
-
-                        let newWorldTransform = toMatrix o.trafo
-                        if collisionObject.WorldTransform <> newWorldTransform then
-                            collisionObject.WorldTransform <- newWorldTransform
+                        updateCollisionObjectSettings(collisionObject :> BulletSharp.CollisionObject, o)
 
                         // release grab
                         if (o.wasGrabbed && not o.isGrabbed) then
@@ -225,26 +228,10 @@ module PhysicsScene =
                             collisionObject.Activate()
                             collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
                     | CollisionObject.StaticBody collisionObject -> 
-                        if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
-                        if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution
-                        if collisionObject.CcdMotionThreshold <> o.ccdSpeedThreshold then collisionObject.CcdMotionThreshold <- o.ccdSpeedThreshold
-                        if collisionObject.CcdSweptSphereRadius <> o.ccdSphereRadius then collisionObject.CcdSweptSphereRadius <- o.ccdSphereRadius
-                        if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
-
-                        let newWorldTransform = toMatrix o.trafo
-                        if collisionObject.WorldTransform <> newWorldTransform then
-                            collisionObject.WorldTransform <- newWorldTransform
+                        updateCollisionObjectSettings(collisionObject, o)
                         // TODO: make static objects grabbable?
                     | CollisionObject.Ghost collisionObject -> 
-                        if collisionObject.Friction <> o.friction then collisionObject.Friction <- o.friction
-                        if collisionObject.Restitution <> o.restitution then collisionObject.Restitution <- o.restitution
-                        if collisionObject.CcdMotionThreshold <> o.ccdSpeedThreshold then collisionObject.CcdMotionThreshold <- o.ccdSpeedThreshold
-                        if collisionObject.CcdSweptSphereRadius <> o.ccdSphereRadius then collisionObject.CcdSweptSphereRadius <- o.ccdSphereRadius
-                        if collisionObject.RollingFriction <> o.rollingFriction then collisionObject.RollingFriction <- o.rollingFriction
-
-                        let newWorldTransform = toMatrix o.trafo
-                        if collisionObject.WorldTransform <> newWorldTransform then
-                            collisionObject.WorldTransform <- newWorldTransform
+                        updateCollisionObjectSettings(collisionObject :> BulletSharp.CollisionObject, o)
                     | CollisionObject.NoObject -> ()
 
         static member Update(pw : PhysicsWorld, s : Scene) =

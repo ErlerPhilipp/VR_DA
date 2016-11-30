@@ -36,6 +36,8 @@ module LogicalScene =
             isGrabbable       : bool
             isGrabbed         : bool
             wasGrabbed        : bool
+            hasScored         : bool
+            timeWhenScored    : float
 
             trafo             : Trafo3d
             model             : ISg
@@ -53,23 +55,25 @@ module LogicalScene =
     let defaultObject = 
         {
             id = newId()
-            castsShadow   = true
-            objectType    = ObjectTypes.Static
-            isColliding   = true
-            isManipulable = false
-            isGrabbable   = false
-            isGrabbed     = false
-            wasGrabbed    = false
-            trafo = Trafo3d.Identity
-            model = Sg.group []
-            tilingFactor = V2d(1.0, 1.0)
-            mass = 0.0f
-            restitution = 0.0f
-            friction = 1.0f
-            ccdSpeedThreshold = 0.0f // ccd disabled
-            ccdSphereRadius = 0.0f
-            rollingFriction = 0.0f
-            collisionShape = None
+            castsShadow         = true
+            objectType          = ObjectTypes.Static
+            isColliding         = true
+            isManipulable       = false
+            isGrabbable         = false
+            isGrabbed           = false
+            wasGrabbed          = false
+            hasScored           = false
+            timeWhenScored      = 0.0
+            trafo               = Trafo3d.Identity
+            model               = Sg.group []
+            tilingFactor        = V2d(1.0, 1.0)
+            mass                = 0.0f
+            restitution         = 0.0f
+            friction            = 1.0f
+            ccdSpeedThreshold   = 0.0f // ccd disabled
+            ccdSphereRadius     = 0.0f
+            rollingFriction     = 0.0f
+            collisionShape      = None
         }
 
     type Scene =
@@ -87,11 +91,14 @@ module LogicalScene =
             controller1ObjectId : int
             controller2ObjectId : int
             headId              : int
-
+            hoopTriggerId       : int
             lightId             : int
 
             interactionType     : VrInteractions.VrInteractionTechnique
             armExtensionFactor  : float
+
+            score               : int
+            timeSinceStart      : float
 
             physicsDebugDraw    : bool
             gravity             : V3d
@@ -220,11 +227,23 @@ module LogicalScene =
                 }
 
             | StartFrame ->
-                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        { o with 
-                            isGrabbable = false
-                        }
-                    )
+                let newObjects = 
+                    scene.objects 
+                        |> PersistentHashSet.map (fun o -> 
+                                if o.isGrabbable <> false then { o with isGrabbable = false } else o
+                            )
+                        |> PersistentHashSet.map (fun o -> 
+                                let ballScoredResetDelay = 3.0
+                                let resetScored = o.hasScored && (scene.timeSinceStart > o.timeWhenScored + ballScoredResetDelay)
+                                if resetScored then
+                                    printfn "Ball ready to score at %A" scene.timeSinceStart 
+                                    { o with 
+                                        hasScored = false
+                                        timeWhenScored = 0.0
+                                    }
+                                else
+                                    o
+                            )
 
                 { scene with objects = newObjects}
 
@@ -252,18 +271,43 @@ module LogicalScene =
 //                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
 //                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
 
+                let newTimeSinceStart = scene.timeSinceStart + dt.TotalSeconds
+
                 { scene with
                     objects = newObjects
                     deviceOffset = newSceneTrafo
                     deltaTime = dt.TotalSeconds
+                    timeSinceStart = newTimeSinceStart
                 }
             
             | Collision (ghost, collider) ->
-                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id 
-                        //if collidingWithController then printfn "Ghost %A collides with %A" ghost.id collider.id
-                        if collidingWithController then { o with isGrabbable = true } else o
-                    )
-                { scene with objects = newObjects }
+                let mutable newScore = scene.score
+                let newObjects = 
+                    scene.objects 
+                        |> PersistentHashSet.map (fun o -> 
+                                let collidingWithHoop = ghost.id = scene.hoopTriggerId && o.id = collider.id
+//                                if collidingWithHoop then printfn "Ghost %A collides with %A" ghost.id collider.id
+                                if collidingWithHoop then
+                                    let scored = collidingWithHoop && not o.hasScored
+                                    if scored then
+                                        newScore <- newScore + 1
+                                        printfn "Scored %A at %A" newScore scene.timeSinceStart
+                                        { o with 
+                                            hasScored = true
+                                            timeWhenScored = scene.timeSinceStart
+                                        } 
+                                    else 
+                                        o
+                                else 
+                                    o
+                            )
+                        |> PersistentHashSet.map (fun o -> 
+                                let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id 
+                                if collidingWithController then { o with isGrabbable = true } else o
+                            )
+                { scene with 
+                    objects = newObjects
+                    score = newScore
+                }
 
             | _ -> scene

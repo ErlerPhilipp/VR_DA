@@ -17,7 +17,9 @@ module BulletHelper =
     type Shape =
         | Box            of size :  V3d
         | Sphere         of radius : float
-        | Cylinder       of radius : float * height : float
+        | CylinderX      of radius : float * height : float
+        | CylinderY      of radius : float * height : float
+        | CylinderZ      of radius : float * height : float
         | Plane          of Plane3d
         | Mesh           of IndexedGeometry
         | TriangleMesh   of Triangle3d[]
@@ -52,16 +54,19 @@ module BulletHelper =
     let rec toCollisionShape (s : Shape) : CollisionShape =
         match s with
             | Box size ->
-                let shape = new BoxShape(size * 0.5 |> toVector3) :> CollisionShape
-                shape
+                new BoxShape(size * 0.5 |> toVector3) :> CollisionShape
 
             | Sphere radius ->
-                let shape = new SphereShape(float32 radius) :> CollisionShape
-                shape
+                new SphereShape(float32 radius) :> CollisionShape
 
-            | Cylinder(radius, height) ->
-                let shape = new CylinderShapeZ(float32 radius, float32 radius, float32 (0.5 * height)) :> CollisionShape
-                shape
+            | CylinderX(radius, height) ->
+                new CylinderShapeX(float32 (0.5 * height), float32 radius, float32 radius) :> CollisionShape
+
+            | CylinderY(radius, height) ->
+                new CylinderShape(float32 radius, float32 (0.5 * height), float32 radius) :> CollisionShape
+
+            | CylinderZ(radius, height) ->
+                new CylinderShapeZ(float32 radius, float32 radius, float32 (0.5 * height)) :> CollisionShape
 
             | Plane p ->
                 let shape = new StaticPlaneShape(toVector3 p.Normal, float32 p.Distance) :> CollisionShape
@@ -245,12 +250,17 @@ module BulletHelper =
             x.addLineToStack(positions.[0], positions.[1], toV3d color)
             
         override x.DrawPlane(  planeNormal,  plane,   transform,   color) = 
-            let trafo = toTrafo transform
-            let normal = trafo.Forward.TransformDir(toV3d planeNormal)
-            let planeOrigin = normal * float plane
-
-
+//            let trafo = toTrafo transform
+//            let normal = trafo.Forward.TransformDir(toV3d planeNormal)
+//            let planeOrigin = normal * float plane
             ()
+
+        override x.DrawCylinder( radius,  halfHeight,  upAxis,   transform,   color) = 
+            let pos = V3d()
+
+            let bbMin = pos - V3d(radius, halfHeight, radius) |> toVector3
+            let bbMax = pos + V3d(radius, halfHeight, radius) |> toVector3
+            x.DrawBox(ref bbMin, ref bbMax, ref transform, ref color)
 
         override x.DrawAabb(  from,   toPos,   color) = ()
         override x.DrawArc(  center,   normal,   axis,   radiusA,  radiusB,  minAngle,  maxAngle,   color,  drawSect,  stepDegrees) = ()
@@ -259,7 +269,6 @@ module BulletHelper =
         override x.DrawCapsule( radius,  halfHeight,  upAxis,   transform,   color) = ()
         override x.DrawCone( radius,  height,  upAxis,   transform,   color) = ()
         override x.DrawContactPoint(  pointOnB,   normalOnB,  distance,  lifeTime,   color) = ()
-        override x.DrawCylinder( radius,  halfHeight,  upAxis,   transform,   color) = ()
         //override x.DrawSphere(  p,  radius,   color) = ()
         //override x.DrawSphere( radius,   transform,   color) = ()
         //override x.DrawSpherePatch(  center,   up,   axis,  radius, minTh,  maxTh,  minPs,  maxPs,   color,  stepDegrees,  drawCenter) = ()
