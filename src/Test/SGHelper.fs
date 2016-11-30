@@ -183,13 +183,18 @@ module SGHelper =
 module Highlight =
     type UniformScope with
         member x.isHighlighted : bool = x?isHighlighted
+        member x.hasScored : bool = x?hasScored
 
     let highlight (v : Vertex) =
         fragment {
+            let mutable newColor = v.c
             if uniform.isHighlighted then
-                return v.c * 3.0
-            else
-                return v.c
+                newColor <- newColor + V4d(0.3, 0.3, 0.1, 0.0)
+                
+            if uniform.hasScored then
+                newColor <- newColor + V4d(0.1, 0.5, 0.1, 0.0)
+
+            return newColor
         }
     
     let Effect = 

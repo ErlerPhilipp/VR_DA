@@ -20,6 +20,7 @@ module GraphicsScene =
             mtrafo              : ModRef<Trafo3d>
             mmodel              : ModRef<ISg>
             mhasHighlight       : ModRef<bool>
+            mhasScored          : ModRef<bool>
             mtilingFactor       : ModRef<V2d>
         }
 
@@ -37,8 +38,8 @@ module GraphicsScene =
                 original = o
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
-//                mhasHighlight = Mod.init o.isGrabbable
-                mhasHighlight = Mod.init o.hasScored
+                mhasHighlight = Mod.init o.isGrabbable
+                mhasScored = Mod.init o.hasScored
                 mtilingFactor = Mod.init o.tilingFactor
             }
 
@@ -56,8 +57,9 @@ module GraphicsScene =
                 mo.original <- o
                 mo.mmodel.Value <- o.model
                 mo.mtrafo.Value <- o.trafo
-                mo.mhasHighlight.Value <- o.hasScored
-//                mo.mhasHighlight.Value <- o.isGrabbable
+                mo.mhasHighlight.Value <- o.isGrabbable
+                mo.mhasScored.Value <- o.hasScored
+                mo.mtilingFactor.Value <- o.tilingFactor
 
         static member Update(ms : MScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
@@ -134,6 +136,7 @@ module GraphicsScene =
             t.mmodel
                 |> Sg.dynamic
                 |> Sg.uniform "isHighlighted" t.mhasHighlight
+                |> Sg.uniform "hasScored" t.mhasScored
                 |> Sg.uniform "tilingFactor" t.mtilingFactor
                 |> Sg.trafo t.mtrafo
         
@@ -147,6 +150,7 @@ module GraphicsScene =
                 t.mmodel
                     |> Sg.dynamic
                     |> Sg.uniform "isHighlighted" t.mhasHighlight
+                    |> Sg.uniform "hasScored" t.mhasScored
                     |> Sg.uniform "tilingFactor" t.mtilingFactor
                     |> Sg.trafo t.mtrafo
             else

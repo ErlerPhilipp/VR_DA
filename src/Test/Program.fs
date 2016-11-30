@@ -38,7 +38,7 @@ let main argv =
     let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
     let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(-0.5, -0.7, 0.0)
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(-1.1, -1.1, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
     
     let staticModels =
@@ -334,12 +334,22 @@ let main argv =
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
         }
-    let hoopTrigger = 
+    let lowerHoopTrigger = 
         { defaultObject with
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
             trafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
+            model = Sg.ofList []
+            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
+            isColliding = false
+        }
+    let upperHoopTrigger = 
+        { lowerHoopTrigger with
+            id = newId()
+            castsShadow = false
+            objectType = ObjectTypes.Ghost
+            trafo = lowerHoopTrigger.trafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
             model = Sg.ofList []
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
@@ -382,7 +392,7 @@ let main argv =
         manipulableObjects @ 
         ballObjects @ boxObjects @
         toObjects false staticModels 
-        @ [hoopTrigger; lightObject]
+        @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
         @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
@@ -396,7 +406,8 @@ let main argv =
             headId = headCollider.id
             objects = PersistentHashSet.ofList objects
             lightId = lightObject.id
-            hoopTriggerId = hoopTrigger.id
+            lowerHoopTriggerId = lowerHoopTrigger.id
+            upperHoopTriggerId = upperHoopTrigger.id
             moveDirection = V3d.Zero
             viewTrafo = Trafo3d.Identity
             lastContr2Trafo = Trafo3d.Identity

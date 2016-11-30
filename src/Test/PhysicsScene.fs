@@ -314,7 +314,8 @@ module PhysicsScene =
                                         let obj1 = collisionPair.Proxy1.ClientObject :?> BulletSharp.CollisionObject
 
                                         let firstBodyIsGhost = obj0 = (ghostObject :> BulletSharp.CollisionObject)
-                                        let collidingObject = (if firstBodyIsGhost then obj1.UserObject else obj0.UserObject) :?> Object
+                                        let collidingBody = if firstBodyIsGhost then obj1 else obj0
+                                        let collidingObject = collidingBody.UserObject :?> Object
                                         
                                         let mutable hasContact = false
 
@@ -339,7 +340,7 @@ module PhysicsScene =
                                                                 hasContact <- true
 
                                             if hasContact then
-                                                messages.Add (Collision(b.original, collidingObject))
+                                                messages.Add (Collision(b.original, collidingObject, toV3d collidingBody.InterpolationLinearVelocity))
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects
