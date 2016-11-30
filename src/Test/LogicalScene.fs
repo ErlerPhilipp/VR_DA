@@ -45,6 +45,8 @@ module LogicalScene =
             model             : ISg
             tilingFactor      : V2d
 
+            linearVelocity    : V3d
+            angularVelocity   : V3d
             mass              : float32
             restitution       : float32
             friction          : float32
@@ -73,7 +75,9 @@ module LogicalScene =
             trafo               = Trafo3d.Identity
             model               = Sg.group []
             tilingFactor        = V2d(1.0, 1.0)
-
+            
+            linearVelocity      = V3d()
+            angularVelocity     = V3d()
             mass                = 0.0f
             restitution         = 0.0f
             friction            = 1.0f
@@ -213,28 +217,39 @@ module LogicalScene =
                 { scene with
                     enablePhysics = not scene.enablePhysics
                 }
-            | DevicePress(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
+            | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
                 
-                let newObjects = scene.objects |> PersistentHashSet.map (fun o ->
-                        if o.isManipulable && o.isGrabbable then
-                            { o with isGrabbed = true; }
-                        else
-                            o
-                    ) 
+                let newObjects = 
+                    scene.objects 
+                        |> PersistentHashSet.map (fun o ->
+                                if o.isManipulable && o.isGrabbable then
+                                    { o with isGrabbed = true; }
+                                else
+                                    o
+                            ) 
+                        |> PersistentHashSet.map (fun a ->
+                                if a.hitLowerTrigger then 
+                                    //printfn "Ball reset lower trigger at %A" scene.timeSinceStart 
+                                    { a with hitLowerTrigger = false } 
+                                else 
+                                    a
+                            ) 
+                        |> PersistentHashSet.map (fun a ->
+                                if a.hitUpperTrigger then 
+                                    //printfn "Ball reset upper trigger at %A" scene.timeSinceStart 
+                                    { a with hitUpperTrigger = false } 
+                                else 
+                                    a
+                            ) 
 
                 { scene with objects = newObjects }
                     
-            | DeviceRelease(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
-                let newObjects = scene.objects |> PersistentHashSet.map (fun a ->
-                        if not a.isGrabbed then 
-                            a 
-                        else 
-                            { a with 
-                                isGrabbed = false 
-                                hitLowerTrigger = false
-                                hitUpperTrigger = false
-                            }
-                    ) 
+            | DeviceUntouch(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
+                let newObjects = 
+                    scene.objects 
+                        |> PersistentHashSet.map (fun a ->
+                                if not a.isGrabbed then a else { a with isGrabbed = false }
+                            ) 
 
                 { scene with 
                     objects = newObjects 
@@ -251,11 +266,16 @@ module LogicalScene =
                                 let ballScoredResetDelay = 3.0
                                 let resetScored = o.hasScored && (scene.timeSinceStart > o.timeWhenScored + ballScoredResetDelay)
                                 if resetScored then
-                                    printfn "Ball ready to score at %A" scene.timeSinceStart 
+                                    //printfn "Ball ready to score at %A" scene.timeSinceStart 
                                     { o with 
                                         hasScored = false
+                                        hitLowerTrigger = false
+                                        hitUpperTrigger = false
+                                        isGrabbed = false
                                         timeWhenScored = 0.0
                                         trafo = Trafo3d.Translation(0.0, 0.5, 0.0)
+                                        linearVelocity = V3d()
+                                        angularVelocity = V3d()
                                     }
                                 else
                                     o
@@ -303,9 +323,9 @@ module LogicalScene =
                         // hit upper hoop trigger
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithUpperHoop = ghost.id = scene.upperHoopTriggerId && o.id = collider.id
-//                                if collidingWithUpperHoop then printfn "Ghost %A collides with %A" ghost.id collider.id
                                 let hitUpperTrigger = collidingWithUpperHoop && not o.hitUpperTrigger && not o.hitLowerTrigger && not o.isGrabbed && colliderLinearVelocity.Y < 0.0
                                 if hitUpperTrigger then
+                                    //printfn "hit upper trigger at %A" scene.timeSinceStart
                                     { o with hitUpperTrigger = true } 
                                 else 
                                     o
@@ -313,25 +333,23 @@ module LogicalScene =
                         // hit lower hoop trigger
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithLowerHoop = ghost.id = scene.lowerHoopTriggerId && o.id = collider.id
-//                                if collidingWithLowerHoop then printfn "Ghost %A collides with %A" ghost.id collider.id
-                                let hitLowerTrigger = collidingWithLowerHoop && o.hitUpperTrigger && not o.isGrabbed && colliderLinearVelocity.Y < 0.0
-
+                                let hitLowerTrigger = collidingWithLowerHoop && not o.hitLowerTrigger && not o.isGrabbed
                                 if hitLowerTrigger then
+                                    //printfn "hit lower trigger at %A" scene.timeSinceStart
                                     { o with hitLowerTrigger = true } 
                                 else 
                                     o
                             )
                         // check score
                         |> PersistentHashSet.map (fun o -> 
-                                let scored = o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored
+                                let collidingWithLowerHoop = ghost.id = scene.lowerHoopTriggerId && o.id = collider.id
+                                let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && colliderLinearVelocity.Y < 0.0
                                 if scored then
                                     newScore <- newScore + 1
-                                    printfn "Scored %A at %A" newScore scene.timeSinceStart
+                                    //printfn "Scored %A at %A" newScore scene.timeSinceStart
                                     { o with 
                                         hasScored = true
                                         timeWhenScored = scene.timeSinceStart
-                                        hitLowerTrigger = false
-                                        hitUpperTrigger = false
                                     } 
                                 else 
                                     o

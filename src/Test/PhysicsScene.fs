@@ -99,6 +99,8 @@ module PhysicsScene =
                             let rigidBody = new BulletSharp.RigidBody(info)
                             rigidBody.SetDamping(0.1f, 0.1f)
                             setProperties(rigidBody, o)
+                            rigidBody.LinearVelocity <- (o.linearVelocity |> toVector3)
+                            rigidBody.AngularVelocity <- (o.angularVelocity |> toVector3)
                                 
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             let body =  { 
@@ -181,10 +183,19 @@ module PhysicsScene =
                     let newWorldTransform = toMatrix o.trafo
                     if co.WorldTransform <> newWorldTransform then
                         co.WorldTransform <- newWorldTransform
+                        co.Activate()
                 
                 match pb.collisionObject with
                     | CollisionObject.RigidBody collisionObject -> 
                         updateCollisionObjectSettings(collisionObject :> BulletSharp.CollisionObject, o)
+                        let newLinearVelocity = o.linearVelocity |> toVector3
+                        if collisionObject.LinearVelocity <> newLinearVelocity then 
+                            collisionObject.LinearVelocity <- newLinearVelocity
+                            collisionObject.Activate()
+                        let newAngularVelocity = o.angularVelocity |> toVector3
+                        if collisionObject.AngularVelocity <> newAngularVelocity then 
+                            collisionObject.AngularVelocity <- newAngularVelocity
+                            collisionObject.Activate()
 
                         // release grab
                         if (o.wasGrabbed && not o.isGrabbed) then
@@ -291,18 +302,14 @@ module PhysicsScene =
                 let objects =
                     [
                         for b in world.bodies do
+                            let newTrafo = b.trafo |> toTrafo
+                            let transformedObject = 
+                                if b.original.trafo <> newTrafo then
+                                    { b.original with trafo = newTrafo }
+                                else
+                                    b.original
                             
                             match b.collisionObject with
-                                | CollisionObject.RigidBody rigidBody -> 
-                                    let newTrafo = b.trafo |> toTrafo
-                                    if b.original.trafo <> newTrafo then
-                                        yield { b.original with trafo = newTrafo }
-                                    else
-                                        yield b.original
-
-                                // those shouldn't be moved by the physics
-                                | CollisionObject.StaticBody collisionObject -> 
-                                    yield b.original
                                 | CollisionObject.Ghost ghostObject -> 
                                     // see Bullet3\src\BulletDynamics\Character\btCharacterController.cpp line ~220
                                     let overlappingPairs = ghostObject.OverlappingPairCache.OverlappingPairArray
@@ -340,7 +347,7 @@ module PhysicsScene =
                                                                 hasContact <- true
 
                                             if hasContact then
-                                                messages.Add (Collision(b.original, collidingObject, toV3d collidingBody.InterpolationLinearVelocity))
+                                                messages.Add (Collision(transformedObject, collidingObject, toV3d collidingBody.InterpolationLinearVelocity))
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects
@@ -348,10 +355,23 @@ module PhysicsScene =
 //                                        let userObject = ghostObject.GetOverlappingObject(i).UserObject :?> Object
 //                                        if userObject.objectType = ObjectTypes.Dynamic then
 //                                            //printfn "collision with ghost: %A" userObject.id
-//                                            messages <- messages @ [Collision(b.original, userObject)]
-                                    yield b.original
+//                                            messages <- messages @ [Collision(transformedObject, userObject)].v
+                                    yield transformedObject
+                                | CollisionObject.RigidBody rigidBody -> 
+                                    // only rigidbodies should be moved by the physics
+                                    let linearVelocity = rigidBody.LinearVelocity |> toV3d
+                                    let angularVelocity = rigidBody.AngularVelocity |> toV3d
+                                    if transformedObject.linearVelocity <> linearVelocity || transformedObject.angularVelocity <> angularVelocity then
+                                        yield { transformedObject with
+                                                    linearVelocity = linearVelocity
+                                                    angularVelocity = angularVelocity
+                                              }
+                                    else
+                                        yield transformedObject
+                                | CollisionObject.StaticBody collisionObject -> 
+                                    yield transformedObject
                                 | CollisionObject.NoObject -> 
-                                    yield b.original
+                                    yield transformedObject
                     ]
 
                 world.dynamicsWorld.DebugDrawWorld()

@@ -183,7 +183,7 @@ module SGHelper =
 module Highlight =
     type UniformScope with
         member x.isHighlighted : bool = x?isHighlighted
-        member x.hasScored : bool = x?hasScored
+        member x.scoredState : int = x?scoredState
 
     let highlight (v : Vertex) =
         fragment {
@@ -191,7 +191,13 @@ module Highlight =
             if uniform.isHighlighted then
                 newColor <- newColor + V4d(0.3, 0.3, 0.1, 0.0)
                 
-            if uniform.hasScored then
+            if uniform.scoredState = 0 then // nothing hit
+                ()
+            elif uniform.scoredState = 1 then // upper trigger
+                newColor <- newColor + V4d(0.5, 0.1, 0.1, 0.0)
+            elif uniform.scoredState = 2 then // lower trigger
+                newColor <- newColor + V4d(0.1, 0.1, 0.5, 0.0)
+            elif uniform.scoredState = 3 then // score
                 newColor <- newColor + V4d(0.1, 0.5, 0.1, 0.0)
 
             return newColor

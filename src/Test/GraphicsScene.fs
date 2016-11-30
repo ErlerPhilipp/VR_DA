@@ -20,7 +20,7 @@ module GraphicsScene =
             mtrafo              : ModRef<Trafo3d>
             mmodel              : ModRef<ISg>
             mhasHighlight       : ModRef<bool>
-            mhasScored          : ModRef<bool>
+            mscoredState        : ModRef<int>
             mtilingFactor       : ModRef<V2d>
         }
 
@@ -32,6 +32,12 @@ module GraphicsScene =
             mlightPos           : ModRef<V3d>
         }
 
+    let getScoredState (o : Object) =
+        if o.hasScored then 3
+        //elif o.hitLowerTrigger then 2
+        //elif o.hitUpperTrigger then 1
+        else 0
+
     type Conversion private() =
         static member Create(o : Object) =
             {
@@ -39,7 +45,7 @@ module GraphicsScene =
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
                 mhasHighlight = Mod.init o.isGrabbable
-                mhasScored = Mod.init o.hasScored
+                mscoredState = Mod.init (getScoredState(o))
                 mtilingFactor = Mod.init o.tilingFactor
             }
 
@@ -58,7 +64,7 @@ module GraphicsScene =
                 mo.mmodel.Value <- o.model
                 mo.mtrafo.Value <- o.trafo
                 mo.mhasHighlight.Value <- o.isGrabbable
-                mo.mhasScored.Value <- o.hasScored
+                mo.mscoredState.Value <- (getScoredState(o))
                 mo.mtilingFactor.Value <- o.tilingFactor
 
         static member Update(ms : MScene, s : Scene) =
@@ -136,21 +142,21 @@ module GraphicsScene =
             t.mmodel
                 |> Sg.dynamic
                 |> Sg.uniform "isHighlighted" t.mhasHighlight
-                |> Sg.uniform "hasScored" t.mhasScored
+                |> Sg.uniform "scoredState" t.mscoredState
                 |> Sg.uniform "tilingFactor" t.mtilingFactor
                 |> Sg.trafo t.mtrafo
         
         let objectsInScene = 
             mscene.mobjects
                 |> ASet.map toSg
-                |> Sg.set
-                
+                |> Sg.set     
+        
         let toShadowCasterSg (t : MObject) =
             if t.original.castsShadow then
                 t.mmodel
                     |> Sg.dynamic
                     |> Sg.uniform "isHighlighted" t.mhasHighlight
-                    |> Sg.uniform "hasScored" t.mhasScored
+                    |> Sg.uniform "scoredState" t.mscoredState
                     |> Sg.uniform "tilingFactor" t.mtilingFactor
                     |> Sg.trafo t.mtrafo
             else
