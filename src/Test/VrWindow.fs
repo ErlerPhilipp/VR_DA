@@ -109,7 +109,7 @@ module VrWindow =
 
                 (aFbo |> unbox<Framebuffer> |> ref, bFbo |> unbox<Framebuffer> |> ref, cFbo |> unbox<Framebuffer> |> ref)
             else
-                Unchecked.defaultof<_>
+                (Unchecked.defaultof<_>, Unchecked.defaultof<_>, Unchecked.defaultof<_>)
 
         let renderCtx       = ContextHandle.create()
         let cancel          = new CancellationTokenSource()
@@ -146,51 +146,49 @@ module VrWindow =
                     win.Run(10.0, 30.0)
                 } |> Async.Start
 
-        let renderBothEyes =
-            Mod.custom (fun self ->
-                let lastFrameTook = watch.Elapsed.TotalSeconds
-                watch.Restart()
-                let timeRemaining = OpenVR.Compositor.GetFrameTimeRemaining() |> float
-                //printfn "rem: %A" timeRemaining
+        let renderBothEyes () =
+            let lastFrameTook = watch.Elapsed.TotalSeconds
+            watch.Restart()
+            let timeRemaining = OpenVR.Compositor.GetFrameTimeRemaining() |> float
+            //printfn "rem: %A" timeRemaining
 
-                let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
-                let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
+            let lHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Left).Trafo.Inverse
+            let rHeadToEye = system.GetEyeToHeadTransform(EVREye.Eye_Right).Trafo.Inverse
 
-                task.Use (fun () ->
+            task.Use (fun () ->
                             
-                    // render left
-                    clear.Run(lFbo) |> ignore
-                    transact(fun () -> projection.Value <- lHeadToEye * lProj)
-                    task.Run(self, OutputDescription.ofFramebuffer lFbo) |> ignore
-                    OpenTK.Graphics.OpenGL4.GL.Flush()
-                    OpenTK.Graphics.OpenGL4.GL.Finish()
+                // render left
+                clear.Run(lFbo) |> ignore
+                transact(fun () -> projection.Value <- lHeadToEye * lProj)
+                task.Run(null, OutputDescription.ofFramebuffer lFbo) |> ignore
+                OpenTK.Graphics.OpenGL4.GL.Flush()
+                OpenTK.Graphics.OpenGL4.GL.Finish()
 
 
-                    // render right
-                    clear.Run(rFbo) |> ignore
-                    transact(fun () -> projection.Value <- rHeadToEye * rProj)
-                    task.Run(self, OutputDescription.ofFramebuffer rFbo) |> ignore
-                    OpenTK.Graphics.OpenGL4.GL.Flush()
-                    OpenTK.Graphics.OpenGL4.GL.Finish()
+                // render right
+                clear.Run(rFbo) |> ignore
+                transact(fun () -> projection.Value <- rHeadToEye * rProj)
+                task.Run(null, OutputDescription.ofFramebuffer rFbo) |> ignore
+                OpenTK.Graphics.OpenGL4.GL.Flush()
+                OpenTK.Graphics.OpenGL4.GL.Finish()
 
-                    if timeRemaining > lastFrameTook then    
-                        Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
+                if timeRemaining > lastFrameTook then    
+                    Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
 //                    else
 //                        printfn "long frame; %Ams %Ams" (lastFrameTook  * 1000.0) (timeRemaining * 1000.0)
 
-                    do
-                        let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
-                        let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                        OpenVR.Compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+                do
+                    let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
+                    let mutable leftBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                    OpenVR.Compositor.Submit(EVREye.Eye_Left, &leftTex, &leftBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
 
-                    do 
-                        let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> rColor.Handle))
-                        let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
-                        OpenVR.Compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
+                do 
+                    let mutable rightTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> rColor.Handle))
+                    let mutable rightBounds = VRTextureBounds_t(uMin = 0.0f, uMax = 1.0f, vMin = 0.0f, vMax = 1.0f)
+                    OpenVR.Compositor.Submit(EVREye.Eye_Right, &rightTex, &rightBounds, EVRSubmitFlags.Submit_Default) |> VrDriver.check
                 
 
-                ) 
-            )
+            ) 
 
         member x.Update 
             with get() = update
@@ -218,8 +216,7 @@ module VrWindow =
             frameWatch.Restart()
             update dt (renderPoses |> Array.map (fun p -> p.mDeviceToAbsoluteTracking.Trafo)) evt
 
-            renderBothEyes.OutOfDate <- true
-            renderBothEyes.GetValue()
+            renderBothEyes()
 
             if createWindow then
                 let fbo = !screenA

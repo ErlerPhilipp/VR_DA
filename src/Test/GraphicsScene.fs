@@ -6,6 +6,7 @@ open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
+open Aardvark.Rendering.Text
 
 open ShadowVolumes
 
@@ -170,12 +171,20 @@ module GraphicsScene =
 
         let sgs = 
             objectsInScene
-                |> Sg.fillMode ShadowVolumes.mode
-                |> Sg.andAlso (ShadowVolumes.shadows (shadowCasterInScene))
+//                |> Sg.fillMode ShadowVolumes.mode
+//                |> Sg.andAlso (ShadowVolumes.shadows (shadowCasterInScene))
                 |> Sg.uniform "LightLocation" mscene.mlightPos
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
 
-        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg]
+        let font = new Font("Arial", FontStyle.Bold)
+        let bla =
+            Sg.markdown MarkdownConfig.light (Mod.constant "Hi Ati, how are you doin'?\r\nWell i sold my soul to the companies goal.")
+               |> Sg.scale 0.1
+               |> Sg.translate 0.0 1.0 0.0
+
+        
+
+        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg; bla]
             |> Sg.viewTrafo mscene.mviewTrafo

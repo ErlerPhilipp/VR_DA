@@ -872,10 +872,11 @@ module ShadowVolumes =
             |> Sg.vertexAttribute DefaultSemantic.Positions positions
 
 
-    let shadowVolumes (sceneGraph : ISg) =
+    let shadowVolumes (sceneGraph : ISg) = 
         shadowGeometry (sceneGraph)
             |> Sg.stencilMode (Mod.constant writeStencil)
             |> Sg.writeBuffers' (Set.ofList [ DefaultSemantic.Stencil ])
+            |> Sg.depthTest (Mod.constant (DepthTestMode(DepthTestComparison.LessOrEqual, Range1d(0.0, 1.0))))
             |> Sg.pass afterMain
             |> Sg.effect [
                 VolumeShader.vertex |> toEffect

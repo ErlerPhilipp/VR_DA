@@ -28,6 +28,7 @@ open Highlight
 let main argv =
     Ag.initialize()
     Aardvark.Init()
+    Aardvark.SceneGraph.IO.Loader.Assimp.initialize()
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
@@ -59,7 +60,7 @@ let main argv =
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
-    let ballSg = Sg.sphere 4 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
 
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
@@ -387,8 +388,8 @@ let main argv =
                 )
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 1)
-        let boxObjects = replicate ([box], 5)
+        let ballObjects = replicate ([ball], 10)
+        let boxObjects = replicate ([box], 10)
         
         manipulableObjects @ 
         ballObjects @ boxObjects @
