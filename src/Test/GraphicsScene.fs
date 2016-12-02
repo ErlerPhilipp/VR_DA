@@ -5,8 +5,8 @@ open Valve.VR
 open Aardvark.Base
 open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
-open Aardvark.SceneGraph
 open Aardvark.Rendering.Text
+open Aardvark.SceneGraph
 
 open ShadowVolumes
 
@@ -31,6 +31,9 @@ module GraphicsScene =
             mobjects            : cset<MObject>
             mviewTrafo          : ModRef<Trafo3d>
             mlightPos           : ModRef<V3d>
+
+            mscoreTrafo         : ModRef<Trafo3d>
+            mscoreText          : ModRef<string>
         }
 
     let getScoredState (o : Object) =
@@ -58,6 +61,9 @@ module GraphicsScene =
                 mobjects = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo = Mod.init s.viewTrafo
                 mlightPos = Mod.init (lightPos)
+
+                mscoreTrafo = Mod.init s.scoreTrafo
+                mscoreText  = Mod.init s.scoreText
             }
 
         static member Update(mo : MObject, o : Object) =
@@ -74,10 +80,11 @@ module GraphicsScene =
                 let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.lightId, s.objects).Forward.TransformPos(V3d())
 
                 ms.original <- s
-
                 ms.mviewTrafo.Value <- s.viewTrafo
-
                 ms.mlightPos.Value <- lightPos
+
+                ms.mscoreTrafo.Value <- s.scoreTrafo
+//                ms.mscoreText.Value <- s.scoreText // TODO: crash!
 
                 let table = 
                     ms.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -178,13 +185,11 @@ module GraphicsScene =
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
 
-        let font = new Font("Arial", FontStyle.Bold)
-        let bla =
-            Sg.markdown MarkdownConfig.light (Mod.constant "Hi Ati, how are you doin'?\r\nWell i sold my soul to the companies goal.")
-               |> Sg.scale 0.1
-               |> Sg.translate 0.0 1.0 0.0
+        let textSg =
+//            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red mscene.mscoreText :> ISg
+            Sg.markdown MarkdownConfig.light mscene.mscoreText
+                |> Sg.trafo mscene.mscoreTrafo
 
-        
-
-        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg; bla]
+        // scene.scoreSg at last because markdown messes with stencil buffer
+        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
             |> Sg.viewTrafo mscene.mviewTrafo

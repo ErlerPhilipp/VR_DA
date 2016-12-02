@@ -41,6 +41,9 @@ let main argv =
     let hoopScale = 2.0
     let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(-1.1, -1.1, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
+    let scoreScale = 0.1
+    let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
+                        Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
     
     let staticModels =
         [
@@ -70,7 +73,7 @@ let main argv =
     let goalRoomGroundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
     let goalRoomCeilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
     let goalRoomWallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, goalAreaSize, wallThickness))))
-    
+
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
     let objectBoxEdgeLength = 0.25
@@ -165,7 +168,7 @@ let main argv =
             id = newId()
             castsShadow = false
 //            trafo = Trafo3d.Translation(0.5 * trackingAreaSize - wallThickness - 0.5, trackingAreaSize - wallThickness * 2.0, 0.0)
-            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness * 2.0, 0.0)
+            trafo = Trafo3d.Translation(0.0, trackingAreaSize - wallThickness * 1.5, 0.0)
             model = lightSg |>  constColorEffect
         }
 
@@ -401,26 +404,33 @@ let main argv =
         
     let sceneObj =
         {
-            cam1ObjectId = camObject1.id
-            cam2ObjectId = camObject2.id
+            objects             = PersistentHashSet.ofList objects
+            viewTrafo           = Trafo3d.Identity
+            lastContr2Trafo     = Trafo3d.Identity
+            deviceOffset        = Trafo3d.Identity
+
+            cam1ObjectId        = camObject1.id
+            cam2ObjectId        = camObject2.id
             controller1ObjectId = leftHandObject.id
             controller2ObjectId = rightHandObject.id
-            headId = headCollider.id
-            objects = PersistentHashSet.ofList objects
-            lightId = lightObject.id
-            lowerHoopTriggerId = lowerHoopTrigger.id
-            upperHoopTriggerId = upperHoopTrigger.id
-            groundObjectId = goalRoomGroundObject.id
-            moveDirection = V3d.Zero
-            viewTrafo = Trafo3d.Identity
-            lastContr2Trafo = Trafo3d.Identity
-            deviceOffset = Trafo3d.Identity
+            headId              = headCollider.id
+            lightId             = lightObject.id
+            lowerHoopTriggerId  = lowerHoopTrigger.id
+            upperHoopTriggerId  = upperHoopTrigger.id
+            groundObjectId      = goalRoomGroundObject.id
+
+            interactionType     = VrInteractions.VrInteractionTechnique.VirtualHand
+            armExtensionFactor  = 1.0
+            moveDirection       = V3d.Zero
+
+            score               = 0
+            timeSinceStart      = 0.0
+            scoreTrafo          = scoreTrafo
+            scoreText           = "Score: 000\r\nTime: 000.00"
+            running             = false
+            
             deltaTime = 0.0
             enablePhysics = true
-            interactionType = VrInteractions.VrInteractionTechnique.VirtualHand
-            armExtensionFactor = 1.0
-            score = 0
-            timeSinceStart = 0.0
             gravity = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw = false
             numSubSteps = 3

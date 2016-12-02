@@ -95,9 +95,6 @@ module LogicalScene =
             viewTrafo           : Trafo3d
             lastContr2Trafo     : Trafo3d
             deviceOffset        : Trafo3d
-
-            deltaTime           : float
-            enablePhysics       : bool
             
             cam1ObjectId        : int
             cam2ObjectId        : int
@@ -111,16 +108,20 @@ module LogicalScene =
 
             interactionType     : VrInteractions.VrInteractionTechnique
             armExtensionFactor  : float
+            moveDirection       : V3d
 
             score               : int
             timeSinceStart      : float
-
+            scoreTrafo          : Trafo3d
+            scoreText           : string
+            running             : bool
+            
+            deltaTime           : float
+            enablePhysics       : bool
             physicsDebugDraw    : bool
             gravity             : V3d
             numSubSteps         : int
             subStepTime         : float
-
-            moveDirection       : V3d
         }
         
     type Message =
@@ -168,7 +169,7 @@ module LogicalScene =
         match objectWithId with
             | Some foundObject -> foundObject
             | None -> failwith(sprintf "Object with id %A not found!" id) 
-
+            
     let update (scene : Scene) (message : Message) : Scene =
 
         match message with
@@ -275,8 +276,14 @@ module LogicalScene =
                                 else
                                     o
                             )
+                            
+                let culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+                let newText = sprintf "Score: %A\r\nTime: %A" (scene.score.ToString("000", culture)) (scene.timeSinceStart.ToString("000.00", culture))
 
-                { scene with objects = newObjects}
+                { scene with 
+                    objects = newObjects
+                    scoreText = newText
+                }
 
             | TimeElapsed(dt) ->
                 let maxSpeed = 10.0
