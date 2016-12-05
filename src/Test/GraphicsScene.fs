@@ -134,7 +134,7 @@ module GraphicsScene =
                 let t = trafos.[i]
                 if oldTrafos.[i] <> t || deviceOffsetHasChanged then
                     oldTrafos.[i] <- t
-                    scene <- LogicalScene.update scene (DeviceMove(i, t * scene.deviceOffset.Inverse))
+                    scene <- LogicalScene.update scene (DeviceMove(i, t * scene.deviceOffset))
                 
             if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
                 let deviceId = e.trackedDeviceIndex |> int

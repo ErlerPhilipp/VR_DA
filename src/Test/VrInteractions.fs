@@ -65,12 +65,12 @@ module VrInteractions =
             | VrMovementTechnique.Teleport -> VrMovementTechnique.Flying
             | _ -> VrMovementTechnique.Flying
 
-    let getDeltaTrafoForFlying (moveDirection : V3d, deltaTime : float, axisValue: float) = 
+    let getTrafoAfterFlying (currentTrafo : Trafo3d, moveDirection : V3d, deltaTime : float, axisValue: float) = 
         let axisWithDeathZone = getAxisValueWithDeathZone(axisValue)
         let maxSpeed = 10.0
-        Trafo3d.Translation(moveDirection * deltaTime * maxSpeed * axisWithDeathZone)
+        currentTrafo * Trafo3d.Translation(moveDirection * -deltaTime * maxSpeed * axisWithDeathZone)
 
-    let getDeltaTrafoForTeleport (currentTrafo : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d) = 
-        let oldPos = hmdTrafo.Forward.TransformPos(V3d())
-        let translation = V3d(targetPos.X - oldPos.X, 0.0, targetPos.Z - oldPos.Z)
-        Trafo3d.Translation(-translation)
+    let getTrafoAfterTeleport (currentTrafo : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d) = 
+        let trackingSpaceOrigin = currentTrafo.Forward.TransformPos(V3d())
+        let hmdPosWorldSpace = hmdTrafo.Forward.TransformPos(V3d())
+        Trafo3d.Translation(targetPos - (hmdPosWorldSpace - trackingSpaceOrigin).XOZ)

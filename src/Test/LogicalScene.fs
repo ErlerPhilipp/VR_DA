@@ -243,6 +243,8 @@ module LogicalScene =
                 let newMovementTechnique = VrInteractions.nextMovementTechnique scene.movementType
                 { scene with
                     movementType = newMovementTechnique
+                    wantsRayCast = false
+                    rayCastHasHit = false
                 }
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id && a = 2 ->
                 { scene with
@@ -251,8 +253,8 @@ module LogicalScene =
             | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller1Id && a = 1 ->
                 if scene.movementType = VrInteractions.VrMovementTechnique.Teleport && scene.rayCastHasHit then
                     let hmdTrafo = getTrafoOfFirstObjectWithId(scene.headId, scene.objects)
-                    let deltaTrafo = VrInteractions.getDeltaTrafoForTeleport(scene.deviceOffset, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal)
-                    { scene with deviceOffset = scene.deviceOffset * deltaTrafo }
+                    let newTrafo = VrInteractions.getTrafoAfterTeleport(scene.deviceOffset, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal)
+                    { scene with deviceOffset = newTrafo }
                 else
                     scene
                     
@@ -337,8 +339,7 @@ module LogicalScene =
 
                 let newSceneTrafo = 
                     if scene.movementType = VrInteractions.VrMovementTechnique.Flying then
-                        let dp = VrInteractions.getDeltaTrafoForFlying(scene.moveDirection, dt.TotalSeconds, axisValue)
-                        scene.deviceOffset * dp
+                        VrInteractions.getTrafoAfterFlying(scene.deviceOffset, scene.moveDirection, dt.TotalSeconds, axisValue)
                     else
                         scene.deviceOffset
                 
