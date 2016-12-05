@@ -34,6 +34,9 @@ module GraphicsScene =
 
             mscoreTrafo         : ModRef<Trafo3d>
             mscoreText          : ModRef<string>
+
+            mhasRayCastHit      : ModRef<bool>
+            mrayCastHitPoint    : ModRef<Trafo3d>
         }
 
     let getScoredState (o : Object) =
@@ -64,6 +67,9 @@ module GraphicsScene =
 
                 mscoreTrafo = Mod.init s.scoreTrafo
                 mscoreText  = Mod.init s.scoreText
+
+                mhasRayCastHit = Mod.init s.rayCastHasHit
+                mrayCastHitPoint = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
             }
 
         static member Update(mo : MObject, o : Object) =
@@ -98,6 +104,9 @@ module GraphicsScene =
                             ms.mobjects.Add mo |> ignore
                 
                 ms.mobjects.ExceptWith table.Values
+
+                ms.mhasRayCastHit.Value <- s.rayCastHasHit
+                ms.mrayCastHitPoint.Value <- Trafo3d.Translation(s.rayCastHitPoint)
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =
@@ -190,6 +199,11 @@ module GraphicsScene =
             Sg.markdown MarkdownConfig.light mscene.mscoreText
                 |> Sg.trafo mscene.mscoreTrafo
 
+        let rayCastHitSg =
+            initialScene.rayCastHitPointSg
+                |> Sg.trafo mscene.mrayCastHitPoint
+                |> Sg.onOff mscene.mhasRayCastHit
+
         // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList [sgs; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
+        Sg.ofList [sgs; rayCastHitSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
             |> Sg.viewTrafo mscene.mviewTrafo

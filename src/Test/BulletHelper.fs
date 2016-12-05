@@ -25,6 +25,11 @@ module BulletHelper =
         | TriangleMesh   of Triangle3d[]
         | Compound       of list<Trafo3d * Shape>
 
+    let rayCast (startPos : Vector3, endPos : Vector3, world : BulletSharp.CollisionWorld) = 
+        let raycastResult = new BulletSharp.ClosestRayResultCallback(ref startPos, ref endPos)
+        world.RayTest(startPos, endPos, raycastResult)
+        (raycastResult.HasHit, raycastResult.HitPointWorld, raycastResult.HitNormalWorld)
+
     let toVector3 (v : V3d) = 
         Vector3(float32 v.X, float32 v.Y, float32 v.Z)
 

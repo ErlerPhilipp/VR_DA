@@ -108,6 +108,7 @@ module LogicalScene =
 
             interactionType     : VrInteractions.VrInteractionTechnique
             armExtensionFactor  : float
+            movementType        : VrInteractions.VrMovementTechnique
             moveDirection       : V3d
 
             score               : int
@@ -122,6 +123,14 @@ module LogicalScene =
             gravity             : V3d
             numSubSteps         : int
             subStepTime         : float
+
+            wantsRayCast        : bool
+            rayCastStart        : V3d
+            rayCastEnd          : V3d
+            rayCastHasHit       : bool
+            rayCastHitPoint     : V3d
+            rayCastHitNormal    : V3d
+            rayCastHitPointSg   : ISg
         }
         
     type Message =
@@ -134,6 +143,7 @@ module LogicalScene =
         | TimeElapsed of System.TimeSpan
         | UpdateViewTrafo of Trafo3d
         | Collision of Object * Object * V3d
+        | RayCastResult of bool * V3d * V3d
         
     let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>) = 
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
@@ -182,12 +192,24 @@ module LogicalScene =
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
                 let newObjects = setTrafoOfObjectsWithId(scene.controller1ObjectId, t, scene.objects)
                 let direction = t.Forward.TransformDir(V3d.OOI)
-                { scene with 
-                    objects = newObjects
-                    moveDirection = direction
-                }
+                let rayCastStart = t.Forward.TransformPos(V3d())
+                
+                if scene.movementType = VrInteractions.VrMovementTechnique.Teleport then
+                    { scene with 
+                        objects = newObjects
+                        moveDirection = direction
+                        wantsRayCast = true
+                        rayCastStart = rayCastStart
+                        rayCastEnd = rayCastStart + -100.0 * direction
+                    }
+                else
+                    { scene with 
+                        objects = newObjects
+                        moveDirection = direction
+                    }
+
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.interactionType)
+                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(scene.interactionType, t, scene.viewTrafo)
                 let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
                 let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
                 let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
@@ -218,9 +240,22 @@ module LogicalScene =
                     interactionType = newInteractionTechnique
                 }
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id && a = 0 ->
+                let newMovementTechnique = VrInteractions.nextMovementTechnique scene.movementType
+                { scene with
+                    movementType = newMovementTechnique
+                }
+            | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id && a = 2 ->
                 { scene with
                     enablePhysics = not scene.enablePhysics
                 }
+            | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller1Id && a = 1 ->
+                if scene.movementType = VrInteractions.VrMovementTechnique.Teleport && scene.rayCastHasHit then
+                    let hmdTrafo = getTrafoOfFirstObjectWithId(scene.headId, scene.objects)
+                    let deltaTrafo = VrInteractions.getDeltaTrafoForTeleport(scene.deviceOffset, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal)
+                    { scene with deviceOffset = scene.deviceOffset * deltaTrafo }
+                else
+                    scene
+                    
             | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
                 
                 let newObjects = 
@@ -286,8 +321,6 @@ module LogicalScene =
                 }
 
             | TimeElapsed(dt) ->
-                let maxSpeed = 10.0
-                    
                 let mutable state = VRControllerState_t()
                 let axisPosition =
                     if system.GetControllerState(uint32 assignedInputs.controller1Id, &state) then
@@ -296,15 +329,18 @@ module LogicalScene =
 
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
 
-                let axisWithDeathZone = VrInteractions.getAxisValueWithDeathZone(axisValue)
-
-                let dp = Trafo3d.Translation(scene.moveDirection * dt.TotalSeconds * maxSpeed * axisWithDeathZone)
                 let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
                         { o with 
                             wasGrabbed = o.isGrabbed
                         }
                     )
-                let newSceneTrafo = scene.deviceOffset * dp
+
+                let newSceneTrafo = 
+                    if scene.movementType = VrInteractions.VrMovementTechnique.Flying then
+                        let dp = VrInteractions.getDeltaTrafoForFlying(scene.moveDirection, dt.TotalSeconds, axisValue)
+                        scene.deviceOffset * dp
+                    else
+                        scene.deviceOffset
                 
 //                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
 //                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
@@ -348,7 +384,7 @@ module LogicalScene =
                                 let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
                                 if scored then
                                     newScore <- newScore + 1
-                                    //printfn "Scored %A at %A" newScore scene.timeSinceStart
+                                    printfn "Scored %A at %A" newScore scene.timeSinceStart
                                     { o with 
                                         hasScored = true
                                         
@@ -377,5 +413,11 @@ module LogicalScene =
                     objects = newObjects
                     score = newScore
                 }
-
+            | RayCastResult (hasHit, hitPoint, hitNormal) ->
+                { scene with 
+                    rayCastHasHit = hasHit
+                    rayCastHitPoint = hitPoint
+                    rayCastHitNormal = hitNormal
+                    wantsRayCast = false
+                }
             | _ -> scene

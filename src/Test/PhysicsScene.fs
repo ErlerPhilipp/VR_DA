@@ -296,7 +296,7 @@ module PhysicsScene =
                 world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds, s.numSubSteps, float32 s.subStepTime) |> ignore
                 simulationSw.Stop()
 //                System.Console.WriteLine(simulationSw.MicroTime.ToString())
-                
+
                 let mutable messages = System.Collections.Generic.List()
 
                 let objects =
@@ -380,6 +380,11 @@ module PhysicsScene =
 
                 for message in messages do
                     newScene <- LogicalScene.update newScene message
+                   
+                if s.wantsRayCast then
+                    let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(s.rayCastStart), toVector3(s.rayCastEnd), world.dynamicsWorld)
+                    let rayCastMsg = RayCastResult (hasHit, toV3d(hitPoint), toV3d(hitNormal))
+                    newScene <- LogicalScene.update newScene rayCastMsg
 
                 newScene
             | None -> 

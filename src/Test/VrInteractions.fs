@@ -4,12 +4,23 @@ open Valve.VR
 
 open Aardvark.Base
 
+open BulletSharp.Math
+
 module VrInteractions =
     open VrTypes
     
     type VrInteractionTechnique =
         | VirtualHand = 1
         | GoGo = 2
+        
+    type VrMovementTechnique =
+        | Flying = 1
+        | Teleport = 2
+
+    let getAxisValueWithDeathZone (value : float) = 
+        let deathZone = 0.1
+        let axisWithDeathZone = clamp 0.0 1.0 (value * (1.0 + deathZone) - deathZone)
+        axisWithDeathZone
 
     let nextInteractionTechnique (it : VrInteractionTechnique) =
         match it with
@@ -22,10 +33,8 @@ module VrInteractions =
             | VrInteractionTechnique.VirtualHand -> C4f.White
             | VrInteractionTechnique.GoGo -> C4f.Green
             | _ -> C4f.White
-            
-    let gogoQuadraticTermFactor = 200.0
 
-    let getVirtualHandTrafoAndExtensionFactor (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, interactionType : VrInteractionTechnique) = 
+    let getVirtualHandTrafoAndExtensionFactor (interactionType : VrInteractionTechnique, realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d) = 
         if interactionType = VrInteractionTechnique.VirtualHand then
             (realHandTrafo, 1.0)
         else
@@ -41,14 +50,27 @@ module VrInteractions =
             if headToHandDist < linearExtensionLimit then
                 (realHandTrafo, 1.0)
             else
+                let gogoQuadraticTermFactor = 200.0
+
                 let quadraticExtension = headToHandDist - linearExtensionLimit
                 let gogoAdditionalExtension = max 0.0 gogoQuadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
                 let gogoHandPosOffset = chestToHand.Normalized * gogoAdditionalExtension
                 let gogoHandTrafo = realHandTrafo * Trafo3d.Translation(gogoHandPosOffset)
                 //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
                 (gogoHandTrafo, gogoAdditionalExtension)
+        
+    let nextMovementTechnique (it : VrMovementTechnique) =
+        match it with
+            | VrMovementTechnique.Flying -> VrMovementTechnique.Teleport
+            | VrMovementTechnique.Teleport -> VrMovementTechnique.Flying
+            | _ -> VrMovementTechnique.Flying
 
-    let getAxisValueWithDeathZone (value : float) = 
-        let deathZone = 0.1
-        let axisWithDeathZone = clamp 0.0 1.0 (value * (1.0 + deathZone) - deathZone)
-        axisWithDeathZone
+    let getDeltaTrafoForFlying (moveDirection : V3d, deltaTime : float, axisValue: float) = 
+        let axisWithDeathZone = getAxisValueWithDeathZone(axisValue)
+        let maxSpeed = 10.0
+        Trafo3d.Translation(moveDirection * deltaTime * maxSpeed * axisWithDeathZone)
+
+    let getDeltaTrafoForTeleport (currentTrafo : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d) = 
+        let oldPos = hmdTrafo.Forward.TransformPos(V3d())
+        let translation = V3d(targetPos.X - oldPos.X, 0.0, targetPos.Z - oldPos.Z)
+        Trafo3d.Translation(-translation)

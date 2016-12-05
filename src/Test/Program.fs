@@ -57,7 +57,7 @@ let main argv =
                                     TextureTiling.Effect
                                     NormalMap.Effect
                                     defaultDiffuseTextureEffect
-                                    Lighting.Effect true
+                                    Lighting.Effect false
                                 ]
     let boxEffect = Sg.effect [
                         defaultTrafoEffect
@@ -427,6 +427,7 @@ let main argv =
 
             interactionType     = VrInteractions.VrInteractionTechnique.VirtualHand
             armExtensionFactor  = 1.0
+            movementType        = VrInteractions.VrMovementTechnique.Flying
             moveDirection       = V3d.Zero
 
             score               = 0
@@ -435,12 +436,20 @@ let main argv =
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
             
-            deltaTime = 0.0
-            enablePhysics = true
-            gravity = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw = false
-            numSubSteps = 3
-            subStepTime = 1.0 / 180.0
+            deltaTime           = 0.0
+            enablePhysics       = true
+            gravity             = V3d(0.0, -9.81, 0.0)
+            physicsDebugDraw    = true
+            numSubSteps         = 3
+            subStepTime         = 1.0 / 180.0
+
+            wantsRayCast        = false
+            rayCastStart        = V3d()
+            rayCastEnd          = V3d()
+            rayCastHasHit       = false
+            rayCastHitPoint     = V3d()
+            rayCastHitNormal    = V3d()
+            rayCastHitPointSg   = rayCastHitPointSg
         }
 
     let scene =
