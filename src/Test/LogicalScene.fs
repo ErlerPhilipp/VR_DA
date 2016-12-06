@@ -131,6 +131,7 @@ module LogicalScene =
             rayCastHitPoint     : V3d
             rayCastHitNormal    : V3d
             rayCastHitPointSg   : ISg
+            rayCastCamSg        : ISg
         }
         
     type Message =

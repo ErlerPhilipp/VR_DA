@@ -73,4 +73,30 @@ module VrInteractions =
     let getTrafoAfterTeleport (currentTrafo : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d) = 
         let trackingSpaceOrigin = currentTrafo.Forward.TransformPos(V3d())
         let hmdPosWorldSpace = hmdTrafo.Forward.TransformPos(V3d())
-        Trafo3d.Translation(targetPos - (hmdPosWorldSpace - trackingSpaceOrigin).XOZ)
+        let trackingOriginTargetPos = targetPos
+        let translationTrafo = Trafo3d.Translation(trackingOriginTargetPos)
+//        let trackingOffsetTrafo = Trafo3d.Translation(-(hmdPosWorldSpace - trackingSpaceOrigin).XOZ) // keep height of hmd
+//        translationTrafo * trackingOffsetTrafo
+                
+        let currY = V3d.OIO
+        let targetY = targetNormal.Normalized
+        let currYDotTargetY = currY.Dot(targetY)
+        let tinyValue = 0.01
+        let rotationTrafo = 
+            let currX = V3d.IOO
+            let currZ = V3d.OOI
+            let currXDotTargetY = currX.Dot(targetY)
+            let currZDotTargetY = currZ.Dot(targetY)
+            let rotAxisIsTargetXAxis = abs(currXDotTargetY) < abs(currZDotTargetY) + tinyValue
+            let rotAxis = if rotAxisIsTargetXAxis then currX else currZ
+            let forwardAxis = targetY.Cross(rotAxis)
+
+            let tryTrafo =  if rotAxisIsTargetXAxis then 
+                                Trafo3d.FromBasis(rotAxis, targetY, forwardAxis, V3d())
+                            else
+                                Trafo3d.FromBasis(forwardAxis, targetY, rotAxis, V3d())
+            let switchXY = Trafo3d.FromBasis(V3d.OIO, V3d.IOO, V3d.OOI, V3d())
+            switchXY.Inverse * Trafo3dExtensions.GetOrthoNormalOrientation(switchXY * tryTrafo)
+
+//        rotationTrafo * trackingOffsetTrafo * translationTrafo
+        rotationTrafo * translationTrafo

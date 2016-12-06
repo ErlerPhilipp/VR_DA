@@ -47,6 +47,11 @@ let main argv =
                                 DefaultSurfaces.constantColor C4f.White |> toEffect
                                 defaultSimpleLightingEffect
                             ]
+    let rayCastHitEffect = Sg.effect [
+                                defaultTrafoEffect
+                                DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
+                                defaultSimpleLightingEffect
+                            ]
     let beamEffect = Sg.effect [
                         defaultTrafoEffect
                         DefaultSurfaces.vertexColor |> toEffect
@@ -110,6 +115,8 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
+    let rayCastAreaSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, 0.1, trackingAreaSize))))
+    let rayCastCamSg = Sg.cone 4 (Mod.constant (C4b(50, 250, 50, 80))) (Mod.constant 0.1) (Mod.constant 0.4)
 
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
     let ceilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
@@ -136,8 +143,9 @@ let main argv =
 
     let goalRoomWallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", true) :> ITexture))
     let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture goalRoomWallNormalSampler
-                    
-    let rayCastHitPointSg = lightSg |>  constColorEffect
+
+    let rayCastHitPointSg = rayCastAreaSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastCamSg = rayCastCamSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
 
     let leftHandObject = 
         { defaultObject with
@@ -450,6 +458,7 @@ let main argv =
             rayCastHitPoint     = V3d()
             rayCastHitNormal    = V3d()
             rayCastHitPointSg   = rayCastHitPointSg
+            rayCastCamSg        = rayCastCamSg
         }
 
     let scene =
