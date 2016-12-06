@@ -34,9 +34,11 @@ module GraphicsScene =
 
             mscoreTrafo         : ModRef<Trafo3d>
             mscoreText          : ModRef<string>
-
+            
             mhasRayCastHit      : ModRef<bool>
-            mrayCastHitPoint    : ModRef<Trafo3d>
+            mdrawHitPoint       : ModRef<bool>
+            mdrawHitArea        : ModRef<bool>
+            mrayCastHitTrafo    : ModRef<Trafo3d>
             mrayCastCam         : ModRef<Trafo3d>
         }
 
@@ -70,7 +72,9 @@ module GraphicsScene =
                 mscoreText          = Mod.init s.scoreText
 
                 mhasRayCastHit      = Mod.init s.rayCastHasHit
-                mrayCastHitPoint    = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
+                mdrawHitPoint       = Mod.init (s.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
+                mdrawHitArea        = Mod.init (s.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
+                mrayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
                 mrayCastCam         = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
             }
 
@@ -106,14 +110,17 @@ module GraphicsScene =
                             ms.mobjects.Add mo |> ignore
                 
                 ms.mobjects.ExceptWith table.Values
-
-                ms.mhasRayCastHit.Value <- s.rayCastHasHit
                 
-                // teleport target debug
+                ms.mhasRayCastHit.Value <- s.rayCastHasHit
+                ms.mdrawHitPoint.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                ms.mdrawHitArea.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportArea
+                
                 let hmdTrafo = getTrafoOfFirstObjectWithId(s.headId, s.objects)
-                let newTrafo = VrInteractions.getTrafoAfterTeleport(s.deviceOffset, hmdTrafo, s.rayCastHitPoint, s.rayCastHitNormal)
+                let recenter = s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                let newTrafo = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdTrafo, s.rayCastHitPoint, s.rayCastHitNormal, recenter)
+//                ms.mrayCastCam.Value <- (hmdTrafo * s.trackingToWorld.Inverse * newTrafo)
                 ms.mrayCastCam.Value <- (hmdTrafo * newTrafo)
-                ms.mrayCastHitPoint.Value <- newTrafo
+                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.rayCastHitPoint) else newTrafo
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =
@@ -122,7 +129,7 @@ module GraphicsScene =
 
         let deviceCount = VrDriver.devices.Length
         let oldTrafos = Array.zeroCreate deviceCount
-        let mutable oldDeviceOffset = Trafo3d.Identity
+        let mutable oldTrackingToWorld = Trafo3d.Identity
         let update (dt : System.TimeSpan) (trafos : Trafo3d[]) (e : VREvent_t) =
             
             scene <- LogicalScene.update scene StartFrame
@@ -134,14 +141,14 @@ module GraphicsScene =
                     
             scene <- LogicalScene.update scene (TimeElapsed dt)
 
-            let deviceOffsetHasChanged = oldDeviceOffset <> scene.deviceOffset
-            oldDeviceOffset <- scene.deviceOffset
+            let trackingToWorldHasChanged = oldTrackingToWorld <> scene.trackingToWorld
+            oldTrackingToWorld <- scene.trackingToWorld
 
             for i in 0 .. VrDriver.devices.Length-1 do
                 let t = trafos.[i]
-                if oldTrafos.[i] <> t || deviceOffsetHasChanged then
+                if oldTrafos.[i] <> t || trackingToWorldHasChanged then
                     oldTrafos.[i] <- t
-                    scene <- LogicalScene.update scene (DeviceMove(i, t * scene.deviceOffset))
+                    scene <- LogicalScene.update scene (DeviceMove(i, t * scene.trackingToWorld))
                 
             if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
                 let deviceId = e.trackedDeviceIndex |> int
@@ -206,17 +213,24 @@ module GraphicsScene =
 //            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red mscene.mscoreText :> ISg
             Sg.markdown MarkdownConfig.light mscene.mscoreText
                 |> Sg.trafo mscene.mscoreTrafo
-
-        let rayCastHitSg =
+                
+        let rayCastHitPointSg =
             initialScene.rayCastHitPointSg
-                |> Sg.trafo mscene.mrayCastHitPoint
+                |> Sg.trafo mscene.mrayCastHitTrafo
                 |> Sg.onOff mscene.mhasRayCastHit
+                |> Sg.onOff mscene.mdrawHitPoint
 
+        let rayCastHitAreaSg =
+            initialScene.rayCastHitAreaSg
+                |> Sg.trafo mscene.mrayCastHitTrafo
+                |> Sg.onOff mscene.mhasRayCastHit
+                |> Sg.onOff mscene.mdrawHitArea
+                
         let rayCastCamSg =
             initialScene.rayCastCamSg
                 |> Sg.trafo mscene.mrayCastCam
                 |> Sg.onOff mscene.mhasRayCastHit
                 
         // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList [sgs; rayCastHitSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
+        Sg.ofList [sgs; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
             |> Sg.viewTrafo mscene.mviewTrafo

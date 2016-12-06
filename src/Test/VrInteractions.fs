@@ -15,7 +15,8 @@ module VrInteractions =
         
     type VrMovementTechnique =
         | Flying = 1
-        | Teleport = 2
+        | TeleportPos = 2
+        | TeleportArea = 3
 
     let getAxisValueWithDeathZone (value : float) = 
         let deathZone = 0.1
@@ -34,56 +35,49 @@ module VrInteractions =
             | VrInteractionTechnique.GoGo -> C4f.Green
             | _ -> C4f.White
 
-    let getVirtualHandTrafoAndExtensionFactor (interactionType : VrInteractionTechnique, realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, trackingTrafo : Trafo3d) = 
-        if interactionType = VrInteractionTechnique.VirtualHand then
+    let getVirtualHandTrafoAndExtensionFactor (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, trackingToWorld : Trafo3d) = 
+        let handPosTrackingSpace = (realHandTrafo * trackingToWorld).Forward.TransformPos(V3d.Zero)
+        let headPosTrackingSpace = (realHeadTrafo.Inverse * trackingToWorld).Forward.TransformPos V3d.Zero
+        let headToChestOffsetTrackingSpace = V3d(0.0, -0.15, 0.0)
+        let chestPosTrackingSpace = Trafo3d.Translation(headToChestOffsetTrackingSpace).Forward.TransformPos(headPosTrackingSpace)
+        let chestToHandTrackingSpace = handPosTrackingSpace - chestPosTrackingSpace
+        //printfn "hand: %A, chest: %A" (chestPos) (handPos)
+        let headToHandDistTrackingSpace = chestToHandTrackingSpace.Length
+                    
+        let linearExtensionLimit = 0.5
+
+        if headToHandDistTrackingSpace < linearExtensionLimit then
             (realHandTrafo, 1.0)
         else
-            let handPosTrackingSpace = (realHandTrafo * trackingTrafo).Forward.TransformPos(V3d.Zero)
-            let headPosTrackingSpace = (realHeadTrafo.Inverse * trackingTrafo).Forward.TransformPos V3d.Zero
-            let headToChestOffsetTrackingSpace = V3d(0.0, -0.15, 0.0)
-            let chestPosTrackingSpace = Trafo3d.Translation(headToChestOffsetTrackingSpace).Forward.TransformPos(headPosTrackingSpace)
-            let chestToHandTrackingSpace = handPosTrackingSpace - chestPosTrackingSpace
-            //printfn "hand: %A, chest: %A" (chestPos) (handPos)
-            let headToHandDistTrackingSpace = chestToHandTrackingSpace.Length
-                    
-            let linearExtensionLimit = 0.5
+            let gogoQuadraticTermFactor = 200.0
 
-            if headToHandDistTrackingSpace < linearExtensionLimit then
-                (realHandTrafo, 1.0)
-            else
-                let gogoQuadraticTermFactor = 200.0
-
-                let quadraticExtension = headToHandDistTrackingSpace - linearExtensionLimit
-                let gogoAdditionalExtension = max 0.0 gogoQuadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
-                let gogoHandPosOffset =  trackingTrafo.Backward.TransformDir(chestToHandTrackingSpace.Normalized) * gogoAdditionalExtension
-                let gogoHandTrafo = realHandTrafo * Trafo3d.Translation(gogoHandPosOffset)
-                //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
-                (gogoHandTrafo, gogoAdditionalExtension)
+            let quadraticExtension = headToHandDistTrackingSpace - linearExtensionLimit
+            let gogoAdditionalExtension = max 0.0 gogoQuadraticTermFactor * quadraticExtension * quadraticExtension // R_r + k(R_r - D)^2
+            let gogoHandPosOffset =  trackingToWorld.Backward.TransformDir(chestToHandTrackingSpace.Normalized) * gogoAdditionalExtension
+            let gogoHandTrafo = realHandTrafo * Trafo3d.Translation(gogoHandPosOffset)
+            //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
+            (gogoHandTrafo, gogoAdditionalExtension)
         
     let nextMovementTechnique (it : VrMovementTechnique) =
         match it with
-            | VrMovementTechnique.Flying -> VrMovementTechnique.Teleport
-            | VrMovementTechnique.Teleport -> VrMovementTechnique.Flying
+            | VrMovementTechnique.Flying -> VrMovementTechnique.TeleportPos
+            | VrMovementTechnique.TeleportPos -> VrMovementTechnique.TeleportArea
+            | VrMovementTechnique.TeleportArea -> VrMovementTechnique.Flying
             | _ -> VrMovementTechnique.Flying
 
-    let getTrafoAfterFlying (currentTrafo : Trafo3d, moveDirection : V3d, deltaTime : float, axisValue: float) = 
+    let getTrafoAfterFlying (trackingToWorld : Trafo3d, moveDirection : V3d, deltaTime : float, axisValue: float) = 
         let axisWithDeathZone = getAxisValueWithDeathZone(axisValue)
         let maxSpeed = 10.0
-        currentTrafo * Trafo3d.Translation(moveDirection * -deltaTime * maxSpeed * axisWithDeathZone)
+        trackingToWorld * Trafo3d.Translation(moveDirection * -deltaTime * maxSpeed * axisWithDeathZone)
 
-    let getTrafoAfterTeleport (currentTrafo : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d) = 
-        let trackingSpaceOrigin = currentTrafo.Forward.TransformPos(V3d())
-        let hmdPosWorldSpace = hmdTrafo.Forward.TransformPos(V3d())
-        let trackingOriginTargetPos = targetPos
-        let translationTrafo = Trafo3d.Translation(trackingOriginTargetPos)
-//        let trackingOffsetTrafo = Trafo3d.Translation(-(hmdPosWorldSpace - trackingSpaceOrigin).XOZ) // keep height of hmd
-//        translationTrafo * trackingOffsetTrafo
+    let getTeleportTrafo (trackingToWorld : Trafo3d, hmdTrafo : Trafo3d, targetPos : V3d, targetNormal : V3d, recenter : bool) = 
+        let translationWorldSpace = Trafo3d.Translation(targetPos)
                 
-        let currY = V3d.OIO
-        let targetY = targetNormal.Normalized
-        let currYDotTargetY = currY.Dot(targetY)
-        let tinyValue = 0.01
         let rotationTrafo = 
+            let currY = V3d.OIO
+            let targetY = targetNormal.Normalized
+            let currYDotTargetY = currY.Dot(targetY)
+            let tinyValue = 0.01
             let currX = V3d.IOO
             let currZ = V3d.OOI
             let currXDotTargetY = currX.Dot(targetY)
@@ -99,5 +93,18 @@ module VrInteractions =
             let mirrorFix = Trafo3d.Scale(1.0, 1.0, -1.0)
             mirrorFix * switchXY.Inverse * Trafo3dExtensions.GetOrthoNormalOrientation(switchXY * tryTrafo)
 
-//        rotationTrafo * trackingOffsetTrafo * translationTrafo
-        rotationTrafo * translationTrafo
+        let hmdRecenterWorldSpace =   
+            if recenter then // keep height of hmd
+                let trackingSpaceOriginInWorldSpace = trackingToWorld.Forward.TransformPos(V3d())
+                let hmdPosWorldSpace = hmdTrafo.Forward.TransformPos(V3d())
+                let originToHmdWorldSpace = (hmdPosWorldSpace - trackingSpaceOriginInWorldSpace)
+
+                let hmdPosTrackingSpace = trackingToWorld.Backward.TransformPos(hmdPosWorldSpace)
+                let hmdHeightTrackingSpace = hmdPosTrackingSpace.OYO
+                let hmdHeightTargetSpace = hmdHeightTrackingSpace.Y * targetNormal
+
+                Trafo3d.Translation(-originToHmdWorldSpace + hmdHeightTargetSpace)
+            else
+                Trafo3d.Identity
+
+        rotationTrafo * hmdRecenterWorldSpace * translationWorldSpace

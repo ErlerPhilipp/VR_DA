@@ -94,7 +94,7 @@ module LogicalScene =
             objects             : pset<Object>
             viewTrafo           : Trafo3d
             lastContr2Trafo     : Trafo3d
-            deviceOffset        : Trafo3d
+            trackingToWorld     : Trafo3d
             
             cam1ObjectId        : int
             cam2ObjectId        : int
@@ -130,6 +130,7 @@ module LogicalScene =
             rayCastHasHit       : bool
             rayCastHitPoint     : V3d
             rayCastHitNormal    : V3d
+            rayCastHitAreaSg    : ISg
             rayCastHitPointSg   : ISg
             rayCastCamSg        : ISg
         }
@@ -195,7 +196,7 @@ module LogicalScene =
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 let rayCastStart = t.Forward.TransformPos(V3d())
                 
-                if scene.movementType = VrInteractions.VrMovementTechnique.Teleport then
+                if scene.movementType = VrInteractions.VrMovementTechnique.TeleportArea || scene.movementType = VrInteractions.VrMovementTechnique.TeleportPos then
                     { scene with 
                         objects = newObjects
                         moveDirection = direction
@@ -210,23 +211,38 @@ module LogicalScene =
                     }
 
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(scene.interactionType, t, scene.viewTrafo, scene.deviceOffset)
-                let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
-                let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
-                let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
-                                 |> PersistentHashSet.map (fun a ->
-                                    if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
-                                 )
+                match scene.interactionType with
+                    | VrInteractionTechnique.VirtualHand ->
+                        let virtualHandTrafo = t
+                        let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
+                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
+                                         |> PersistentHashSet.map (fun a ->
+                                            if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
+                                         )
+                        { scene with 
+                            objects = newObjects
+                            armExtensionFactor = 1.0
+                            lastContr2Trafo = virtualHandTrafo
+                        }
+                    | VrInteractionTechnique.GoGo ->
+                        let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.trackingToWorld)
+                        let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
+                        let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
+                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
+                                         |> PersistentHashSet.map (fun a ->
+                                            if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
+                                         )
 
-//                // attach light to grabbing hand
-//                let lightPos = virtualHandTrafo
-//                let newObjects = setTrafoOfObjectsWithId(scene.lightId, lightPos, newObjects)
+        //                // attach light to grabbing hand
+        //                let lightPos = virtualHandTrafo
+        //                let newObjects = setTrafoOfObjectsWithId(scene.lightId, lightPos, newObjects)
 
-                { scene with 
-                    objects = newObjects
-                    armExtensionFactor = extension
-                    lastContr2Trafo = virtualHandTrafo
-                }
+                        { scene with 
+                            objects = newObjects
+                            armExtensionFactor = extension
+                            lastContr2Trafo = virtualHandTrafo
+                        }
+                    | _ -> failwith "Not implemented"
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
                 let newObjects = setTrafoOfObjectsWithId(scene.cam1ObjectId, t, scene.objects)
                 { scene with objects = newObjects }
@@ -252,12 +268,14 @@ module LogicalScene =
                     enablePhysics = not scene.enablePhysics
                 }
             | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller1Id && a = 1 ->
-                if scene.movementType = VrInteractions.VrMovementTechnique.Teleport && scene.rayCastHasHit then
+                if (scene.movementType = VrInteractions.VrMovementTechnique.TeleportArea || 
+                    scene.movementType = VrInteractions.VrMovementTechnique.TeleportPos) && scene.rayCastHasHit then
                     let hmdTrafo = getTrafoOfFirstObjectWithId(scene.headId, scene.objects)
-                    let newTrafo = VrInteractions.getTrafoAfterTeleport(scene.deviceOffset, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal)
+                    let recenter = scene.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                    let newTrackingToWorld = VrInteractions.getTeleportTrafo(scene.trackingToWorld, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal, recenter)
                     { scene with 
-                        deviceOffset = newTrafo 
-                        gravity = newTrafo.Forward.TransformDir(V3d(0.0, -9.81, 0.0))
+                        trackingToWorld = newTrackingToWorld 
+                        gravity = newTrackingToWorld.Forward.TransformDir(V3d(0.0, -9.81, 0.0))
                     }
                 else
                     scene
@@ -341,11 +359,11 @@ module LogicalScene =
                         }
                     )
 
-                let newSceneTrafo = 
+                let newTrackingToWorld = 
                     if scene.movementType = VrInteractions.VrMovementTechnique.Flying then
-                        VrInteractions.getTrafoAfterFlying(scene.deviceOffset, scene.moveDirection, dt.TotalSeconds, axisValue)
+                        VrInteractions.getTrafoAfterFlying(scene.trackingToWorld, scene.moveDirection, dt.TotalSeconds, axisValue)
                     else
-                        scene.deviceOffset
+                        scene.trackingToWorld
                 
 //                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
 //                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
@@ -354,7 +372,7 @@ module LogicalScene =
 
                 { scene with
                     objects = newObjects
-                    deviceOffset = newSceneTrafo
+                    trackingToWorld = newTrackingToWorld
                     deltaTime = dt.TotalSeconds
                     timeSinceStart = newTimeSinceStart
                 }

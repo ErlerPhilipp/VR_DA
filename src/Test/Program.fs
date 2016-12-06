@@ -116,6 +116,7 @@ let main argv =
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
     let rayCastAreaSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, 0.1, trackingAreaSize))))
+    let rayCastPointSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant 0.08)
     let rayCastCamSg = Sg.cone 4 (Mod.constant (C4b(50, 250, 50, 80))) (Mod.constant 0.1) (Mod.constant 0.4)
 
     let groundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
@@ -144,7 +145,8 @@ let main argv =
     let goalRoomWallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", true) :> ITexture))
     let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture goalRoomWallNormalSampler
 
-    let rayCastHitPointSg = rayCastAreaSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastHitPointSg = rayCastPointSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastHitAreaSg = rayCastAreaSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastCamSg = rayCastCamSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
 
     let leftHandObject = 
@@ -421,7 +423,7 @@ let main argv =
             objects             = PersistentHashSet.ofList objects
             viewTrafo           = Trafo3d.Identity
             lastContr2Trafo     = Trafo3d.Identity
-            deviceOffset        = Trafo3d.Identity
+            trackingToWorld     = Trafo3d.Identity
 
             cam1ObjectId        = camObject1.id
             cam2ObjectId        = camObject2.id
@@ -458,6 +460,7 @@ let main argv =
             rayCastHitPoint     = V3d()
             rayCastHitNormal    = V3d()
             rayCastHitPointSg   = rayCastHitPointSg
+            rayCastHitAreaSg    = rayCastHitAreaSg
             rayCastCamSg        = rayCastCamSg
         }
 
