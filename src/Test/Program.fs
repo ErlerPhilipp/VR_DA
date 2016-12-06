@@ -347,9 +347,9 @@ let main argv =
             castsShadow = false
             objectType = ObjectTypes.Kinematic
             isManipulable = false
-            trafo = Trafo3d.Identity
+            trafo = Trafo3d.Translation(-0.1, 0.0, 0.0)
             model = Sg.ofList []
-            collisionShape = Some (BulletHelper.Shape.Sphere 0.20)
+            collisionShape = Some (BulletHelper.Shape.Sphere 0.12)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
         }

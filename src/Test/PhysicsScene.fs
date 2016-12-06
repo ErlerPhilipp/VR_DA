@@ -206,6 +206,7 @@ module PhysicsScene =
 
                             // set object velocity to hand velocity
                             let vel = VrDriver.inputDevices.controller2.Velocity
+                            let vel = s.deviceOffset.Forward.TransformDir(vel)
                             let handVelocity = 
                                 match s.interactionType with
                                     | VrInteractions.VrInteractionTechnique.VirtualHand -> toVector3(vel)

@@ -210,7 +210,7 @@ module LogicalScene =
                     }
 
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller2Id ->
-                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(scene.interactionType, t, scene.viewTrafo)
+                let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(scene.interactionType, t, scene.viewTrafo, scene.deviceOffset)
                 let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
                 let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
                 let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
@@ -255,7 +255,10 @@ module LogicalScene =
                 if scene.movementType = VrInteractions.VrMovementTechnique.Teleport && scene.rayCastHasHit then
                     let hmdTrafo = getTrafoOfFirstObjectWithId(scene.headId, scene.objects)
                     let newTrafo = VrInteractions.getTrafoAfterTeleport(scene.deviceOffset, hmdTrafo, scene.rayCastHitPoint, scene.rayCastHitNormal)
-                    { scene with deviceOffset = newTrafo }
+                    { scene with 
+                        deviceOffset = newTrafo 
+                        gravity = newTrafo.Forward.TransformDir(V3d(0.0, -9.81, 0.0))
+                    }
                 else
                     scene
                     
