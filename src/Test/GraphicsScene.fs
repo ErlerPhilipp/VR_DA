@@ -115,12 +115,11 @@ module GraphicsScene =
                 ms.mdrawHitPoint.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
                 ms.mdrawHitArea.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportArea
                 
-                let hmdTrafo = getTrafoOfFirstObjectWithId(s.headId, s.objects)
+                let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.headId, s.objects)
                 let recenter = s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
-                let newTrafo = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdTrafo, s.rayCastHitPoint, s.rayCastHitNormal, recenter)
-//                ms.mrayCastCam.Value <- (hmdTrafo * s.trackingToWorld.Inverse * newTrafo)
-                ms.mrayCastCam.Value <- (hmdTrafo * newTrafo)
-                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.rayCastHitPoint) else newTrafo
+                let newTrackingToWorld = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdWorldTrafo, s.rayCastHitPoint, s.rayCastHitNormal, recenter)
+                ms.mrayCastCam.Value <- (hmdWorldTrafo * s.trackingToWorld.Inverse * newTrackingToWorld)
+                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.rayCastHitPoint) else newTrackingToWorld
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =

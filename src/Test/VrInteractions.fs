@@ -74,37 +74,30 @@ module VrInteractions =
         let translationWorldSpace = Trafo3d.Translation(targetPos)
                 
         let rotationTrafo = 
-            let currY = V3d.OIO
+            let currY = trackingToWorld.Backward.TransformDir(V3d.OIO)
             let targetY = targetNormal.Normalized
             let currYDotTargetY = currY.Dot(targetY)
             let tinyValue = 0.01
-            let currX = V3d.IOO
-            let currZ = V3d.OOI
+            let currX = trackingToWorld.Backward.TransformDir(V3d.IOO)
+            let currZ = trackingToWorld.Backward.TransformDir(V3d.OOI)
             let currXDotTargetY = currX.Dot(targetY)
             let currZDotTargetY = currZ.Dot(targetY)
             let rotAxisIsTargetXAxis = abs(currXDotTargetY) < abs(currZDotTargetY) + tinyValue
             let rotAxis = if rotAxisIsTargetXAxis then currX else currZ
             let forwardAxis = targetY.Cross(rotAxis)
-            let tryTrafo =  if rotAxisIsTargetXAxis then 
-                                Trafo3d.FromBasis(rotAxis, targetY, forwardAxis, V3d())
-                            else
-                                Trafo3d.FromBasis(forwardAxis, targetY, rotAxis, V3d())
-            let switchXY = Trafo3d.FromBasis(V3d.OIO, V3d.IOO, V3d.OOI, V3d())
+
+            let orthonormalizationTrafo = Trafo3dExtensions.GetOrthoNormalOrientation(Trafo3d.FromBasis(targetY, rotAxis, forwardAxis, V3d()))
+            let switchAxes = Trafo3d.FromBasis(V3d.OIO, V3d.IOO, V3d.OOI, V3d())
             let mirrorFix = Trafo3d.Scale(1.0, 1.0, -1.0)
-            mirrorFix * switchXY.Inverse * Trafo3dExtensions.GetOrthoNormalOrientation(switchXY * tryTrafo)
+            mirrorFix * switchAxes * orthonormalizationTrafo
 
-        let hmdRecenterWorldSpace =   
-            if recenter then // keep height of hmd
-                let trackingSpaceOriginInWorldSpace = trackingToWorld.Forward.TransformPos(V3d())
+        let hmdHeight =
+            if recenter then // keep height of hmd, reset lateral offset
                 let hmdPosWorldSpace = hmdTrafo.Forward.TransformPos(V3d())
-                let originToHmdWorldSpace = (hmdPosWorldSpace - trackingSpaceOriginInWorldSpace)
-
                 let hmdPosTrackingSpace = trackingToWorld.Backward.TransformPos(hmdPosWorldSpace)
-                let hmdHeightTrackingSpace = hmdPosTrackingSpace.OYO
-                let hmdHeightTargetSpace = hmdHeightTrackingSpace.Y * targetNormal
-
-                Trafo3d.Translation(-originToHmdWorldSpace + hmdHeightTargetSpace)
+                let hmdRecenteredTrackingSpace = hmdPosTrackingSpace.XOZ
+                Trafo3d.Translation(-hmdRecenteredTrackingSpace)
             else
                 Trafo3d.Identity
 
-        rotationTrafo * hmdRecenterWorldSpace * translationWorldSpace
+        hmdHeight * rotationTrafo * translationWorldSpace
