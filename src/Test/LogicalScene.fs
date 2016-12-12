@@ -297,6 +297,8 @@ module LogicalScene =
                                 if a.hasScored then { a with hasScored = false }  else a
                             )
 
+//                VrDriver.vibrate(uint32 assignedInputs.controller2Id, 1000000)
+
                 { scene with objects = newObjects }
                     
             | DeviceUntouch(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 1 ->
@@ -369,6 +371,16 @@ module LogicalScene =
 //                let newObjects = transformTrafoOfObjectsWithId(scene.lightId, lightRotation, newObjects)
 
                 let newTimeSinceStart = scene.timeSinceStart + dt.TotalSeconds
+
+                let axisPosition =
+                    if system.GetControllerState(uint32 assignedInputs.controller2Id, &state) then
+                        Some (V2d(state.[1].x, state.[1].y))
+                    else None
+                let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
+                printfn "axisValue: %A" axisValue
+                Vibration.stopVibration(uint32 assignedInputs.controller2Id)
+                Vibration.vibrate(uint32 assignedInputs.controller2Id, int 1000000, axisValue)
+//                Vibration.vibrate(uint32 assignedInputs.controller2Id, int (1000000.0 * dt.TotalSeconds), axisValue)
 
                 { scene with
                     objects = newObjects

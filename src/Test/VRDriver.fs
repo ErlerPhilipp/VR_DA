@@ -4,6 +4,8 @@ open Valve.VR
 
 open Aardvark.Base
 
+open System.Collections.Generic
+
 module VrDriver =
     open VrTypes
     open VrConversions
@@ -82,3 +84,79 @@ module VrDriver =
         
     let assignedInputs = getInputAssignment ()
     let inputDevices = getInputDevices ()
+
+module Vibration = 
+    open System.Threading
+    open System.Collections.Concurrent
+
+    type private VibrationEvent = int * float // duration in microsec, strength
+
+    let private threads = ConcurrentDictionary<uint32, List<VibrationEvent>*CancellationTokenSource*SemaphoreSlim>()
+
+    let private triggerHapticPulse(deviceIndex : uint32, axis : uint32, durationUs : uint16) = 
+        OpenVR.System.TriggerHapticPulse(deviceIndex, axis, char durationUs)
+        
+    let private vibrationThread (deviceIndex : uint32) =
+        let l = List<VibrationEvent>()
+        let semaphore = new SemaphoreSlim(0)
+        let cts = new System.Threading.CancellationTokenSource()
+        let worker =
+            async {
+                do! Async.SwitchToNewThread()
+                while not cts.IsCancellationRequested do
+                    semaphore.Wait(cts.Token)
+                    let strength = lock l (fun () -> 
+                        if not (l.IsEmpty()) then          
+                            let durationUs, strength = l.[0]
+                            let newDurationUs = durationUs - 5000
+                            if newDurationUs > 0 then
+                                l.[0] <- (newDurationUs, strength)
+                                semaphore.Release() |> ignore
+                            else
+                                l.RemoveAt(0)
+                                    
+                            strength
+                        else
+                            failwith("List empty although semaphore released")
+                    )
+
+                    if strength > 0.0 then
+                        let minDurationUs = 0us
+                        let maxDurationUs = 220us // empirical max strength
+                        let pulseDurationUs = Aardvark.Base.Fun.Lerp(strength, minDurationUs, maxDurationUs)
+                        triggerHapticPulse(deviceIndex, 0u, pulseDurationUs)
+                            
+                        // no impulse possible in the next 5 ms
+                        do! Async.Sleep 5
+                ()
+            } 
+            
+        Async.Start(worker,cts.Token)
+
+        l, cts, semaphore
+
+    let stopVibration(deviceIndex : uint32) =
+        let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
+
+        lock l (fun () -> 
+            if not (l.IsEmpty()) then
+                semaphore.Wait()
+                l.RemoveAt 0
+        )
+
+//        match threads.TryRemove(deviceIndex) with
+//            | (true,(c,cts)) ->
+//                cts.Cancel()
+//            | _ -> failwith "cannot stop without start"
+
+    let vibrate(deviceIndex : uint32, durationUs : int, strength : float) =
+    
+        let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
+
+        lock l (fun () -> 
+            let newEvent = (durationUs, strength)
+            l.Add newEvent
+        )
+        semaphore.Release() |> ignore
+        
+//        printfn "sem: %A, list count: %A" (semaphore.Release()) (l.Count)
