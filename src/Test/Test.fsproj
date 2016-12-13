@@ -61,6 +61,7 @@
     <Compile Include="VrWindow.fs" />
     <Compile Include="VrInteractions.fs" />
     <Compile Include="BulletHelper.fs" />
+    <Compile Include="Vibration.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
     <Compile Include="ShadowVolumes.fs" />

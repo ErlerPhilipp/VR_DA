@@ -377,10 +377,9 @@ module LogicalScene =
                         Some (V2d(state.[1].x, state.[1].y))
                     else None
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
-                printfn "axisValue: %A" axisValue
-                Vibration.stopVibration(uint32 assignedInputs.controller2Id)
-                Vibration.vibrate(uint32 assignedInputs.controller2Id, int 1000000, axisValue)
-//                Vibration.vibrate(uint32 assignedInputs.controller2Id, int (1000000.0 * dt.TotalSeconds), axisValue)
+//                printfn "%A: axisValue: %A" newTimeSinceStart axisValue
+//                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
+//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
 
                 { scene with
                     objects = newObjects
@@ -420,17 +419,21 @@ module LogicalScene =
                                 if scored then
                                     newScore <- newScore + 1
                                     printfn "Scored %A at %A" newScore scene.timeSinceStart
+                                    Vibration.triangularFunction(3, 60, 300, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
+                                    Vibration.triangularFunction(3, 60, 300, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     { o with 
                                         hasScored = true
-                                        
                                     } 
                                 else 
                                     o
                             )
                         // check grabbable
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id 
-                                if collidingWithController then { o with isGrabbable = true } else o
+                                let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id
+                                if collidingWithController then 
+                                    { o with isGrabbable = true } 
+                                else 
+                                    o
                             )
                         // check reset on ground
                         |> PersistentHashSet.map (fun o -> 
