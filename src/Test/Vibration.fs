@@ -49,7 +49,8 @@ module Vibration =
                                     
                             strength
                         else
-                            failwith("List empty although semaphore released")
+                            printfn "List empty although semaphore released"
+                            0.0
                     )
 
                     let minDurationUs = 0us
@@ -59,9 +60,9 @@ module Vibration =
                     // according to docu: no impulse possible in the next 5 ms
 //                    printfn "%A: start sleep" stopwatch.Elapsed.TotalSeconds
                     // do! Async.Sleep sleepTimeMs // sleep too inaccurate, do busy waiting
-                    while stopwatch.Elapsed.TotalSeconds < 0.005 do
+                    while stopwatch.Elapsed.TotalSeconds < float sleepTimeMs / 1000.0 do
                         ()
-
+                        
                     triggerHapticPulse(deviceIndex, 0u, pulseDurationUs)
 //                    printfn "%A: triggered pulse" stopwatch.Elapsed.TotalSeconds
                     
@@ -76,16 +77,33 @@ module Vibration =
     let stopVibration(vibroTypeToStop : VibrationEventType, deviceIndex : uint32) =
         let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
         
-        lock l (fun () -> 
-            let mutable index = 0
-            while index < l.Count do
-                let vibroType, durationUs, strength = l.[index]
-                if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
-                    let entered = semaphore.Wait(0)
-                    l.RemoveAt index
-                else
-                    index <- index + 1
-        )
+        let mutable stoppedAll = false
+        let mutable stoppedOne = false
+
+        while semaphore.Wait(0) && not stoppedAll do
+            lock l (fun () -> 
+                let mutable index = 0
+                stoppedOne <- false
+                while index < l.Count && not stoppedOne do
+                    let vibroType, durationUs, strength = l.[index]
+                    if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
+                        l.RemoveAt index
+                        stoppedOne <- true
+                    else
+                        index <- index + 1
+                stoppedAll <- not stoppedOne
+            )
+
+//        lock l (fun () -> 
+//            let mutable index = 0
+//            while index < l.Count do
+//                let vibroType, durationUs, strength = l.[index]
+//                if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
+//                    let entered = semaphore.Wait(0)
+//                    l.RemoveAt index
+//                else
+//                    index <- index + 1
+//        )
 
 //        match threads.TryRemove(deviceIndex) with
 //            | (true,(c,cts)) ->

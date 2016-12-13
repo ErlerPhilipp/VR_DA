@@ -378,8 +378,10 @@ module LogicalScene =
                     else None
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
 //                printfn "%A: axisValue: %A" newTimeSinceStart axisValue
+                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
-//              Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
+//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, int 1000, axisValue)
+//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
 
                 { scene with
                     objects = newObjects
@@ -419,6 +421,8 @@ module LogicalScene =
                                 if scored then
                                     newScore <- newScore + 1
                                     printfn "Scored %A at %A" newScore scene.timeSinceStart
+                                    Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
+                                    Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
                                     Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
                                     Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     { o with 
