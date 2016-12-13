@@ -104,11 +104,12 @@ module Vibration =
             async {
                 do! Async.SwitchToNewThread()
                 while not cts.IsCancellationRequested do
+                    let sleepTimeMs = 5
                     semaphore.Wait(cts.Token)
                     let strength = lock l (fun () -> 
                         if not (l.IsEmpty()) then          
                             let durationUs, strength = l.[0]
-                            let newDurationUs = durationUs - 5000
+                            let newDurationUs = durationUs - sleepTimeMs * 1000
                             if newDurationUs > 0 then
                                 l.[0] <- (newDurationUs, strength)
                                 semaphore.Release() |> ignore
@@ -120,14 +121,13 @@ module Vibration =
                             failwith("List empty although semaphore released")
                     )
 
-                    if strength > 0.0 then
-                        let minDurationUs = 0us
-                        let maxDurationUs = 220us // empirical max strength
-                        let pulseDurationUs = Aardvark.Base.Fun.Lerp(strength, minDurationUs, maxDurationUs)
-                        triggerHapticPulse(deviceIndex, 0u, pulseDurationUs)
+                    let minDurationUs = 0us
+                    let maxDurationUs = 250us // empirical max strength
+                    let pulseDurationUs = Aardvark.Base.Fun.Lerp(strength, minDurationUs, maxDurationUs)
+                    triggerHapticPulse(deviceIndex, 0u, pulseDurationUs)
                             
-                        // no impulse possible in the next 5 ms
-                        do! Async.Sleep 5
+                    // according to docu: no impulse possible in the next 5 ms
+                    do! Async.Sleep sleepTimeMs
                 ()
             } 
             
@@ -137,11 +137,11 @@ module Vibration =
 
     let stopVibration(deviceIndex : uint32) =
         let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
-
+        
         lock l (fun () -> 
-            if not (l.IsEmpty()) then
-                semaphore.Wait()
-                l.RemoveAt 0
+            while semaphore.Wait(0) do
+                if not (l.IsEmpty()) then
+                        l.RemoveAt 0
         )
 
 //        match threads.TryRemove(deviceIndex) with
@@ -149,14 +149,14 @@ module Vibration =
 //                cts.Cancel()
 //            | _ -> failwith "cannot stop without start"
 
-    let vibrate(deviceIndex : uint32, durationUs : int, strength : float) =
+    let vibrate(deviceIndex : uint32, durationMs : int, strength : float) =
     
         let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
 
         lock l (fun () -> 
-            let newEvent = (durationUs, strength)
+            let newEvent = (durationMs * 1000, strength)
             l.Add newEvent
+            semaphore.Release() |> ignore
         )
-        semaphore.Release() |> ignore
         
-//        printfn "sem: %A, list count: %A" (semaphore.Release()) (l.Count)
+        printfn "sem: %A, list count: %A" (semaphore.CurrentCount) (l.Count)
