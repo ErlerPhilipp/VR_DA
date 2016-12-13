@@ -378,8 +378,8 @@ module LogicalScene =
                     else None
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
 //                printfn "%A: axisValue: %A" newTimeSinceStart axisValue
-//                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
-//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
+                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
+//              Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
 
                 { scene with
                     objects = newObjects
@@ -419,8 +419,8 @@ module LogicalScene =
                                 if scored then
                                     newScore <- newScore + 1
                                     printfn "Scored %A at %A" newScore scene.timeSinceStart
-                                    Vibration.triangularFunction(3, 60, 300, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
-                                    Vibration.triangularFunction(3, 60, 300, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
+                                    Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
+                                    Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     { o with 
                                         hasScored = true
                                     } 
@@ -430,7 +430,8 @@ module LogicalScene =
                         // check grabbable
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id
-                                if collidingWithController then 
+                                if collidingWithController then
+                                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, 1.0)
                                     { o with isGrabbable = true } 
                                 else 
                                     o

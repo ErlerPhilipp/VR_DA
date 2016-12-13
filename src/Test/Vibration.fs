@@ -104,17 +104,32 @@ module Vibration =
         
 //        printfn "sem: %A, list count: %A" (semaphore.CurrentCount) (l.Count)
 
-    let triangularFunction(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
-                           vibroType : VibrationEventType, deviceIndex : uint32, strength : float) = 
+    let periodicPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
+                       vibroType : VibrationEventType, deviceIndex : uint32, strength : float, strengthFunction : (float -> float)) = 
         for period in 0..numPeriods-1 do
             for impuls in 0..impulsesPerPeriod-1 do
                 let impulseDuration = periodDurationMs / impulsesPerPeriod
-                let triFunction (t : float) = 
-                    if t < 0.5 then
-                        strength * 2.0 * t
-                    else
-                        strength * 2.0 - strength * 2.0 * t
-
-                let currentStrength = triFunction(float impuls / float impulsesPerPeriod)
+                let currentStrength = strengthFunction(float impuls / float impulsesPerPeriod)
                 vibrate(vibroType, deviceIndex, impulseDuration, currentStrength)
+
+    let triangularFunctionPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
+                                 vibroType : VibrationEventType, deviceIndex : uint32, strength : float) = 
+        let triFunction (t : float) = 
+            if t < 0.5 then
+                strength * 2.0 * t
+            else
+                strength * 2.0 - strength * 2.0 * t
+        periodicPulses(numPeriods, impulsesPerPeriod, periodDurationMs, vibroType, deviceIndex, strength, triFunction)
+
+    let sawFunctionPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
+                          vibroType : VibrationEventType, deviceIndex : uint32, strength : float) = 
+        let triFunction (t : float) = 
+                strength * t
+        periodicPulses(numPeriods, impulsesPerPeriod, periodDurationMs, vibroType, deviceIndex, strength, triFunction)
+
+    let sinusiodFunctionPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
+                               vibroType : VibrationEventType, deviceIndex : uint32, strength : float) = 
+        let sinFunction (t : float) = 
+            1.0 - Fun.Cos(t * Constant.PiTimesTwo)
+        periodicPulses(numPeriods, impulsesPerPeriod, periodDurationMs, vibroType, deviceIndex, strength, sinFunction)
         
