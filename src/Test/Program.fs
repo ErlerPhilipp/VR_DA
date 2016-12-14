@@ -466,6 +466,11 @@ let main argv =
             rayCastHitPointSg   = rayCastHitPointSg
             rayCastHitAreaSg    = rayCastHitAreaSg
             rayCastCamSg        = rayCastCamSg
+            
+            ctr1VibStr          = 0.0
+            ctr1VibStrLastFrame = 0.0
+            ctr2VibStr          = 0.0
+            ctr2VibStrLastFrame = 0.0
         }
 
     let scene =

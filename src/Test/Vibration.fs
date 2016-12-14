@@ -32,9 +32,9 @@ module Vibration =
                 do! Async.SwitchToNewThread()
                 let stopwatch = System.Diagnostics.Stopwatch()
                 while not cts.IsCancellationRequested do
-                    nonEmpty.Wait(cts.Token)
                     stopwatch.Restart()
                     let sleepTimeMs = 5
+                    nonEmpty.Wait(cts.Token)
                     let strength = lock l (fun () -> 
                         if not (l.IsEmpty()) then
                             let vibroType, durationUs, strength = l.[0]

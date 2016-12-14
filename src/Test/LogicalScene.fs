@@ -133,6 +133,11 @@ module LogicalScene =
             rayCastHitAreaSg    : ISg
             rayCastHitPointSg   : ISg
             rayCastCamSg        : ISg
+            
+            ctr1VibStr          : float
+            ctr1VibStrLastFrame : float
+            ctr2VibStr          : float
+            ctr2VibStrLastFrame : float
         }
         
     type Message =
@@ -360,6 +365,8 @@ module LogicalScene =
                 { scene with 
                     objects = newObjects
                     scoreText = newText
+                    ctr1VibStr = 0.0
+                    ctr2VibStr = 0.0
                 }
 
             | TimeElapsed(dt) ->
@@ -394,20 +401,26 @@ module LogicalScene =
                     else None
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
 //                printfn "%A: axisValue: %A" newTimeSinceStart axisValue
-                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
+//                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
-//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, int 1000, axisValue)
-//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, axisValue)
+
+                if scene.ctr2VibStrLastFrame = 0.0 && scene.ctr2VibStr <> 0.0 then
+                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, int 100, 1.0)
+
+                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, scene.ctr2VibStr)
 
                 { scene with
                     objects = newObjects
                     trackingToWorld = newTrackingToWorld
                     deltaTime = dt.TotalSeconds
                     timeSinceStart = newTimeSinceStart
+                    ctr1VibStrLastFrame = scene.ctr1VibStr
+                    ctr2VibStrLastFrame = scene.ctr2VibStr
                 }
             
             | Collision (ghostId, colliderId) ->
                 let mutable newScore = scene.score
+                let mutable newCtr2VibStrength = scene.ctr2VibStr
                 let newObjects = 
                     scene.objects 
                         // hit upper hoop trigger
@@ -460,15 +473,16 @@ module LogicalScene =
                                         let velWithoutTrackingNoise = (max (vel - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
 
                                         let velocityToStrength = 0.8
-                                        let constVibrationOffset = 0.35
+                                        let constVibrationOffset = 0.25
                                         let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
 
                                         let clampedStrength = clamp 0.0 1.0 linearStrength
                                         clampedStrength
 
                                     let strength = velToStrength(relativeVel)
-//                                    printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
-                                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, strength)
+//                                     printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
+                                    if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
+
                                     { o with isGrabbable = true } 
                                 else 
                                     o
@@ -485,9 +499,11 @@ module LogicalScene =
                                 else 
                                     o
                             )
+                                 
                 { scene with 
                     objects = newObjects
                     score = newScore
+                    ctr2VibStr = newCtr2VibStrength
                 }
             | RayCastResult (hasHit, hitPoint, hitNormal) ->
                 { scene with 
