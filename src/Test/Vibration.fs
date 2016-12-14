@@ -30,11 +30,9 @@ module Vibration =
         let worker =
             async {
                 do! Async.SwitchToNewThread()
-
                 let stopwatch = System.Diagnostics.Stopwatch()
-                stopwatch.Start()
-
                 while not cts.IsCancellationRequested do
+                    stopwatch.Restart()
                     let sleepTimeMs = 5
                     semaphore.Wait(cts.Token)
                     let strength = lock l (fun () -> 
@@ -65,8 +63,6 @@ module Vibration =
                         
                     triggerHapticPulse(deviceIndex, 0u, pulseDurationUs)
 //                    printfn "%A: triggered pulse" stopwatch.Elapsed.TotalSeconds
-                    
-                    stopwatch.Restart()
                 ()
             } 
             
@@ -78,12 +74,11 @@ module Vibration =
         let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
         
         let mutable stoppedAll = false
-        let mutable stoppedOne = false
 
         while semaphore.Wait(0) && not stoppedAll do
             lock l (fun () -> 
                 let mutable index = 0
-                stoppedOne <- false
+                let mutable stoppedOne = false
                 while index < l.Count && not stoppedOne do
                     let vibroType, durationUs, strength = l.[index]
                     if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
@@ -92,6 +87,7 @@ module Vibration =
                     else
                         index <- index + 1
                 stoppedAll <- not stoppedOne
+                if stoppedAll then semaphore.Release() |> ignore
             )
 
 //        match threads.TryRemove(deviceIndex) with
@@ -109,7 +105,7 @@ module Vibration =
             semaphore.Release() |> ignore
         )
         
-//        printfn "sem: %A, list count: %A" (semaphore.CurrentCount) (l.Count)
+//        printfn "dev: %A, sem: %A, list count: %A" deviceIndex (semaphore.CurrentCount) (l.Count)
 
     let periodicPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
                        vibroType : VibrationEventType, deviceIndex : uint32, strength : float, strengthFunction : (float -> float)) = 
@@ -137,6 +133,6 @@ module Vibration =
     let sinusiodFunctionPulses(numPeriods : int, impulsesPerPeriod : int, periodDurationMs : int, 
                                vibroType : VibrationEventType, deviceIndex : uint32, strength : float) = 
         let sinFunction (t : float) = 
-            1.0 - Fun.Cos(t * Constant.PiTimesTwo)
+            0.5 + (Fun.Cos(t * Constant.PiTimesTwo) / 2.0) 
         periodicPulses(numPeriods, impulsesPerPeriod, periodDurationMs, vibroType, deviceIndex, strength, sinFunction)
         
