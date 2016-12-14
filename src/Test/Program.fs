@@ -133,17 +133,16 @@ let main argv =
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
     let boxSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
-    let groundNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", true) :> ITexture))
-    let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture groundNormalSampler
+    let textureParam = { TextureParams.empty with wantMipMaps = true }
+    let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", textureParam) :> ITexture))
+    let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", textureParam) :> ITexture))
+    let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", textureParam) :> ITexture))
+    let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", textureParam) :> ITexture))
 
-    let ceilingNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", true) :> ITexture))
-    let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture ceilingNormalSampler
-
-    let wallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", true) :> ITexture))
-    let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture wallNormalSampler
-
-    let goalRoomWallNormalSampler = (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", true) :> ITexture))
-    let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture goalRoomWallNormalSampler
+    let groundDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg", textureParam) :> ITexture))
+    let ceilingDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg", textureParam) :> ITexture))
+    let wallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
+    let goalRoomWallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg", textureParam) :> ITexture))
 
     let rayCastHitPointSg = rayCastPointSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastHitAreaSg = rayCastAreaSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
@@ -200,7 +199,7 @@ let main argv =
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = groundSg 
                         |> normalDiffuseEffect 
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
+                        |> groundDiffuseTexture
                         |> groundNormalMap
             tilingFactor = V2d(groundTilingFactor * trackingAreaSize)
             collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
@@ -213,7 +212,7 @@ let main argv =
             trafo = Trafo3d.Translation(0.0, trackingAreaHight - 1.5 * wallThickness, 0.0)
             model = ceilingSg 
                         |> normalDiffuseEffect 
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg" true
+                        |> ceilingDiffuseTexture
                         |> ceilingNormalMap
             tilingFactor = V2d(ceilingTilingFactor * trackingAreaSize)
             collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
@@ -224,7 +223,7 @@ let main argv =
             castsShadow = true
             model = wallSg
                         |> normalDiffuseEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true
+                        |> wallDiffuseTexture
                         |> wallNormalMap
             tilingFactor = V2d(0.25 * trackingAreaSize)
         }
@@ -263,7 +262,7 @@ let main argv =
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
             model = goalRoomGroundSg 
                         |> normalDiffuseEffect 
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg" true
+                        |> groundDiffuseTexture
                         |> groundNormalMap
             tilingFactor = V2d(groundTilingFactor * goalAreaSize)
             collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
@@ -276,7 +275,7 @@ let main argv =
             trafo = Trafo3d.Translation(0.0, goalAreaHight - 1.5 * wallThickness, 0.0) * goalRoomOffset
             model = goalRoomCeilingSg 
                         |> normalDiffuseEffect 
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg" true
+                        |> ceilingDiffuseTexture
                         |> ceilingNormalMap
             tilingFactor = V2d(ceilingTilingFactor * goalAreaSize)
             collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
@@ -287,7 +286,7 @@ let main argv =
             castsShadow = false
             model = goalRoomWallSg
                         |> normalDiffuseEffect
-                        |> Sg.diffuseFileTexture' @"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg" true
+                        |> goalRoomWallDiffuseTexture
                         |> goalRoomWallNormalMap
             tilingFactor = V2d(0.5 * goalAreaSize)
         }
@@ -324,7 +323,9 @@ let main argv =
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             trafo = Trafo3d.Identity
-            model = ballSg |> ballEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\basketball\balldimpled.png" true
+            model = ballSg 
+                        |> ballEffect 
+                        |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
             mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             ccdSpeedThreshold = 0.1f
@@ -336,7 +337,10 @@ let main argv =
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
-            model = boxSg |> boxEffect |> Sg.diffuseFileTexture' @"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg" true |> wallNormalMap
+            model = boxSg 
+                        |> boxEffect 
+                        |> wallNormalMap
+                        |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
             mass = 0.625f
             collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box )
             restitution = 0.1f
