@@ -18,39 +18,39 @@ module Vibration =
 
     type private VibrationEvent = VibrationEventType * int * float // duration in microsec, strength
 
-    let private threads = ConcurrentDictionary<uint32, List<VibrationEvent>*CancellationTokenSource*SemaphoreSlim>()
+    let private threads = ConcurrentDictionary<uint32, List<VibrationEvent>*CancellationTokenSource*ManualResetEventSlim>()
 
     let private triggerHapticPulse(deviceIndex : uint32, axis : uint32, durationUs : uint16) = 
         OpenVR.System.TriggerHapticPulse(deviceIndex, axis, char durationUs)
         
     let private vibrationThread (deviceIndex : uint32) =
         let l = List<VibrationEvent>()
-        let semaphore = new SemaphoreSlim(0)
+        let nonEmpty = new ManualResetEventSlim(false)
         let cts = new System.Threading.CancellationTokenSource()
         let worker =
             async {
                 do! Async.SwitchToNewThread()
                 let stopwatch = System.Diagnostics.Stopwatch()
                 while not cts.IsCancellationRequested do
+                    nonEmpty.Wait(cts.Token)
                     stopwatch.Restart()
                     let sleepTimeMs = 5
-                    semaphore.Wait(cts.Token)
                     let strength = lock l (fun () -> 
                         if not (l.IsEmpty()) then
                             let vibroType, durationUs, strength = l.[0]
                             let newDurationUs = durationUs - sleepTimeMs * 1000
                             if newDurationUs > 0 then
                                 l.[0] <- (vibroType, newDurationUs, strength)
-                                semaphore.Release() |> ignore
                             else
                                 l.RemoveAt(0)
+                                if l.Count = 0 then nonEmpty.Reset()
                                     
                             strength
                         else
                             printfn "List empty although semaphore released"
                             0.0
                     )
-
+     
                     let minDurationUs = 0us
                     let maxDurationUs = 250us // empirical max strength
                     let pulseDurationUs = Aardvark.Base.Fun.Lerp(strength, minDurationUs, maxDurationUs)
@@ -68,27 +68,21 @@ module Vibration =
             
         Async.Start(worker,cts.Token)
 
-        l, cts, semaphore
+        l, cts, nonEmpty
 
     let stopVibration(vibroTypeToStop : VibrationEventType, deviceIndex : uint32) =
-        let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
+        let l,_,nonEmpty = threads.GetOrAdd(deviceIndex, vibrationThread)
         
-        let mutable stoppedAll = false
-
-        while semaphore.Wait(0) && not stoppedAll do
-            lock l (fun () -> 
-                let mutable index = 0
-                let mutable stoppedOne = false
-                while index < l.Count && not stoppedOne do
-                    let vibroType, durationUs, strength = l.[index]
-                    if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
-                        l.RemoveAt index
-                        stoppedOne <- true
-                    else
-                        index <- index + 1
-                stoppedAll <- not stoppedOne
-                if stoppedAll then semaphore.Release() |> ignore
-            )
+        lock l (fun () -> 
+            let mutable index = 0
+            while index < l.Count do
+                let vibroType, durationUs, strength = l.[index]
+                if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
+                    l.RemoveAt index
+                else
+                    index <- index + 1
+            if l.Count = 0 then nonEmpty.Reset()
+        )
 
 //        match threads.TryRemove(deviceIndex) with
 //            | (true,(c,cts)) ->
@@ -97,12 +91,12 @@ module Vibration =
 
     let vibrate(vibroType : VibrationEventType, deviceIndex : uint32, durationMs : int, strength : float) =
     
-        let l,_,semaphore = threads.GetOrAdd(deviceIndex, vibrationThread)
+        let l,_,nonEmpty = threads.GetOrAdd(deviceIndex, vibrationThread)
 
         lock l (fun () -> 
             let newEvent = (vibroType, durationMs * 1000, strength)
             l.Add newEvent
-            semaphore.Release() |> ignore
+            nonEmpty.Set()
         )
         
 //        printfn "dev: %A, sem: %A, list count: %A" deviceIndex (semaphore.CurrentCount) (l.Count)
