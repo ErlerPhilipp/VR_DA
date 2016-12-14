@@ -69,7 +69,6 @@ module PhysicsScene =
 
                     let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
                         if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
-                        collObj.UserObject <- o
                         collObj.UserIndex <- o.id
                         collObj.Friction <- float32 o.friction
                         collObj.RollingFriction <- float32 o.rollingFriction
@@ -114,6 +113,7 @@ module PhysicsScene =
                         | ObjectTypes.Ghost ->
                             let ghost = new BulletSharp.PairCachingGhostObject()
                             setProperties(ghost, o)
+                            ghost.CollisionFlags <- ghost.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
                             scene.dynamicsWorld.AddCollisionObject(ghost)
                             { 
                                 original = o
@@ -280,7 +280,10 @@ module PhysicsScene =
                 let mutable oldGravity = Vector3.Zero
                 pw.dynamicsWorld.GetGravity(&oldGravity)
                 let newGravity = toVector3 s.gravity
-                if oldGravity <> newGravity then pw.dynamicsWorld.SetGravity(ref newGravity)
+                if oldGravity <> newGravity then 
+                    pw.dynamicsWorld.SetGravity(ref newGravity)
+                    for co in pw.dynamicsWorld.CollisionObjectArray do
+                        co.Activate()
 
                 if s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.DrawWireframe then 
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.DrawWireframe
@@ -311,9 +314,9 @@ module PhysicsScene =
                                     b.original
                             
                             match b.collisionObject with
-                                | CollisionObject.Ghost ghostObject -> 
+                                | CollisionObject.Ghost ghost -> 
                                     // see Bullet3\src\BulletDynamics\Character\btCharacterController.cpp line ~220
-                                    let overlappingPairs = ghostObject.OverlappingPairCache.OverlappingPairArray
+                                    let overlappingPairs = ghost.OverlappingPairCache.OverlappingPairArray
                                     for pairIndex in 0..(overlappingPairs.Count - 1) do
                                         let broadphasePair = overlappingPairs.[pairIndex]
                                         let collisionPair = world.dynamicsWorld.PairCache.FindPair(broadphasePair.Proxy0, broadphasePair.Proxy1)
@@ -321,9 +324,11 @@ module PhysicsScene =
                                         let obj0 = collisionPair.Proxy0.ClientObject :?> BulletSharp.CollisionObject
                                         let obj1 = collisionPair.Proxy1.ClientObject :?> BulletSharp.CollisionObject
 
-                                        let firstBodyIsGhost = obj0 = (ghostObject :> BulletSharp.CollisionObject)
+                                        let firstBodyIsGhost = obj0 = (ghost :> BulletSharp.CollisionObject)
                                         let collidingBody = if firstBodyIsGhost then obj1 else obj0
-                                        let collidingObject = collidingBody.UserObject :?> Object
+                                        let collidingObjectId = collidingBody.UserIndex
+                                        let ghostBody = if firstBodyIsGhost then obj0 else obj1
+                                        let ghostObjectId = ghostBody.UserIndex
                                         
                                         let mutable hasContact = false
 
@@ -335,7 +340,7 @@ module PhysicsScene =
                                             for manifoldIndex in 0..(contactManifoldArray.Count - 1) do
                                                 if not hasContact then
                                                     let manifold = contactManifoldArray.[manifoldIndex]
-                                                    let firstBodyIsGhost = manifold.Body0 = (ghostObject :> BulletSharp.CollisionObject)
+                                                    let firstBodyIsGhost = manifold.Body0 = (ghost :> BulletSharp.CollisionObject)
                                                     let directionSign = if firstBodyIsGhost then -1.0f else 1.0f
 
                                                     let numContactPoints = manifold.NumContacts
@@ -348,7 +353,7 @@ module PhysicsScene =
                                                                 hasContact <- true
 
                                             if hasContact then
-                                                messages.Add (Collision(transformedObject, collidingObject, toV3d collidingBody.InterpolationLinearVelocity))
+                                                messages.Add (Collision(ghostObjectId, collidingObjectId))
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects

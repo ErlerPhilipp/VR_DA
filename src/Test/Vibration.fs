@@ -94,17 +94,6 @@ module Vibration =
                 stoppedAll <- not stoppedOne
             )
 
-//        lock l (fun () -> 
-//            let mutable index = 0
-//            while index < l.Count do
-//                let vibroType, durationUs, strength = l.[index]
-//                if vibroTypeToStop = VibrationEventType.All || vibroType = vibroTypeToStop then
-//                    let entered = semaphore.Wait(0)
-//                    l.RemoveAt index
-//                else
-//                    index <- index + 1
-//        )
-
 //        match threads.TryRemove(deviceIndex) with
 //            | (true,(c,cts)) ->
 //                cts.Cancel()

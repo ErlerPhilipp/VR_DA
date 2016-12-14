@@ -144,22 +144,38 @@ module LogicalScene =
         | StartFrame
         | TimeElapsed of System.TimeSpan
         | UpdateViewTrafo of Trafo3d
-        | Collision of Object * Object * V3d
+        | Collision of int * int
         | RayCastResult of bool * V3d * V3d
         
-    let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>) = 
+    let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>, dt : float) = 
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
-                {o with trafo = t}
+                let newTrafo = t
+                if o.objectType = ObjectTypes.Ghost then
+                    let linVel = (newTrafo.Forward.TransformPos(V3d()) - o.trafo.Forward.TransformPos(V3d())) / dt
+                    {o with 
+                        trafo = newTrafo
+                        linearVelocity = linVel
+                    }
+                else
+                    {o with trafo = newTrafo}
             else
                 o
             ) 
         newObjects
 
-    let transformTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>) = 
+    let transformTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : pset<Object>, dt : float) = 
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
-                {o with trafo = o.trafo * t}
+                let newTrafo = o.trafo * t
+                if o.objectType = ObjectTypes.Ghost then
+                    let linVel = (newTrafo.Forward.TransformPos(V3d()) - o.trafo.Forward.TransformPos(V3d())) / dt
+                    {o with 
+                        trafo = newTrafo
+                        linearVelocity = linVel
+                    }
+                else
+                    {o with trafo = newTrafo}
             else
                 o
             ) 
@@ -186,13 +202,13 @@ module LogicalScene =
 
         match message with
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
-                let newObjects = setTrafoOfObjectsWithId(scene.headId, t, scene.objects)
+                let newObjects = setTrafoOfObjectsWithId(scene.headId, t, scene.objects, scene.deltaTime)
                 { scene with 
                     objects = newObjects
                     viewTrafo = t.Inverse
                 }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.controller1Id ->
-                let newObjects = setTrafoOfObjectsWithId(scene.controller1ObjectId, t, scene.objects)
+                let newObjects = setTrafoOfObjectsWithId(scene.controller1ObjectId, t, scene.objects, scene.deltaTime)
                 let direction = t.Forward.TransformDir(V3d.OOI)
                 let rayCastStart = t.Forward.TransformPos(V3d())
                 
@@ -215,7 +231,7 @@ module LogicalScene =
                     | VrInteractionTechnique.VirtualHand ->
                         let virtualHandTrafo = t
                         let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
-                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
+                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects, scene.deltaTime)
                                          |> PersistentHashSet.map (fun a ->
                                             if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                                          )
@@ -228,7 +244,7 @@ module LogicalScene =
                         let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.trackingToWorld)
                         let virtualHandPos = virtualHandTrafo.Forward.TransformPos(V3d.OOO)
                         let deltaTrafo = scene.lastContr2Trafo.Inverse * virtualHandTrafo
-                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects)
+                        let newObjects = setTrafoOfObjectsWithId(scene.controller2ObjectId, virtualHandTrafo, scene.objects, scene.deltaTime)
                                          |> PersistentHashSet.map (fun a ->
                                             if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                                          )
@@ -244,10 +260,10 @@ module LogicalScene =
                         }
                     | _ -> failwith "Not implemented"
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
-                let newObjects = setTrafoOfObjectsWithId(scene.cam1ObjectId, t, scene.objects)
+                let newObjects = setTrafoOfObjectsWithId(scene.cam1ObjectId, t, scene.objects, scene.deltaTime)
                 { scene with objects = newObjects }
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam2Id ->
-                let newObjects = setTrafoOfObjectsWithId(scene.cam2ObjectId, t, scene.objects)
+                let newObjects = setTrafoOfObjectsWithId(scene.cam2ObjectId, t, scene.objects, scene.deltaTime)
                 { scene with objects = newObjects }
 
             | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller2Id && a = 0 ->
@@ -390,13 +406,13 @@ module LogicalScene =
                     timeSinceStart = newTimeSinceStart
                 }
             
-            | Collision (ghost, collider, colliderLinearVelocity) ->
+            | Collision (ghostId, colliderId) ->
                 let mutable newScore = scene.score
                 let newObjects = 
                     scene.objects 
                         // hit upper hoop trigger
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithUpperHoop = ghost.id = scene.upperHoopTriggerId && o.id = collider.id
+                                let collidingWithUpperHoop = ghostId = scene.upperHoopTriggerId && o.id = colliderId
                                 let hitUpperTrigger = collidingWithUpperHoop && not o.hitUpperTrigger && not o.hitLowerTrigger && not o.isGrabbed && o.linearVelocity.Y < 0.0
                                 if hitUpperTrigger then
                                     //printfn "hit upper trigger at %A" scene.timeSinceStart
@@ -406,7 +422,7 @@ module LogicalScene =
                             )
                         // hit lower hoop trigger
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithLowerHoop = ghost.id = scene.lowerHoopTriggerId && o.id = collider.id
+                                let collidingWithLowerHoop = ghostId = scene.lowerHoopTriggerId && o.id = colliderId
                                 let hitLowerTrigger = collidingWithLowerHoop && not o.hitLowerTrigger && not o.isGrabbed
                                 if hitLowerTrigger then
                                     //printfn "hit lower trigger at %A" scene.timeSinceStart
@@ -416,7 +432,7 @@ module LogicalScene =
                             )
                         // check score
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithLowerHoop = ghost.id = scene.lowerHoopTriggerId && o.id = collider.id
+                                let collidingWithLowerHoop = ghostId = scene.lowerHoopTriggerId && o.id = colliderId
                                 let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
                                 if scored then
                                     newScore <- newScore + 1
@@ -433,16 +449,33 @@ module LogicalScene =
                             )
                         // check grabbable
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithController = ghost.id = scene.controller2ObjectId && o.id = collider.id
+                                let collidingWithController = ghostId = scene.controller2ObjectId && o.id = colliderId
                                 if collidingWithController then
-                                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, 1.0)
+                                    let ghostLinearVelocity = getObjectWithId(ghostId, scene.objects).linearVelocity
+                                    let colliderLinearVelocity = o.linearVelocity
+                                    let relativeVel = (ghostLinearVelocity - colliderLinearVelocity).Length
+
+                                    let velToStrength(vel : float) = 
+                                        let maxTrackingNoiseLevel = 0.1
+                                        let velWithoutTrackingNoise = (max (vel - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
+
+                                        let velocityToStrength = 0.8
+                                        let constVibrationOffset = 0.35
+                                        let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
+
+                                        let clampedStrength = clamp 0.0 1.0 linearStrength
+                                        clampedStrength
+
+                                    let strength = velToStrength(relativeVel)
+//                                    printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
+                                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, strength)
                                     { o with isGrabbable = true } 
                                 else 
                                     o
                             )
                         // check reset on ground
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithGround = ghost.id = scene.groundObjectId && o.id = collider.id && o.isManipulable && not o.willReset && not o.isGrabbed
+                                let collidingWithGround = ghostId = scene.groundObjectId && o.id = colliderId && o.isManipulable && not o.willReset && not o.isGrabbed
                                 let resetDelay = 3.0
                                 if collidingWithGround then 
                                     { o with 
