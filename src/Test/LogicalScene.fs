@@ -302,7 +302,6 @@ module LogicalScene =
                     scene
                     
             | DeviceTouch(deviceId, a, t) when deviceId = assignedInputs.controller2Id && a = 1 ->
-                
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o ->
@@ -400,14 +399,21 @@ module LogicalScene =
                         Some (V2d(state.[1].x, state.[1].y))
                     else None
                 let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
-//                printfn "%A: axisValue: %A" newTimeSinceStart axisValue
-//                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
+//                let duration = uint16 (axisValue * 1999.0)
+//                printfn "%A: duration: %A" newTimeSinceStart duration
+
+                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
 
+                // hit object
                 if scene.ctr2VibStrLastFrame = 0.0 && scene.ctr2VibStr <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, int 100, 1.0)
-
-                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, int 1000, scene.ctr2VibStr)
+                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
+                    
+//                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, int 1000, axisValue)
+                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.ctr2VibStr)
+                
+                Vibration.updateVibration(uint32 assignedInputs.controller1Id, dt.TotalSeconds)
+                Vibration.updateVibration(uint32 assignedInputs.controller2Id, dt.TotalSeconds)
 
                 { scene with
                     objects = newObjects
@@ -452,8 +458,8 @@ module LogicalScene =
                                     printfn "Scored %A at %A" newScore scene.timeSinceStart
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
-                                    Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
-                                    Vibration.sinusiodFunctionPulses(5, 60, 300, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
+                                    Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
+                                    Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     { o with 
                                         hasScored = true
                                     } 
@@ -472,8 +478,8 @@ module LogicalScene =
                                         let maxTrackingNoiseLevel = 0.1
                                         let velWithoutTrackingNoise = (max (vel - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
 
-                                        let velocityToStrength = 0.8
-                                        let constVibrationOffset = 0.25
+                                        let velocityToStrength = 0.6
+                                        let constVibrationOffset = 0.1
                                         let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
 
                                         let clampedStrength = clamp 0.0 1.0 linearStrength

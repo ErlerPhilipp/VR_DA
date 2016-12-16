@@ -186,7 +186,7 @@ namespace Valve.VR
         internal _GetControllerStateWithPose GetControllerStateWithPose;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate void _TriggerHapticPulse(uint unControllerDeviceIndex, uint unAxisId, char usDurationMicroSec);
+        internal delegate void _TriggerHapticPulse(uint unControllerDeviceIndex, uint unAxisId, ushort usDurationMicroSec);
         [MarshalAs(UnmanagedType.FunctionPtr)]
         internal _TriggerHapticPulse TriggerHapticPulse;
 
@@ -1583,7 +1583,7 @@ namespace Valve.VR
             bool result = FnTable.GetControllerStateWithPose(eOrigin, unControllerDeviceIndex, ref pControllerState, ref pTrackedDevicePose);
             return result;
         }
-        public void TriggerHapticPulse(uint unControllerDeviceIndex, uint unAxisId, char usDurationMicroSec)
+        public void TriggerHapticPulse(uint unControllerDeviceIndex, uint unAxisId, ushort usDurationMicroSec)
         {
             FnTable.TriggerHapticPulse(unControllerDeviceIndex, unAxisId, usDurationMicroSec);
         }
