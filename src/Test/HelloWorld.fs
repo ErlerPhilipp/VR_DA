@@ -47,12 +47,23 @@ module VRTest =
                 //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
                 @"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0)
             ]
+
+        let assimpFlags = 
+            Assimp.PostProcessSteps.CalculateTangentSpace |||
+            Assimp.PostProcessSteps.GenerateSmoothNormals |||
+            //Assimp.PostProcessSteps.FixInFacingNormals ||| 
+            //Assimp.PostProcessSteps.JoinIdenticalVertices |||
+            Assimp.PostProcessSteps.FindDegenerates |||
+            //Assimp.PostProcessSteps.FlipUVs |||
+            //Assimp.PostProcessSteps.FlipWindingOrder |||
+            Assimp.PostProcessSteps.MakeLeftHanded ||| 
+            Assimp.PostProcessSteps.Triangulate
+   
                    
         let scene =
             let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
-   
             models
-                |> List.map (fun (file, trafo) -> file |> Loader.Assimp.load |> Sg.AdapterNode |> Sg.transform (flip * trafo))
+                |> List.map (fun (file, trafo) -> Loader.Assimp.load(assimpFlags, file) |> Sg.AdapterNode |> Sg.transform (flip * trafo))
                 |> Sg.ofList
                 |> Sg.effect [
                     DefaultSurfaces.trafo |> toEffect

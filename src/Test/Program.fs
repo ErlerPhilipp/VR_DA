@@ -57,6 +57,11 @@ let main argv =
                         DefaultSurfaces.vertexColor |> toEffect
                         DefaultSurfaces.thickLine |> toEffect
                     ]
+    let diffuseEffect = Sg.effect [
+                                    defaultTrafoEffect
+                                    defaultDiffuseTextureEffect
+                                    Lighting.Effect false
+                                ]
     let normalDiffuseEffect = Sg.effect [
                                     defaultTrafoEffect
                                     TextureTiling.Effect
@@ -108,10 +113,45 @@ let main argv =
             //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(0.0, 0.0, 0.0), Mass 100.0f, None, 0.5f
             //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
+    let textureParam = { TextureParams.empty with wantMipMaps = true }
+    let assimpFlagsSteamVR = 
+        Assimp.PostProcessSteps.None
+        
+    let assimpFlags = 
+        Assimp.PostProcessSteps.CalculateTangentSpace |||
+        Assimp.PostProcessSteps.GenerateSmoothNormals |||
+        //Assimp.PostProcessSteps.FixInFacingNormals ||| 
+        //Assimp.PostProcessSteps.JoinIdenticalVertices |||
+//        Assimp.PostProcessSteps.FindDegenerates |||
+        //Assimp.PostProcessSteps.FlipUVs |||
+        //Assimp.PostProcessSteps.FlipWindingOrder |||
+        Assimp.PostProcessSteps.MakeLeftHanded ||| 
+        Assimp.PostProcessSteps.Triangulate
+   
 
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
-    let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox) 
+    let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox)
+    let controllerSg = 
+        let controllerBody = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerButton = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\buttontri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerLGrip = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\lgriptri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerRGrip = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\rgriptri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerSysButton = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerTrackpad = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerTrigger = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger ]
+            |> Sg.group :> ISg
+            |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
+            |> diffuseEffect
+
+    let basestationSg = 
+        (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\lh_basestation_vive\basestationtri.obj")
+            |> Loader.Assimp.load
+            |> Sg.AdapterNode :> ISg
+            |> diffuseEffect 
+            |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\lh_basestation_vive\lh_basestation_vive.png", textureParam) :> ITexture))
+            
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
@@ -133,7 +173,6 @@ let main argv =
     let objectBox = Box3d.FromCenterAndSize(V3d.OOO, objectBoxEdgeLength * V3d.III)
     let boxSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant objectBox)
 
-    let textureParam = { TextureParams.empty with wantMipMaps = true }
     let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", textureParam) :> ITexture))
     let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", textureParam) :> ITexture))
     let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", textureParam) :> ITexture))
@@ -152,7 +191,7 @@ let main argv =
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-            model = Sg.ofList [handSg |> constColorEffect; beamSg |> beamEffect]
+            model = Sg.ofList [controllerSg |> constColorEffect; beamSg |> beamEffect]
             isColliding = false
         }
     let rightHandObject = 
@@ -160,7 +199,7 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Ghost
             trafo = Trafo3d.Identity
-            model = handSg |> virtualHandEffect
+            model = controllerSg |> virtualHandEffect
             collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
             isColliding = false
         }
@@ -168,7 +207,7 @@ let main argv =
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-            model = handSg |> constColorEffect
+            model = basestationSg
             isColliding = false
         }
     let camObject2 = 
@@ -383,7 +422,7 @@ let main argv =
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
             l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
-                    let assimpScene : Loader.Scene = file |> Loader.Assimp.load 
+                    let assimpScene : Loader.Scene = (assimpFlags, file) |> Loader.Assimp.load 
                     let triangles = createShape trafo assimpScene.root
                     let bounds = triangles |> Seq.collect (fun t -> [t.P0; t.P1; t.P2]) |> Box3d
 

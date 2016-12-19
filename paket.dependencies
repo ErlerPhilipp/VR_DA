@@ -13,6 +13,8 @@ nuget Aardvark.Rendering.Text              ~> 2.6.1
 
 nuget BulletSharp
 
+nuget FShade = 2.3.5
+
 group Build
 content: none
 source https://vrvis.myget.org/F/aardvark_public/api/v3/index.json
