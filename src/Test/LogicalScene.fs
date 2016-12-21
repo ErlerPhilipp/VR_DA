@@ -164,12 +164,13 @@ module LogicalScene =
             rayCastHasHit       : bool
             rayCastHitPoint     : V3d
             rayCastHitNormal    : V3d
+            rayCastDirSg        : ISg
             rayCastHitAreaSg    : ISg
             rayCastHitPointSg   : ISg
             rayCastCamSg        : ISg
         }
 
-    let DefaultRaycastInfo (rayCastHitPointSg : ISg, rayCastHitAreaSg : ISg, rayCastCamSg : ISg) = 
+    let DefaultRaycastInfo (rayCastDirSg : ISg, rayCastHitPointSg : ISg, rayCastHitAreaSg : ISg, rayCastCamSg : ISg) = 
         {
             wantsRayCast        = false
             rayCastStart        = V3d()
@@ -177,6 +178,7 @@ module LogicalScene =
             rayCastHasHit       = false
             rayCastHitPoint     = V3d()
             rayCastHitNormal    = V3d()
+            rayCastDirSg        = rayCastDirSg
             rayCastHitPointSg   = rayCastHitPointSg
             rayCastHitAreaSg    = rayCastHitAreaSg
             rayCastCamSg        = rayCastCamSg

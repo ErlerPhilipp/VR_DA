@@ -64,7 +64,7 @@
     <Compile Include="Vibration.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
-    <Compile Include="ShadowVolumes.fs" />
+    <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
     <Compile Include="SGHelper.fs" />
     <Compile Include="Program.fs" />

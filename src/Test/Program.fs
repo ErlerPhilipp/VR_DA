@@ -191,7 +191,8 @@ let main argv =
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-            model = Sg.ofList [controllerSg |> constColorEffect; beamSg |> beamEffect]
+//            model = Sg.ofList [controllerSg |> constColorEffect; beamSg |> beamEffect]
+            model = Sg.ofList [controllerSg |> constColorEffect]
             isColliding = false
         }
     let rightHandObject = 
@@ -485,7 +486,7 @@ let main argv =
             interactionInfo = DefaultInteractionInfo
             gameInfo = DefaultGameInfo(scoreTrafo)
             physicsInfo = DefaultPhysicsInfo
-            raycastInfo = DefaultRaycastInfo(rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
+            raycastInfo = DefaultRaycastInfo(beamSg |> beamEffect, rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
             vibrationInfo = DefaultVibrationInfo
         }
 

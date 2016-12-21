@@ -8,10 +8,11 @@ open Aardvark.Base.Rendering
 open Aardvark.Rendering.Text
 open Aardvark.SceneGraph
 
-open ShadowVolumes
+open OmnidirShadows
 
 module GraphicsScene =
     open LogicalScene
+//    open OmnidirShadows
     open VrInteractions
     open VrWindow
 
@@ -38,6 +39,7 @@ module GraphicsScene =
             mhasRayCastHit      : ModRef<bool>
             mdrawHitPoint       : ModRef<bool>
             mdrawHitArea        : ModRef<bool>
+            mhasRayCastDir      : ModRef<Trafo3d>
             mrayCastHitTrafo    : ModRef<Trafo3d>
             mrayCastCam         : ModRef<Trafo3d>
         }
@@ -70,10 +72,11 @@ module GraphicsScene =
 
                 mscoreTrafo         = Mod.init s.gameInfo.scoreTrafo
                 mscoreText          = Mod.init s.gameInfo.scoreText
-
+                
                 mhasRayCastHit      = Mod.init s.raycastInfo.rayCastHasHit
                 mdrawHitPoint       = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
                 mdrawHitArea        = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
+                mhasRayCastDir      = Mod.init (LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
                 mrayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
                 mrayCastCam         = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
             }
@@ -119,8 +122,21 @@ module GraphicsScene =
                 let recenter = s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
                 let newTrackingToWorld = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdWorldTrafo, s.raycastInfo.rayCastHitPoint, s.raycastInfo.rayCastHitNormal, recenter)
                 ms.mrayCastCam.Value <- (hmdWorldTrafo * s.trackingToWorld.Inverse * newTrackingToWorld)
+                ms.mhasRayCastDir.Value <- (LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
                 ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.raycastInfo.rayCastHitPoint) else newTrackingToWorld
             
+    // renders the shadows to a texture
+//    let private renderShadows (runtime : IRuntime) (shadowCasterSg : ISg) =
+//        
+//        let trafo = OmnidirShadows.lightSpaceViewProjTrafo s
+//        let cullBack = Mod.constant CullMode.Clockwise
+//
+//        let texture =
+//            shadowCasterSg
+//                |> Sg.cullMode cullBack
+//                |> OmnidirShadows.createTexture runtime s 
+//
+//        (texture, trafo)
 
     let createScene (initialScene : Scene) (win : VrWindow) =
         let mutable scene = initialScene
@@ -190,6 +206,7 @@ module GraphicsScene =
                     |> Sg.uniform "scoredState" t.mscoredState
                     |> Sg.uniform "tilingFactor" t.mtilingFactor
                     |> Sg.trafo t.mtrafo
+                    |> Sg.effect [DefaultSurfaces.trafo |> toEffect]
             else
                 Sg.ofList []
 
@@ -200,18 +217,22 @@ module GraphicsScene =
 
         let sgs = 
             objectsInScene
-//                |> Sg.fillMode ShadowVolumes.mode
-//                |> Sg.andAlso (ShadowVolumes.shadows (shadowCasterInScene))
                 |> Sg.uniform "LightLocation" mscene.mlightPos
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
                 |> Sg.blendMode(Mod.constant (BlendMode(false)))
 
+        let newSg = OmnidirShadows.init(win, shadowCasterInScene, sgs)
+
         let textSg =
 //            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red mscene.mscoreText :> ISg
             Sg.markdown MarkdownConfig.light mscene.mscoreText
                 |> Sg.trafo mscene.mscoreTrafo
+                
+        let rayCastDirSg =
+            initialScene.raycastInfo.rayCastDirSg
+                |> Sg.trafo mscene.mhasRayCastDir
                 
         let rayCastHitPointSg =
             initialScene.raycastInfo.rayCastHitPointSg
@@ -231,5 +252,5 @@ module GraphicsScene =
                 |> Sg.onOff mscene.mhasRayCastHit
                 
         // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList [sgs; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
+        Sg.ofList [newSg; rayCastDirSg; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
             |> Sg.viewTrafo mscene.mviewTrafo
