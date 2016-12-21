@@ -461,13 +461,8 @@ let main argv =
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
         @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
         
-    let sceneObj =
+    let specialObjectIds =
         {
-            objects             = PersistentHashSet.ofList objects
-            viewTrafo           = Trafo3d.Identity
-            lastContr2Trafo     = Trafo3d.Identity
-            trackingToWorld     = Trafo3d.Identity
-
             cam1ObjectId        = camObject1.id
             cam2ObjectId        = camObject2.id
             controller1ObjectId = leftHandObject.id
@@ -477,39 +472,21 @@ let main argv =
             lowerHoopTriggerId  = lowerHoopTrigger.id
             upperHoopTriggerId  = upperHoopTrigger.id
             groundObjectId      = goalRoomGroundObject.id
+        }
 
-            interactionType     = VrInteractions.VrInteractionTechnique.VirtualHand
-            armExtensionFactor  = 1.0
-            movementType        = VrInteractions.VrMovementTechnique.Flying
-            moveDirection       = V3d.Zero
+    let sceneObj =
+        {
+            objects             = PersistentHashSet.ofList objects
+            viewTrafo           = Trafo3d.Identity
+            lastContr2Trafo     = Trafo3d.Identity
+            trackingToWorld     = Trafo3d.Identity
 
-            score               = 0
-            timeSinceStart      = 0.0
-            scoreTrafo          = scoreTrafo
-            scoreText           = "Score: 000\r\nTime: 000.00"
-            running             = false
-            
-            deltaTime           = 0.0
-            enablePhysics       = true
-            gravity             = V3d(0.0, -9.81, 0.0)
-            physicsDebugDraw    = false
-            numSubSteps         = 3
-            subStepTime         = 1.0 / 180.0
-
-            wantsRayCast        = false
-            rayCastStart        = V3d()
-            rayCastEnd          = V3d()
-            rayCastHasHit       = false
-            rayCastHitPoint     = V3d()
-            rayCastHitNormal    = V3d()
-            rayCastHitPointSg   = rayCastHitPointSg
-            rayCastHitAreaSg    = rayCastHitAreaSg
-            rayCastCamSg        = rayCastCamSg
-            
-            ctr1VibStr          = 0.0
-            ctr1VibStrLastFrame = 0.0
-            ctr2VibStr          = 0.0
-            ctr2VibStrLastFrame = 0.0
+            specialObjectIds = specialObjectIds
+            interactionInfo = DefaultInteractionInfo
+            gameInfo = DefaultGameInfo(scoreTrafo)
+            physicsInfo = DefaultPhysicsInfo
+            raycastInfo = DefaultRaycastInfo(rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
+            vibrationInfo = DefaultVibrationInfo
         }
 
     let scene =

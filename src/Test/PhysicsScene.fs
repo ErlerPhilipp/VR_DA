@@ -151,7 +151,7 @@ module PhysicsScene =
             let broad = new DbvtBroadphase()
             let solver = new SequentialImpulseConstraintSolver()
             let dynWorld = new DiscreteDynamicsWorld(dispatcher, broad, solver, collConf)
-            dynWorld.Gravity <- toVector3(s.gravity)
+            dynWorld.Gravity <- toVector3(s.physicsInfo.gravity)
             dynWorld.DebugDrawer <- debugDrawer
 
             // make bounce reliable, no added impulse from penetration
@@ -208,12 +208,12 @@ module PhysicsScene =
                             let vel = VrDriver.inputDevices.controller2.Velocity
                             let vel = s.trackingToWorld.Forward.TransformDir(vel)
                             let handVelocity = 
-                                match s.interactionType with
+                                match s.interactionInfo.interactionType with
                                     | VrInteractions.VrInteractionTechnique.VirtualHand -> toVector3(vel)
                                     | VrInteractions.VrInteractionTechnique.GoGo -> 
                                         // TODO: make more accurate, function of difference with last step
                                         //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
-                                        toVector3(vel * s.armExtensionFactor)
+                                        toVector3(vel * s.interactionInfo.armExtensionFactor)
                                     | _ -> failwith "not implemented"
 
                             collisionObject.LinearVelocity <- handVelocity
@@ -279,15 +279,15 @@ module PhysicsScene =
 
                 let mutable oldGravity = Vector3.Zero
                 pw.dynamicsWorld.GetGravity(&oldGravity)
-                let newGravity = toVector3 s.gravity
+                let newGravity = toVector3 s.physicsInfo.gravity
                 if oldGravity <> newGravity then 
                     pw.dynamicsWorld.SetGravity(ref newGravity)
                     for co in pw.dynamicsWorld.CollisionObjectArray do
                         co.Activate()
 
-                if s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.DrawWireframe then 
+                if s.physicsInfo.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.DrawWireframe then 
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.DrawWireframe
-                else if not s.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.None then 
+                else if not s.physicsInfo.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.None then 
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.None
 
 
@@ -297,7 +297,7 @@ module PhysicsScene =
             | Some world -> 
                 Conversion.Update(world,s)
                 simulationSw.Restart()
-                world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds, s.numSubSteps, float32 s.subStepTime) |> ignore
+                world.dynamicsWorld.StepSimulation(float32 dt.TotalSeconds, s.physicsInfo.numSubSteps, float32 s.physicsInfo.subStepTime) |> ignore
                 simulationSw.Stop()
 //                System.Console.WriteLine(simulationSw.MicroTime.ToString())
 
@@ -387,8 +387,8 @@ module PhysicsScene =
                 for message in messages do
                     newScene <- LogicalScene.update newScene message
                    
-                if s.wantsRayCast then
-                    let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(s.rayCastStart), toVector3(s.rayCastEnd), world.dynamicsWorld)
+                if s.raycastInfo.wantsRayCast then
+                    let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(s.raycastInfo.rayCastStart), toVector3(s.raycastInfo.rayCastEnd), world.dynamicsWorld)
                     let rayCastMsg = RayCastResult (hasHit, toV3d(hitPoint), toV3d(hitNormal))
                     newScene <- LogicalScene.update newScene rayCastMsg
 

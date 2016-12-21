@@ -61,21 +61,21 @@ module GraphicsScene =
             }
 
         static member Create(s : Scene) =
-            let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.lightId, s.objects).Forward.TransformPos(V3d())
+            let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
             {
                 original            = s
                 mobjects            = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 mviewTrafo          = Mod.init s.viewTrafo
                 mlightPos           = Mod.init lightPos
 
-                mscoreTrafo         = Mod.init s.scoreTrafo
-                mscoreText          = Mod.init s.scoreText
+                mscoreTrafo         = Mod.init s.gameInfo.scoreTrafo
+                mscoreText          = Mod.init s.gameInfo.scoreText
 
-                mhasRayCastHit      = Mod.init s.rayCastHasHit
-                mdrawHitPoint       = Mod.init (s.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
-                mdrawHitArea        = Mod.init (s.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
-                mrayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
-                mrayCastCam         = Mod.init (Trafo3d.Translation(s.rayCastHitPoint))
+                mhasRayCastHit      = Mod.init s.raycastInfo.rayCastHasHit
+                mdrawHitPoint       = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
+                mdrawHitArea        = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
+                mrayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
+                mrayCastCam         = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
             }
 
         static member Update(mo : MObject, o : Object) =
@@ -89,13 +89,13 @@ module GraphicsScene =
 
         static member Update(ms : MScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
-                let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.lightId, s.objects).Forward.TransformPos(V3d())
+                let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
 
                 ms.original <- s
                 ms.mviewTrafo.Value <- s.viewTrafo
                 ms.mlightPos.Value <- lightPos
 
-                ms.mscoreTrafo.Value <- s.scoreTrafo
+                ms.mscoreTrafo.Value <- s.gameInfo.scoreTrafo
 //                ms.mscoreText.Value <- s.scoreText // TODO: crash!
 
                 let table = 
@@ -111,15 +111,15 @@ module GraphicsScene =
                 
                 ms.mobjects.ExceptWith table.Values
                 
-                ms.mhasRayCastHit.Value <- s.rayCastHasHit
-                ms.mdrawHitPoint.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
-                ms.mdrawHitArea.Value <- s.movementType = VrInteractions.VrMovementTechnique.TeleportArea
+                ms.mhasRayCastHit.Value <- s.raycastInfo.rayCastHasHit
+                ms.mdrawHitPoint.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                ms.mdrawHitArea.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea
                 
-                let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.headId, s.objects)
-                let recenter = s.movementType = VrInteractions.VrMovementTechnique.TeleportPos
-                let newTrackingToWorld = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdWorldTrafo, s.rayCastHitPoint, s.rayCastHitNormal, recenter)
+                let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.headId, s.objects)
+                let recenter = s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                let newTrackingToWorld = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdWorldTrafo, s.raycastInfo.rayCastHitPoint, s.raycastInfo.rayCastHitNormal, recenter)
                 ms.mrayCastCam.Value <- (hmdWorldTrafo * s.trackingToWorld.Inverse * newTrackingToWorld)
-                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.rayCastHitPoint) else newTrackingToWorld
+                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.raycastInfo.rayCastHitPoint) else newTrackingToWorld
             
 
     let createScene (initialScene : Scene) (win : VrWindow) =
@@ -134,7 +134,7 @@ module GraphicsScene =
             scene <- LogicalScene.update scene StartFrame
 
             let timeStepThreshold = 0.5
-            if dt.TotalSeconds < timeStepThreshold && scene.enablePhysics then
+            if dt.TotalSeconds < timeStepThreshold && scene.physicsInfo.enablePhysics then
                 scene <- PhysicsScene.stepSimulation dt scene 
                 PhysicsScene.debugDrawer.flush()
                     
@@ -214,19 +214,19 @@ module GraphicsScene =
                 |> Sg.trafo mscene.mscoreTrafo
                 
         let rayCastHitPointSg =
-            initialScene.rayCastHitPointSg
+            initialScene.raycastInfo.rayCastHitPointSg
                 |> Sg.trafo mscene.mrayCastHitTrafo
                 |> Sg.onOff mscene.mhasRayCastHit
                 |> Sg.onOff mscene.mdrawHitPoint
 
         let rayCastHitAreaSg =
-            initialScene.rayCastHitAreaSg
+            initialScene.raycastInfo.rayCastHitAreaSg
                 |> Sg.trafo mscene.mrayCastHitTrafo
                 |> Sg.onOff mscene.mhasRayCastHit
                 |> Sg.onOff mscene.mdrawHitArea
                 
         let rayCastCamSg =
-            initialScene.rayCastCamSg
+            initialScene.raycastInfo.rayCastCamSg
                 |> Sg.trafo mscene.mrayCastCam
                 |> Sg.onOff mscene.mhasRayCastHit
                 
