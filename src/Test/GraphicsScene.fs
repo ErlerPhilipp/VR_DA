@@ -30,19 +30,18 @@ module GraphicsScene =
                 original = o
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
-                effect = o.effect
                 mhasHighlight = Mod.init o.isGrabbable
                 mscoredState = Mod.init (getScoredState(o))
                 mtilingFactor = Mod.init o.tilingFactor
             }
 
         static member Create(s : Scene) =
-            let lightTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
+            let lightViewTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
             {
                 original           = s
                 graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 viewTrafo          = Mod.init s.viewTrafo
-                lightTrafo         = Mod.init lightTrafo
+                lightViewTrafo     = Mod.init lightViewTrafo
 
                 scoreTrafo         = Mod.init s.gameInfo.scoreTrafo
                 scoreText          = Mod.init s.gameInfo.scoreText
@@ -58,7 +57,6 @@ module GraphicsScene =
         static member Update(mo : GraphicsObject, o : Object) =
             if not (System.Object.ReferenceEquals(mo.original, o)) then
                 mo.original <- o
-                mo.mmodel.Value <- o.model
                 mo.mtrafo.Value <- o.trafo
                 mo.mhasHighlight.Value <- o.isGrabbable
                 mo.mscoredState.Value <- (getScoredState(o))
@@ -66,11 +64,11 @@ module GraphicsScene =
 
         static member Update(ms : GraphicsScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
-                let lightTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
+                let lightViewTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
 
                 ms.original <- s
                 ms.viewTrafo.Value <- s.viewTrafo
-                ms.lightTrafo.Value <- lightTrafo
+                ms.lightViewTrafo.Value <- lightViewTrafo
 
                 ms.scoreTrafo.Value <- s.gameInfo.scoreTrafo
 //                ms.scoreText.Value <- s.scoreText // TODO: crash!

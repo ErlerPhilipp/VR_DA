@@ -39,8 +39,8 @@ module LogicalSceneTypes =
             timeToReset       : float
 
             trafo             : Trafo3d
-            model             : ISg
-            effect            : list<Rendering.FShadeEffect>
+            model             : Option<ISg>
+            surface           : Option<ISurface>
             tilingFactor      : V2d
 
             linearVelocity    : V3d
@@ -72,8 +72,8 @@ module LogicalSceneTypes =
             timeToReset         = 0.0
 
             trafo               = Trafo3d.Identity
-            model               = Sg.group []
-            effect              = []
+            model               = None
+            surface             = None
             tilingFactor        = V2d(1.0, 1.0)
             
             linearVelocity      = V3d()
@@ -337,8 +337,7 @@ module GraphicsSceneTypes =
         {
             mutable original    : Object
             mtrafo              : ModRef<Trafo3d>
-            mmodel              : ModRef<ISg>
-            effect              : list<Rendering.FShadeEffect>
+            mmodel              : ModRef<Option<ISg>>
             mhasHighlight       : ModRef<bool>
             mscoredState        : ModRef<int>
             mtilingFactor       : ModRef<V2d>
@@ -349,7 +348,7 @@ module GraphicsSceneTypes =
             mutable original    : Scene
             graphicsObjects     : cset<GraphicsObject>
             viewTrafo           : ModRef<Trafo3d>
-            lightTrafo          : ModRef<Trafo3d>
+            lightViewTrafo      : ModRef<Trafo3d>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

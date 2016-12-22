@@ -11,7 +11,7 @@ module OmnidirShadowShader =
 
     type UniformScope with
         member x.LightSpaceViewProjTrafo : M44d = uniform?LightSpaceViewProjTrafo
-        member x.LightTrafo : M44d = uniform?LightTrafo
+        member x.LightViewTrafo : M44d = uniform?LightViewTrafo
         
     let private shadowSampler =
         sampler2dShadow {
@@ -23,24 +23,9 @@ module OmnidirShadowShader =
             comparison ComparisonFunction.LessOrEqual
         }
 
-//    let clipPlane = V4d(1.0,1.0,1.0,0.0)
-//
-//    type ClipVertex = {
-//        [<Position>]        pos     : V4d
-//        [<WorldPosition>]   wp      : V4d
-//        [<Normal>]          n       : V3d
-//        [<BiNormal>]        b       : V3d
-//        [<Tangent>]         t       : V3d
-//        [<Color>]           c       : V4d
-//        [<TexCoord>]        tc      : V2d
-//        [<ClipDistance>] clipDistances : float[]
-//    }
-
     let trafo (v : Vertex) =
         vertex {
             let wp = uniform.ModelTrafo * v.pos
-//            let distance = Vec.dot wp clipPlane
-            //let distance = 10.0
             return {
                 pos = uniform.ViewProjTrafo * wp
                 wp = wp
@@ -49,7 +34,6 @@ module OmnidirShadowShader =
                 t = uniform.NormalMatrix * v.t
                 c = v.c
                 tc = v.tc
-//                clipDistances = [| distance |]
             }
         }
 
@@ -60,25 +44,8 @@ module OmnidirShadowShader =
             let tc = V3d(0.5, 0.5,0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
             let shadowValue = shadowSampler.Sample(tc.XY, tc.Z - 0.000017)
             let d = max 0.3 shadowValue
-//            if shadowValue < 0.3 then
-//                return V4d(1.0, 1.0, 0.0, v.c.W)
-//            else
+//            return V4d(1.0, d, 0.0, v.c.W * 0.5)
             return V4d(v.c.XYZ * d, v.c.W)
-        }
-
-
-    let lighting (v : Vertex) =
-        fragment {
-            let n = v.n |> Vec.normalize
-            let lightPos = (uniform.LightTrafo * V4d(0.0, 0.0, 0.0, 1.0)).XYZ
-            let c = lightPos - v.wp.XYZ |> Vec.normalize
-
-            let ambient = 0.2
-            let diffuse = Vec.dot (uniform.ViewTrafo * V4d(c,0.0)).XYZ n |> max 0.0
-
-            let l = ambient + (1.0 - ambient) * diffuse
-
-            return V4d(v.c.XYZ * diffuse, v.c.W)
         }
 
 module Highlight =
@@ -153,12 +120,12 @@ module Lighting =
         member x.SpecularExponent : int = x?SpecularExponent
         member x.AmbientFactor : float = x?AmbientFactor
         member x.LinearAttenuation : float = x?LinearAttenuation
-        member x.LightTrafo : M44d = uniform?LightTrafo
+        member x.LightViewTrafo : M44d = uniform?LightViewTrafo
 
     let internal lighting (twoSided : bool) (v : Vertex) =
         fragment {
             let n = v.n |> Vec.normalize
-            let lightPos = (uniform.LightTrafo * V4d(0.0, 0.0, 0.0, 1.0)).XYZ
+            let lightPos = (uniform.LightViewTrafo * V4d(0.0, 0.0, 0.0, 1.0)).XYZ
             let fragmentToLight = lightPos - v.wp.XYZ
             let distToLight = fragmentToLight.Length
             let c = fragmentToLight |> Vec.normalize
