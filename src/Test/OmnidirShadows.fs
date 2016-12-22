@@ -70,20 +70,13 @@ module OmnidirShadows =
 
         let shadowMapSize = Mod.init (V2i(4096, 4096))
     
-        let shadowCam = CameraView.lookAt (V3d.OIO * 4.0) V3d.Zero V3d.OOI
-//        let shadowCam = CameraView.lookAt (V3d.III * 2.0) V3d.Zero V3d.OOI
-        let shadowProj = Frustum.perspective 60.0 0.1 50.0 1.0
-
-        let angle = Mod.constant 0.0
-//        let lightViewTrafo = 
-//            graphicsScene.lightViewTrafo
-//                |> Mod.map (fun trafo -> 
-//                                let lightPosTrafo = Trafo3d.Translation(trafo.Forward.TransformPos(V3d()))
-////                                Trafo3d.RotationZ(90.0) * lightPosTrafo
-//                                Trafo3d.RotationZ(90.0) * lightPosTrafo.Inverse
-//                            )
-        let lightViewTrafo =
-            angle |> Mod.map (fun angle -> Trafo3d.RotationZ(angle) * (shadowCam |> CameraView.viewTrafo))
+        let lightViewTrafo = 
+            graphicsScene.lightViewTrafo
+                |> Mod.map (fun trafo -> 
+                                let lightPosTrafo = Trafo3d.Translation(trafo.Forward.TransformPos(V3d()))
+                                (Trafo3d.RotationXInDegrees(-90.0) * lightPosTrafo).Inverse
+                            )
+        let shadowProj = Frustum.perspective 90.0 0.1 50.0 1.0
         let lightSpaceViewProjTrafo = lightViewTrafo |> Mod.map (fun view -> view * (shadowProj |> Frustum.projTrafo))
     
         let signature = 

@@ -42,10 +42,14 @@ module OmnidirShadowShader =
             let lightSpace = uniform.LightSpaceViewProjTrafo * v.wp
             let div = lightSpace.XYZ / lightSpace.W
             let tc = V3d(0.5, 0.5,0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
-            let shadowValue = shadowSampler.Sample(tc.XY, tc.Z - 0.000017)
-            let d = max 0.3 shadowValue
-//            return V4d(1.0, d, 0.0, v.c.W * 0.5)
-            return V4d(v.c.XYZ * d, v.c.W)
+            let colorFactor = 
+                if lightSpace.W >= 0.0 then
+                    let shadowValue = shadowSampler.Sample(tc.XY, tc.Z - 0.00017)
+                    max 0.3 shadowValue
+                else
+                    1.0
+
+            return V4d(v.c.XYZ * colorFactor, v.c.W)
         }
 
 module Highlight =

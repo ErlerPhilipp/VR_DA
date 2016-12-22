@@ -216,8 +216,8 @@ module LogicalScene =
                     else
                         scene.trackingToWorld
                 
-                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
-                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
+//                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
+//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
 
                 let newTimeSinceStart = scene.gameInfo.timeSinceStart + dt.TotalSeconds
 
