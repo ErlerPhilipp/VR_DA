@@ -3,57 +3,13 @@
 open Aardvark.Base
 
 module PhysicsScene =
+    open LogicalSceneTypes
+    open PhysicsSceneTypes
     open LogicalScene
     open BulletHelper
 
     open BulletSharp
     open BulletSharp.Math
-
-    type CollisionObject =
-        | StaticBody     of collObj     : BulletSharp.CollisionObject
-        | RigidBody      of rb          : BulletSharp.RigidBody
-        | Ghost          of ghost       : BulletSharp.PairCachingGhostObject
-        | NoObject
-    
-    [<ReferenceEquality;NoComparison>]
-    type PhysicsBody = 
-        { 
-            mutable original    : Object
-            collisionObject     : CollisionObject
-            inertia             : Vector3
-            mutable trafo       : Matrix
-        }
-        
-    type MyMotionState() =
-        inherit MotionState()
-
-        let mutable body = None
-        member this.init(newBody : PhysicsBody) =
-            body <- Some newBody
-
-        override this.GetWorldTransform(worldTrans : Matrix byref) = 
-            match body with
-                | Some body -> worldTrans <- body.trafo
-                | None -> worldTrans <- Matrix()
-
-        override this.SetWorldTransform(worldTrans : Matrix byref) = 
-            match body with
-                | Some body -> body.trafo <- worldTrans
-                | None -> ()
-            
-    
-    [<ReferenceEquality;NoComparison>]
-    type PhysicsWorld =
-        {
-            mutable original : Scene
-            
-            collisionConf    : DefaultCollisionConfiguration
-            collisionDisp    : CollisionDispatcher
-            broadPhase       : DbvtBroadphase
-            dynamicsWorld    : DiscreteDynamicsWorld
-
-            mutable bodies   : System.Collections.Generic.HashSet<PhysicsBody>
-        }
 
     let mutable currentWorld = None
     let debugDrawer = BulletHelper.DebugDrawer()
@@ -104,7 +60,7 @@ module PhysicsScene =
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             let body =  { 
                                             original = o
-                                            collisionObject = RigidBody rigidBody 
+                                            collisionObject = CollisionObject.RigidBody rigidBody 
                                             inertia = inertia
                                             trafo = initialTrafo
                                         } 
@@ -135,7 +91,7 @@ module PhysicsScene =
                             scene.dynamicsWorld.AddRigidBody(rigidBody)
                             let body =  { 
                                             original = o
-                                            collisionObject = RigidBody rigidBody 
+                                            collisionObject = CollisionObject.RigidBody rigidBody 
                                             inertia = inertia
                                             trafo = initialTrafo
                                         } 

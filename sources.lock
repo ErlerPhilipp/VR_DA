@@ -1,1 +1,2 @@
-..\aardvark.rendering;Release
+..\aardvark.rendering;Debug
+..\fshade;Debug

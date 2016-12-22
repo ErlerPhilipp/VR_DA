@@ -62,8 +62,10 @@
     <Compile Include="VrInteractions.fs" />
     <Compile Include="BulletHelper.fs" />
     <Compile Include="Vibration.fs" />
+    <Compile Include="SceneTypes.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
+    <Compile Include="Shaders.fs" />
     <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
     <Compile Include="SGHelper.fs" />

@@ -14,7 +14,7 @@ open Aardvark.SceneGraph
 open Aardvark.SceneGraph.IO
 open Aardvark.VR
 
-open LogicalScene
+open LogicalSceneTypes
 
 open Primitives
 open Sphere
@@ -37,54 +37,54 @@ let main argv =
     let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
     let defaultDiffuseTextureEffect = DefaultSurfaces.diffuseTexture |> toEffect
 
-    let virtualHandEffect = Sg.effect [
-                                defaultTrafoEffect
-                                DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
-                                defaultSimpleLightingEffect
-                            ]
-    let constColorEffect = Sg.effect [
-                                defaultTrafoEffect
-                                DefaultSurfaces.constantColor C4f.White |> toEffect
-                                defaultSimpleLightingEffect
-                            ]
-    let rayCastHitEffect = Sg.effect [
-                                defaultTrafoEffect
-                                DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
-                                defaultSimpleLightingEffect
-                            ]
-    let beamEffect = Sg.effect [
-                        defaultTrafoEffect
-                        DefaultSurfaces.vertexColor |> toEffect
-                        DefaultSurfaces.thickLine |> toEffect
-                    ]
-    let diffuseEffect = Sg.effect [
+    let virtualHandEffect =     [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
+                                    defaultSimpleLightingEffect
+                                ]
+    let constColorEffect =      [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.constantColor C4f.White |> toEffect
+                                    defaultSimpleLightingEffect
+                                ]
+    let rayCastHitEffect =      [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
+                                    defaultSimpleLightingEffect
+                                ]
+    let beamEffect =            [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.vertexColor |> toEffect
+                                    DefaultSurfaces.thickLine |> toEffect
+                                ]
+    let diffuseEffect =         [
                                     defaultTrafoEffect
                                     defaultDiffuseTextureEffect
                                     Lighting.Effect false
                                 ]
-    let normalDiffuseEffect = Sg.effect [
+    let normalDiffuseEffect =   [
                                     defaultTrafoEffect
                                     TextureTiling.Effect
                                     NormalMap.Effect
                                     defaultDiffuseTextureEffect
                                     Lighting.Effect false
                                 ]
-    let boxEffect = Sg.effect [
-                        defaultTrafoEffect
-                        TextureTiling.Effect
-                        NormalMap.Effect
-                        defaultDiffuseTextureEffect
-                        Lighting.Effect false
-                        Highlight.Effect
-                    ]
-    let ballEffect = Sg.effect [
-                        SphereTexture.vertex |> toEffect
-                        defaultTrafoEffect
-                        SphereTexture.fragment |> toEffect
-                        defaultDiffuseTextureEffect
-                        Lighting.Effect false
-                        Highlight.Effect
-                    ]
+    let boxEffect =             [
+                                    defaultTrafoEffect
+                                    TextureTiling.Effect
+                                    NormalMap.Effect
+                                    defaultDiffuseTextureEffect
+                                    Lighting.Effect false
+                                    Highlight.Effect
+                                ]
+    let ballEffect =            [
+                                    SphereTexture.vertex |> toEffect
+                                    defaultTrafoEffect
+                                    SphereTexture.fragment |> toEffect
+                                    defaultDiffuseTextureEffect
+                                    Lighting.Effect false
+                                    Highlight.Effect
+                                ]
 
     let trackingAreaSize = 2.9
     let trackingAreaHight = 5.2
@@ -143,13 +143,11 @@ let main argv =
         [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
-            |> diffuseEffect
 
     let basestationSg = 
         (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\lh_basestation_vive\basestationtri.obj")
             |> Loader.Assimp.load
             |> Sg.AdapterNode :> ISg
-            |> diffuseEffect 
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\lh_basestation_vive\lh_basestation_vive.png", textureParam) :> ITexture))
             
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
@@ -183,16 +181,16 @@ let main argv =
     let wallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
     let goalRoomWallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg", textureParam) :> ITexture))
 
-    let rayCastHitPointSg = rayCastPointSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
-    let rayCastHitAreaSg = rayCastAreaSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
-    let rayCastCamSg = rayCastCamSg |> rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastHitPointSg = rayCastPointSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastHitAreaSg = rayCastAreaSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    let rayCastCamSg = rayCastCamSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
 
     let leftHandObject = 
         { defaultObject with
             id = newId()
             trafo = Trafo3d.Identity
-//            model = Sg.ofList [controllerSg |> constColorEffect; beamSg |> beamEffect]
-            model = Sg.ofList [controllerSg |> constColorEffect]
+            model = controllerSg
+            effect = diffuseEffect
             isColliding = false
         }
     let rightHandObject = 
@@ -200,7 +198,8 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Ghost
             trafo = Trafo3d.Identity
-            model = controllerSg |> virtualHandEffect
+            model = controllerSg
+            effect = (diffuseEffect @ virtualHandEffect)
             collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
             isColliding = false
         }
@@ -209,6 +208,7 @@ let main argv =
             id = newId()
             trafo = Trafo3d.Identity
             model = basestationSg
+            effect = diffuseEffect
             isColliding = false
         }
     let camObject2 = 
@@ -219,12 +219,14 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness - 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
-            model = lightSg |>  constColorEffect
+            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
+            model = lightSg
+            effect = constColorEffect
         }
 
     let defaultCollider =
         { defaultObject with
+            castsShadow = false
             rollingFriction = 0.01f
             restitution = 0.95f
             friction = 0.75f
@@ -235,12 +237,9 @@ let main argv =
     let groundObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = true
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
-            model = groundSg 
-                        |> normalDiffuseEffect 
-                        |> groundDiffuseTexture
-                        |> groundNormalMap
+            model = groundSg |> groundDiffuseTexture |> groundNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(groundTilingFactor * trackingAreaSize)
             collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
         }
@@ -248,23 +247,17 @@ let main argv =
     let ceilingObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = true
             trafo = Trafo3d.Translation(0.0, trackingAreaHight - 1.5 * wallThickness, 0.0)
-            model = ceilingSg 
-                        |> normalDiffuseEffect 
-                        |> ceilingDiffuseTexture
-                        |> ceilingNormalMap
+            model = ceilingSg |> ceilingDiffuseTexture |> ceilingNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(ceilingTilingFactor * trackingAreaSize)
             collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
         }
 
     let wallBase = 
         { defaultCollider with
-            castsShadow = true
-            model = wallSg
-                        |> normalDiffuseEffect
-                        |> wallDiffuseTexture
-                        |> wallNormalMap
+            model = wallSg |> wallDiffuseTexture |> wallNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(0.25 * trackingAreaSize)
         }
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
@@ -298,12 +291,9 @@ let main argv =
         { defaultCollider with
             id = newId()
             objectType = ObjectTypes.Ghost
-            castsShadow = false
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
-            model = goalRoomGroundSg 
-                        |> normalDiffuseEffect 
-                        |> groundDiffuseTexture
-                        |> groundNormalMap
+            model = goalRoomGroundSg |> groundDiffuseTexture |> groundNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(groundTilingFactor * goalAreaSize)
             collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
         }
@@ -311,23 +301,17 @@ let main argv =
     let goalRoomCeilingObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = false
             trafo = Trafo3d.Translation(0.0, goalAreaHight - 1.5 * wallThickness, 0.0) * goalRoomOffset
-            model = goalRoomCeilingSg 
-                        |> normalDiffuseEffect 
-                        |> ceilingDiffuseTexture
-                        |> ceilingNormalMap
+            model = goalRoomCeilingSg |> ceilingDiffuseTexture |> ceilingNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(ceilingTilingFactor * goalAreaSize)
             collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
         }
 
     let goalRoomWallBase = 
         { defaultCollider with
-            castsShadow = false
-            model = goalRoomWallSg
-                        |> normalDiffuseEffect
-                        |> goalRoomWallDiffuseTexture
-                        |> goalRoomWallNormalMap
+            model = goalRoomWallSg |> goalRoomWallDiffuseTexture |> goalRoomWallNormalMap
+            effect = normalDiffuseEffect
             tilingFactor = V2d(0.5 * goalAreaSize)
         }
     let goalWallLateralOffset = goalAreaSize * 0.5 + wallThickness * 0.5
@@ -363,9 +347,8 @@ let main argv =
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             trafo = Trafo3d.Identity
-            model = ballSg 
-                        |> ballEffect 
-                        |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
+            model = ballSg |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
+            effect = ballEffect
             mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             ccdSpeedThreshold = 0.1f
@@ -377,10 +360,8 @@ let main argv =
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
-            model = boxSg 
-                        |> boxEffect 
-                        |> wallNormalMap
-                        |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
+            model = boxSg |> wallNormalMap |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
+            effect = boxEffect
             mass = 0.625f
             collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box )
             restitution = 0.1f
@@ -395,6 +376,7 @@ let main argv =
             isManipulable = false
             trafo = Trafo3d.Translation(-0.1, 0.0, 0.0)
             model = Sg.ofList []
+            effect = []
             collisionShape = Some (BulletHelper.Shape.Sphere 0.12)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
@@ -406,6 +388,7 @@ let main argv =
             objectType = ObjectTypes.Ghost
             trafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
             model = Sg.ofList []
+            effect = []
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
         }
@@ -416,6 +399,7 @@ let main argv =
             objectType = ObjectTypes.Ghost
             trafo = lowerHoopTrigger.trafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
             model = Sg.ofList []
+            effect = []
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
         }
@@ -444,6 +428,7 @@ let main argv =
                         isManipulable = canMove
                         trafo = Trafo3d.Identity
                         model = sg 
+                        effect = diffuseEffect
                         mass = mass
                         collisionShape = collShape
                         restitution = restitution
@@ -486,28 +471,13 @@ let main argv =
             interactionInfo = DefaultInteractionInfo
             gameInfo = DefaultGameInfo(scoreTrafo)
             physicsInfo = DefaultPhysicsInfo
-            raycastInfo = DefaultRaycastInfo(beamSg |> beamEffect, rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
+            raycastInfo = DefaultRaycastInfo(beamSg |> Sg.effect beamEffect, rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
             vibrationInfo = DefaultVibrationInfo
         }
 
-    let scene =
-        GraphicsScene.createScene sceneObj vrWin
-            |> Sg.effect [
-                defaultTrafoEffect
-                DefaultSurfaces.constantColor C4f.White |> toEffect
-                defaultDiffuseTextureEffect
-                DefaultSurfaces.normalMap |> toEffect
-                DefaultSurfaces.lighting false |> toEffect
-            ]
+    let scene = GraphicsScene.createScene sceneObj vrWin
 
-    let vrSg = 
-        scene
-            |> Sg.projTrafo vrWin.Projection
-            |> Sg.uniform "LineWidth" (Mod.constant 5.0)
-            |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
-
- 
-    let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, vrSg)
+    let task = app.Runtime.CompileRender(vrWin.FramebufferSignature, scene)
     vrWin.RenderTask <- task
     
     vrWin.Run()

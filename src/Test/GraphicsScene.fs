@@ -11,38 +11,11 @@ open Aardvark.SceneGraph
 open OmnidirShadows
 
 module GraphicsScene =
-    open LogicalScene
-//    open OmnidirShadows
+    open LogicalSceneTypes
+    open GraphicsSceneTypes
+    open OmnidirShadows
     open VrInteractions
     open VrWindow
-
-    type MObject =
-        {
-            mutable original    : Object
-            mtrafo              : ModRef<Trafo3d>
-            mmodel              : ModRef<ISg>
-            mhasHighlight       : ModRef<bool>
-            mscoredState        : ModRef<int>
-            mtilingFactor       : ModRef<V2d>
-        }
-
-    type MScene =
-        {
-            mutable original    : Scene
-            mobjects            : cset<MObject>
-            mviewTrafo          : ModRef<Trafo3d>
-            mlightPos           : ModRef<V3d>
-
-            mscoreTrafo         : ModRef<Trafo3d>
-            mscoreText          : ModRef<string>
-            
-            mhasRayCastHit      : ModRef<bool>
-            mdrawHitPoint       : ModRef<bool>
-            mdrawHitArea        : ModRef<bool>
-            mhasRayCastDir      : ModRef<Trafo3d>
-            mrayCastHitTrafo    : ModRef<Trafo3d>
-            mrayCastCam         : ModRef<Trafo3d>
-        }
 
     let getScoredState (o : Object) =
         if o.hasScored then 3
@@ -57,31 +30,32 @@ module GraphicsScene =
                 original = o
                 mtrafo = Mod.init o.trafo
                 mmodel = Mod.init o.model
+                effect = o.effect
                 mhasHighlight = Mod.init o.isGrabbable
                 mscoredState = Mod.init (getScoredState(o))
                 mtilingFactor = Mod.init o.tilingFactor
             }
 
         static member Create(s : Scene) =
-            let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
+            let lightTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
             {
-                original            = s
-                mobjects            = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
-                mviewTrafo          = Mod.init s.viewTrafo
-                mlightPos           = Mod.init lightPos
+                original           = s
+                graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
+                viewTrafo          = Mod.init s.viewTrafo
+                lightTrafo         = Mod.init lightTrafo
 
-                mscoreTrafo         = Mod.init s.gameInfo.scoreTrafo
-                mscoreText          = Mod.init s.gameInfo.scoreText
+                scoreTrafo         = Mod.init s.gameInfo.scoreTrafo
+                scoreText          = Mod.init s.gameInfo.scoreText
                 
-                mhasRayCastHit      = Mod.init s.raycastInfo.rayCastHasHit
-                mdrawHitPoint       = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
-                mdrawHitArea        = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
-                mhasRayCastDir      = Mod.init (LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
-                mrayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
-                mrayCastCam         = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
+                hasRayCastHit      = Mod.init s.raycastInfo.rayCastHasHit
+                drawHitPoint       = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos)
+                drawHitArea        = Mod.init (s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea)
+                hasRayCastDir      = Mod.init (getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
+                rayCastHitTrafo    = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
+                rayCastCam         = Mod.init (Trafo3d.Translation(s.raycastInfo.rayCastHitPoint))
             }
 
-        static member Update(mo : MObject, o : Object) =
+        static member Update(mo : GraphicsObject, o : Object) =
             if not (System.Object.ReferenceEquals(mo.original, o)) then
                 mo.original <- o
                 mo.mmodel.Value <- o.model
@@ -90,19 +64,19 @@ module GraphicsScene =
                 mo.mscoredState.Value <- (getScoredState(o))
                 mo.mtilingFactor.Value <- o.tilingFactor
 
-        static member Update(ms : MScene, s : Scene) =
+        static member Update(ms : GraphicsScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
-                let lightPos = LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
+                let lightTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
 
                 ms.original <- s
-                ms.mviewTrafo.Value <- s.viewTrafo
-                ms.mlightPos.Value <- lightPos
+                ms.viewTrafo.Value <- s.viewTrafo
+                ms.lightTrafo.Value <- lightTrafo
 
-                ms.mscoreTrafo.Value <- s.gameInfo.scoreTrafo
-//                ms.mscoreText.Value <- s.scoreText // TODO: crash!
+                ms.scoreTrafo.Value <- s.gameInfo.scoreTrafo
+//                ms.scoreText.Value <- s.scoreText // TODO: crash!
 
                 let table = 
-                    ms.mobjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
+                    ms.graphicsObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
                 
                 for t in PersistentHashSet.toSeq s.objects do
                     match table.TryRemove t.id with
@@ -110,20 +84,20 @@ module GraphicsScene =
                             Conversion.Update(mo, t)
                         | _ ->
                             let mo = Conversion.Create(t)
-                            ms.mobjects.Add mo |> ignore
+                            ms.graphicsObjects.Add mo |> ignore
                 
-                ms.mobjects.ExceptWith table.Values
+                ms.graphicsObjects.ExceptWith table.Values
                 
-                ms.mhasRayCastHit.Value <- s.raycastInfo.rayCastHasHit
-                ms.mdrawHitPoint.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
-                ms.mdrawHitArea.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea
+                ms.hasRayCastHit.Value <- s.raycastInfo.rayCastHasHit
+                ms.drawHitPoint.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
+                ms.drawHitArea.Value <- s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportArea
                 
                 let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.headId, s.objects)
                 let recenter = s.interactionInfo.movementType = VrInteractions.VrMovementTechnique.TeleportPos
                 let newTrackingToWorld = VrInteractions.getTeleportTrafo(s.trackingToWorld, hmdWorldTrafo, s.raycastInfo.rayCastHitPoint, s.raycastInfo.rayCastHitNormal, recenter)
-                ms.mrayCastCam.Value <- (hmdWorldTrafo * s.trackingToWorld.Inverse * newTrackingToWorld)
-                ms.mhasRayCastDir.Value <- (LogicalScene.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
-                ms.mrayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.raycastInfo.rayCastHitPoint) else newTrackingToWorld
+                ms.rayCastCam.Value <- (hmdWorldTrafo * s.trackingToWorld.Inverse * newTrackingToWorld)
+                ms.hasRayCastDir.Value <- (getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
+                ms.rayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.raycastInfo.rayCastHitPoint) else newTrackingToWorld
             
     // renders the shadows to a texture
 //    let private renderShadows (runtime : IRuntime) (shadowCasterSg : ISg) =
@@ -140,7 +114,7 @@ module GraphicsScene =
 
     let createScene (initialScene : Scene) (win : VrWindow) =
         let mutable scene = initialScene
-        let mscene = Conversion.Create initialScene
+        let graphicsScene = Conversion.Create initialScene
 
         let deviceCount = VrDriver.devices.Length
         let oldTrafos = Array.zeroCreate deviceCount
@@ -179,78 +153,43 @@ module GraphicsScene =
                     | _ -> () //printfn "%A" (e.eventType)
   
             transact (fun () ->
-                Conversion.Update(mscene, scene)
+                Conversion.Update(graphicsScene, scene)
             )
             ()
 
         win.Update <- update
 
-        let toSg (t : MObject) =
-            t.mmodel
-                |> Sg.dynamic
-                |> Sg.uniform "isHighlighted" t.mhasHighlight
-                |> Sg.uniform "scoredState" t.mscoredState
-                |> Sg.uniform "tilingFactor" t.mtilingFactor
-                |> Sg.trafo t.mtrafo
-        
-        let objectsInScene = 
-            mscene.mobjects
-                |> ASet.map toSg
-                |> Sg.set     
-        
-        let toShadowCasterSg (t : MObject) =
-            if t.original.castsShadow then
-                t.mmodel
-                    |> Sg.dynamic
-                    |> Sg.uniform "isHighlighted" t.mhasHighlight
-                    |> Sg.uniform "scoredState" t.mscoredState
-                    |> Sg.uniform "tilingFactor" t.mtilingFactor
-                    |> Sg.trafo t.mtrafo
-                    |> Sg.effect [DefaultSurfaces.trafo |> toEffect]
-            else
-                Sg.ofList []
-
-        let shadowCasterInScene = 
-            mscene.mobjects
-                |> ASet.map toShadowCasterSg
-                |> Sg.set
-
-        let sgs = 
-            objectsInScene
-                |> Sg.uniform "LightLocation" mscene.mlightPos
-                |> Sg.uniform "SpecularExponent" (Mod.constant 32)
-                |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
-                |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
-                |> Sg.blendMode(Mod.constant (BlendMode(false)))
-
-        let newSg = OmnidirShadows.init(win, shadowCasterInScene, sgs)
+        let sg = OmnidirShadows.init(win, scene, graphicsScene)
 
         let textSg =
-//            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red mscene.mscoreText :> ISg
-            Sg.markdown MarkdownConfig.light mscene.mscoreText
-                |> Sg.trafo mscene.mscoreTrafo
+//            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
+            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
+                |> Sg.trafo graphicsScene.scoreTrafo
                 
         let rayCastDirSg =
             initialScene.raycastInfo.rayCastDirSg
-                |> Sg.trafo mscene.mhasRayCastDir
+                |> Sg.trafo graphicsScene.hasRayCastDir
                 
         let rayCastHitPointSg =
             initialScene.raycastInfo.rayCastHitPointSg
-                |> Sg.trafo mscene.mrayCastHitTrafo
-                |> Sg.onOff mscene.mhasRayCastHit
-                |> Sg.onOff mscene.mdrawHitPoint
+                |> Sg.trafo graphicsScene.rayCastHitTrafo
+                |> Sg.onOff graphicsScene.hasRayCastHit
+                |> Sg.onOff graphicsScene.drawHitPoint
 
         let rayCastHitAreaSg =
             initialScene.raycastInfo.rayCastHitAreaSg
-                |> Sg.trafo mscene.mrayCastHitTrafo
-                |> Sg.onOff mscene.mhasRayCastHit
-                |> Sg.onOff mscene.mdrawHitArea
+                |> Sg.trafo graphicsScene.rayCastHitTrafo
+                |> Sg.onOff graphicsScene.hasRayCastHit
+                |> Sg.onOff graphicsScene.drawHitArea
                 
         let rayCastCamSg =
             initialScene.raycastInfo.rayCastCamSg
-                |> Sg.trafo mscene.mrayCastCam
-                |> Sg.onOff mscene.mhasRayCastHit
+                |> Sg.trafo graphicsScene.rayCastCam
+                |> Sg.onOff graphicsScene.hasRayCastHit
                 
         // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList [newSg; rayCastDirSg; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
-            |> Sg.viewTrafo mscene.mviewTrafo
+        Sg.ofList [sg; rayCastDirSg; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
+            |> Sg.viewTrafo graphicsScene.viewTrafo
+            |> Sg.projTrafo win.Projection
+            |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
+            |> Sg.uniform "LineWidth" (Mod.constant 5.0)
