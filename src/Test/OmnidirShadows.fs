@@ -22,6 +22,32 @@ module OmnidirShadows =
     open LogicalSceneTypes
     open GraphicsSceneTypes
 
+    type CubeFaces = 
+        | FacePosX = 0
+        | FaceNegX = 1
+        | FacePosY = 2
+        | FaceNegY = 3
+        | FacePosZ = 4
+        | FaceNegZ = 5
+    
+    let CubeFaceMatrices =
+        [|
+            Trafo3d.FromOrthoNormalBasis(-V3d.OOI, -V3d.OIO, -V3d.IOO)
+            Trafo3d.FromOrthoNormalBasis( V3d.OOI, -V3d.OIO,  V3d.IOO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OOI,  V3d.OIO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO,  V3d.OOI, -V3d.OIO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OIO, -V3d.IOO)
+            Trafo3d.FromOrthoNormalBasis(-V3d.IOO, -V3d.OIO,  V3d.IOO)
+        |]
+//        [|
+//            Trafo3d.FromOrthoNormalBasis(-V3d.OOI, -V3d.OIO, -V3d.IOO)
+//            Trafo3d.FromOrthoNormalBasis( V3d.OOI, -V3d.OIO,  V3d.IOO)
+//            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OOI,  V3d.OIO)
+//            Trafo3d.FromOrthoNormalBasis( V3d.IOO,  V3d.OOI, -V3d.OIO)
+//            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OIO, -V3d.IOO)
+//            Trafo3d.FromOrthoNormalBasis(-V3d.IOO, -V3d.OIO,  V3d.IOO)
+//        |]
+
     let init (vrWin : VrWindow.VrWindow, scene : Scene, graphicsScene : GraphicsScene) = 
         
         let toSg (t : GraphicsObject) =
@@ -68,26 +94,29 @@ module OmnidirShadows =
                 |> Sg.set
                 |> Sg.blendMode(Mod.constant (BlendMode(false)))
 
-        let shadowMapSize = Mod.init (V2i(4096, 4096))
+
+        let shadowMapSize = Mod.init (V2i(1024, 1024))
     
-        let lightViewTrafo = 
-            graphicsScene.lightViewTrafo
+        let lightViewTrafo(faceTrafo : Trafo3d) = 
+            graphicsScene.lightPos
                 |> Mod.map (fun trafo -> 
-                                let lightPosTrafo = Trafo3d.Translation(trafo.Forward.TransformPos(V3d()))
-                                (Trafo3d.RotationXInDegrees(-90.0) * lightPosTrafo).Inverse
+                                let lightPosTrafo = Trafo3d.Translation(trafo)
+                                (faceTrafo * lightPosTrafo).Inverse
+//                                (Trafo3d.RotationXInDegrees(-90.0) * lightPosTrafo).Inverse
+//                                Trafo3d.FromOrthoNormalBasis(V3d.IOO, -V3d.OOI, -V3d.OIO) * lightPosTrafo.Inverse
                             )
         let shadowProj = Frustum.perspective 90.0 0.1 50.0 1.0
-        let lightSpaceViewProjTrafo = lightViewTrafo |> Mod.map (fun view -> view * (shadowProj |> Frustum.projTrafo))
+        let lightViewProjTrafo(faceTrafo : Trafo3d) = lightViewTrafo(faceTrafo) |> Mod.map (fun view -> view * (shadowProj |> Frustum.projTrafo))
     
         let signature = 
             vrWin.Runtime.CreateFramebufferSignature [
                 DefaultSemantic.Depth, { format = RenderbufferFormat.DepthComponent32; samples = 1 }
             ] 
 
-        let shadowDepth =
+        let shadowDepth (faceTrafo : Trafo3d) =
             shadowCasterInScene
                 |> Sg.uniform "ViewportSize" (Mod.constant (V2i(1024,1024)))
-                |> Sg.viewTrafo lightViewTrafo
+                |> Sg.viewTrafo (lightViewTrafo (faceTrafo))
                 |> Sg.projTrafo (shadowProj |> Frustum.projTrafo |> Mod.constant)
                 |> Sg.compile vrWin.Runtime signature   
                 |> RenderTask.renderToDepth shadowMapSize
@@ -97,7 +126,17 @@ module OmnidirShadows =
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
-                |> Sg.uniform "LightViewTrafo" graphicsScene.lightViewTrafo
-                |> Sg.uniform "LightSpaceViewProjTrafo" lightSpaceViewProjTrafo
-                |> Sg.texture (Symbol.Create "ShadowTexture") shadowDepth
+                |> Sg.uniform "LightPos" graphicsScene.lightPos
+                |> Sg.uniform "LightSpaceViewProjTrafoPosX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosX |> int]))
+                |> Sg.uniform "LightSpaceViewProjTrafoNegX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FaceNegX |> int]))
+                |> Sg.uniform "LightSpaceViewProjTrafoPosY" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosY |> int]))
+                |> Sg.uniform "LightSpaceViewProjTrafoNegY" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FaceNegY |> int]))
+                |> Sg.uniform "LightSpaceViewProjTrafoPosZ" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosZ |> int]))
+                |> Sg.uniform "LightSpaceViewProjTrafoNegZ" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FaceNegZ |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTexturePosX") (shadowDepth(CubeFaceMatrices.[CubeFaces.FacePosX |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTextureNegX") (shadowDepth(CubeFaceMatrices.[CubeFaces.FaceNegX |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTexturePosY") (shadowDepth(CubeFaceMatrices.[CubeFaces.FacePosY |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTextureNegY") (shadowDepth(CubeFaceMatrices.[CubeFaces.FaceNegY |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTexturePosZ") (shadowDepth(CubeFaceMatrices.[CubeFaces.FacePosZ |> int]))
+                |> Sg.texture (Symbol.Create "ShadowTextureNegZ") (shadowDepth(CubeFaceMatrices.[CubeFaces.FaceNegZ |> int]))
         sg

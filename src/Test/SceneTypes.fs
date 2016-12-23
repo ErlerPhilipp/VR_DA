@@ -348,7 +348,7 @@ module GraphicsSceneTypes =
             mutable original    : Scene
             graphicsObjects     : cset<GraphicsObject>
             viewTrafo           : ModRef<Trafo3d>
-            lightViewTrafo      : ModRef<Trafo3d>
+            lightPos            : ModRef<V3d>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

@@ -36,12 +36,12 @@ module GraphicsScene =
             }
 
         static member Create(s : Scene) =
-            let lightViewTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
+            let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
             {
                 original           = s
                 graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 viewTrafo          = Mod.init s.viewTrafo
-                lightViewTrafo     = Mod.init lightViewTrafo
+                lightPos           = Mod.init lightPos
 
                 scoreTrafo         = Mod.init s.gameInfo.scoreTrafo
                 scoreText          = Mod.init s.gameInfo.scoreText
@@ -64,14 +64,15 @@ module GraphicsScene =
 
         static member Update(ms : GraphicsScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
-                let lightViewTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects)
+                let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
 
                 ms.original <- s
                 ms.viewTrafo.Value <- s.viewTrafo
-                ms.lightViewTrafo.Value <- lightViewTrafo
+                ms.lightPos.Value <- lightPos
 
+                
                 ms.scoreTrafo.Value <- s.gameInfo.scoreTrafo
-//                ms.scoreText.Value <- s.scoreText // TODO: crash!
+                //ms.scoreText.Value <- s.gameInfo.scoreText
 
                 let table = 
                     ms.graphicsObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -159,10 +160,10 @@ module GraphicsScene =
 
         let sg = OmnidirShadows.init(win, scene, graphicsScene)
 
-        let textSg =
-//            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
-            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
-                |> Sg.trafo graphicsScene.scoreTrafo
+//        let textSg =
+////            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
+//            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
+//                |> Sg.trafo graphicsScene.scoreTrafo
                 
         let rayCastDirSg =
             initialScene.raycastInfo.rayCastDirSg
@@ -186,7 +187,7 @@ module GraphicsScene =
                 |> Sg.onOff graphicsScene.hasRayCastHit
                 
         // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList [sg; rayCastDirSg; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg; textSg]
+        Sg.ofList [sg; rayCastDirSg; rayCastHitPointSg; rayCastHitAreaSg; rayCastCamSg; PhysicsScene.debugDrawer.debugDrawerSg]
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)

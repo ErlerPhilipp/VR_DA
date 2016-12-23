@@ -29,6 +29,7 @@ let main argv =
     Ag.initialize()
     Aardvark.Init()
     Aardvark.SceneGraph.IO.Loader.Assimp.initialize()
+    Aardvark.Rendering.GL.RuntimeConfig.SupressSparseBuffers <- true
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
@@ -240,7 +241,7 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
+            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), (trackingAreaHight - wallThickness * 2.5) * 0.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
         }
@@ -257,7 +258,6 @@ let main argv =
     let groundObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = false
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = Some groundSg
             surface = Some normalDiffuseSurface
@@ -268,7 +268,6 @@ let main argv =
     let ceilingObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = false
             trafo = Trafo3d.Translation(0.0, trackingAreaHight - 1.5 * wallThickness, 0.0)
             model = Some ceilingSg
             surface = Some normalDiffuseSurface
@@ -278,7 +277,6 @@ let main argv =
 
     let wallBase = 
         { defaultCollider with
-            castsShadow = false
             model = Some wallSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.25 * trackingAreaSize)
@@ -313,7 +311,6 @@ let main argv =
     let goalRoomGroundObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = false
             objectType = ObjectTypes.Ghost
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
             model = Some goalRoomGroundSg
@@ -325,7 +322,6 @@ let main argv =
     let goalRoomCeilingObject = 
         { defaultCollider with
             id = newId()
-            castsShadow = false
             trafo = Trafo3d.Translation(0.0, goalAreaHight - 1.5 * wallThickness, 0.0) * goalRoomOffset
             model = Some goalRoomCeilingSg
             surface = Some normalDiffuseSurface
@@ -335,7 +331,6 @@ let main argv =
 
     let goalRoomWallBase = 
         { defaultCollider with
-            castsShadow = false
             model = Some goalRoomWallSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.5 * goalAreaSize)
