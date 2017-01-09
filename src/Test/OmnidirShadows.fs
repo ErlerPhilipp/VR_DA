@@ -34,19 +34,11 @@ module OmnidirShadows =
         [|
             Trafo3d.FromOrthoNormalBasis(-V3d.OOI, -V3d.OIO, -V3d.IOO)
             Trafo3d.FromOrthoNormalBasis( V3d.OOI, -V3d.OIO,  V3d.IOO)
-            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OOI,  V3d.OIO)
-            Trafo3d.FromOrthoNormalBasis( V3d.IOO,  V3d.OOI, -V3d.OIO)
-            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OIO, -V3d.IOO)
-            Trafo3d.FromOrthoNormalBasis(-V3d.IOO, -V3d.OIO,  V3d.IOO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OOI, -V3d.OIO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO,  V3d.OOI,  V3d.OIO)
+            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OIO, -V3d.OOI)
+            Trafo3d.FromOrthoNormalBasis(-V3d.IOO, -V3d.OIO,  V3d.OOI)
         |]
-//        [|
-//            Trafo3d.FromOrthoNormalBasis(-V3d.OOI, -V3d.OIO, -V3d.IOO)
-//            Trafo3d.FromOrthoNormalBasis( V3d.OOI, -V3d.OIO,  V3d.IOO)
-//            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OOI,  V3d.OIO)
-//            Trafo3d.FromOrthoNormalBasis( V3d.IOO,  V3d.OOI, -V3d.OIO)
-//            Trafo3d.FromOrthoNormalBasis( V3d.IOO, -V3d.OIO, -V3d.IOO)
-//            Trafo3d.FromOrthoNormalBasis(-V3d.IOO, -V3d.OIO,  V3d.IOO)
-//        |]
 
     let init (vrWin : VrWindow.VrWindow, scene : Scene, graphicsScene : GraphicsScene) = 
         
@@ -102,8 +94,6 @@ module OmnidirShadows =
                 |> Mod.map (fun trafo -> 
                                 let lightPosTrafo = Trafo3d.Translation(trafo)
                                 (faceTrafo * lightPosTrafo).Inverse
-//                                (Trafo3d.RotationXInDegrees(-90.0) * lightPosTrafo).Inverse
-//                                Trafo3d.FromOrthoNormalBasis(V3d.IOO, -V3d.OOI, -V3d.OIO) * lightPosTrafo.Inverse
                             )
         let shadowProj = Frustum.perspective 90.0 0.1 50.0 1.0
         let lightViewProjTrafo(faceTrafo : Trafo3d) = lightViewTrafo(faceTrafo) |> Mod.map (fun view -> view * (shadowProj |> Frustum.projTrafo))

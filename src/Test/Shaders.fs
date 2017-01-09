@@ -79,14 +79,12 @@ module OmnidirShadowShader =
             let absLightToVertex = V3d(abs(lightToVertex.X), abs(lightToVertex.Y), abs(lightToVertex.Z))
 
             let getMajorDim(vec : V3d) =
-//                (vec.X >= vec.Y ? (vec.X >= vec.Z ? 0 : 2) : (vec.Y >= vec.Z ? 1 : 2))
                 if vec.X >= vec.Y then 
                     if vec.X >= vec.Z then 0 else 2
                 else 
                     if vec.Y >= vec.Z then 1 else 2
             
             let majorDim = getMajorDim(absLightToVertex)
-//            let majorDim = dirToVertex.MajorDim
 
             let getVectorComponent(v : V3d, compIndex : int) =
                 if compIndex = 0 then v.X
@@ -95,19 +93,8 @@ module OmnidirShadowShader =
                 else 100.0 // should never happen
 
             let majorComponent = getVectorComponent(lightToVertex, majorDim)
-            let positiveDir = true //if majorComponent > 0.0 then true else false
-//            let positiveDir = if dirToVertex.[majorDim] > 0.0 then true else false
+            let positiveDir = majorComponent > 0.0
 
-            // test
-//            match majorDim with
-//                | 0 when positiveDir ->     return v.c + V4d(1.0, 0.5, 0.5, 1.0)
-//                | 0 when not positiveDir -> return v.c + V4d(0.0, 0.5, 0.5, 1.0)
-//                | 1 when positiveDir ->     return v.c + V4d(0.5, 1.0, 0.5, 1.0)
-//                | 1 when not positiveDir -> return v.c + V4d(0.5, 0.0, 0.5, 1.0)
-//                | 2 when positiveDir ->     return v.c + V4d(0.5, 0.5, 1.0, 1.0)
-//                | 2 when not positiveDir -> return v.c + V4d(0.5, 0.5, 0.0, 1.0)
-//                | _ -> return V4d(0.0, 0.0, 0.0, 1.0)
-//
             let lightSpaceViewProjTrafo = 
                 match majorDim with
                     | 0 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosX
@@ -122,20 +109,17 @@ module OmnidirShadowShader =
             let div = lightSpace.XYZ / lightSpace.W
             let tc = V3d(0.5, 0.5,0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
             let colorFactor = 
-                if lightSpace.W >= 0.0 then
-                    let zOffset = 0.00017
-                    let sampleValue = 
-                        match majorDim with
-                            | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, tc.Z - zOffset)
-                            | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, tc.Z - zOffset)
-                            | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, tc.Z - zOffset)
-                            | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, tc.Z - zOffset)
-                            | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, tc.Z - zOffset)
-                            | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, tc.Z - zOffset)
-                            | _ -> 100.0 // should never happen
-                    max 0.3 sampleValue
-                else
-                    1.0
+                let zOffset = 0.00017
+                let sampleValue = 
+                    match majorDim with
+                        | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, tc.Z - zOffset)
+                        | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, tc.Z - zOffset)
+                        | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, tc.Z - zOffset)
+                        | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, tc.Z - zOffset)
+                        | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, tc.Z - zOffset)
+                        | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, tc.Z - zOffset)
+                        | _ -> 100.0 // should never happen
+                max 0.3 sampleValue
 
             return V4d(v.c.XYZ * colorFactor, v.c.W)
         }
