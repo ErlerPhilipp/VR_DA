@@ -65,8 +65,7 @@ let main argv =
     let diffuseEffect =         [
                                     defaultTrafoEffect
                                     defaultDiffuseTextureEffect
-                                    Lighting.Effect false
-                                    OmnidirShadowShader.shadowShader |> toEffect
+                                    OmnidirShadowShader.Effect false
                                 ] 
     let diffuseSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, diffuseEffect) :> ISurface
     let normalDiffuseEffect =   [
@@ -74,8 +73,7 @@ let main argv =
                                     TextureTiling.Effect
                                     NormalMap.Effect
                                     defaultDiffuseTextureEffect
-                                    Lighting.Effect false
-                                    OmnidirShadowShader.shadowShader |> toEffect
+                                    OmnidirShadowShader.Effect false
                                 ]
     let normalDiffuseSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, normalDiffuseEffect) :> ISurface
     let boxEffect =             [
@@ -83,9 +81,8 @@ let main argv =
                                     TextureTiling.Effect
                                     NormalMap.Effect
                                     defaultDiffuseTextureEffect
-                                    Lighting.Effect false
+                                    OmnidirShadowShader.Effect false
                                     Highlight.Effect
-                                    OmnidirShadowShader.shadowShader |> toEffect
                                 ]
     let boxSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, boxEffect) :> ISurface
     let ballEffect =            [
@@ -93,9 +90,8 @@ let main argv =
                                     defaultTrafoEffect
                                     SphereTexture.fragment |> toEffect
                                     defaultDiffuseTextureEffect
-                                    Lighting.Effect false
+                                    OmnidirShadowShader.Effect false
                                     Highlight.Effect
-                                    OmnidirShadowShader.shadowShader |> toEffect
                                 ]
     let ballSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, ballEffect) :> ISurface
 
@@ -241,7 +237,7 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), (trackingAreaHight - wallThickness * 2.5) * 0.5, 0.0)
+            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
         }
@@ -451,8 +447,8 @@ let main argv =
                 )
 
         let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 10)
-        let boxObjects = replicate ([box], 10)
+        let ballObjects = replicate ([ball], 1)
+        let boxObjects = replicate ([box], 0)
         
         manipulableObjects @ 
         ballObjects @ boxObjects @

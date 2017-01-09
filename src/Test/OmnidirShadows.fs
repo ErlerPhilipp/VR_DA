@@ -114,7 +114,7 @@ module OmnidirShadows =
         let sg =
             objectsInScene
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
-                |> Sg.uniform "AmbientFactor" (Mod.constant 0.03)
+                |> Sg.uniform "AmbientFactor" (Mod.constant 0.2)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
                 |> Sg.uniform "LightPos" graphicsScene.lightPos
                 |> Sg.uniform "LightSpaceViewProjTrafoPosX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosX |> int]))

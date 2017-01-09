@@ -16,6 +16,10 @@ module OmnidirShadowShader =
         member x.LightSpaceViewProjTrafoNegY : M44d = uniform?LightSpaceViewProjTrafoNegY
         member x.LightSpaceViewProjTrafoPosZ : M44d = uniform?LightSpaceViewProjTrafoPosZ
         member x.LightSpaceViewProjTrafoNegZ : M44d = uniform?LightSpaceViewProjTrafoNegZ
+        member x.HasSpecularColorTexture : bool = x?HasSpecularColorTexture
+        member x.SpecularExponent : int = x?SpecularExponent
+        member x.AmbientFactor : float = x?AmbientFactor
+        member x.LinearAttenuation : float = x?LinearAttenuation
         member x.LightPos : V3d = uniform?LightPos
         
     let private shadowSamplerPosX =
@@ -73,7 +77,7 @@ module OmnidirShadowShader =
             comparison ComparisonFunction.LessOrEqual
         }
 
-    let shadowShader (v : Vertex) =
+    let internal shadowShader (twoSided : bool) (v : Vertex) =
         fragment {
             let lightToVertex = v.wp.XYZ - uniform.LightPos
             let absLightToVertex = V3d(abs(lightToVertex.X), abs(lightToVertex.Y), abs(lightToVertex.Z))
@@ -108,7 +112,7 @@ module OmnidirShadowShader =
             let lightSpace = lightSpaceViewProjTrafo * v.wp
             let div = lightSpace.XYZ / lightSpace.W
             let tc = V3d(0.5, 0.5,0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
-            let colorFactor = 
+            let shadowFactor = 
                 let zOffset = 0.00017
                 let sampleValue = 
                     match majorDim with
@@ -119,10 +123,34 @@ module OmnidirShadowShader =
                         | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, tc.Z - zOffset)
                         | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, tc.Z - zOffset)
                         | _ -> 100.0 // should never happen
-                max 0.3 sampleValue
+//                max 0.3 sampleValue
+                sampleValue
+                
+            let n = v.n |> Vec.normalize
+            let fragmentToLight = uniform.LightPos - v.wp.XYZ
+            let distToLight = fragmentToLight.Length
+            let c = fragmentToLight |> Vec.normalize
+            let l = c
+            let h = c
+            let specularExponent = uniform.SpecularExponent
+            let attenuation = (1.0 - distToLight * uniform.LinearAttenuation) |> clamp 0.0 1.0
+            
+            let ambient = uniform.AmbientFactor
+            let diffuse = 
+                if twoSided then Vec.dot l n |> abs
+                else Vec.dot l n |> max 0.0
+                
+            let s = Vec.dot h n |> max 0.0
 
-            return V4d(v.c.XYZ * colorFactor, v.c.W)
+            let ambientPart =  ambient
+            let diffusePart =  (1.0 - ambient) * diffuse * attenuation
+            let specularPart = (pown s specularExponent) * attenuation
+
+            return V4d(v.c.XYZ * (ambientPart + (diffusePart + specularPart) * shadowFactor), v.c.W)
         }
+
+    let Effect (twoSided : bool)= 
+        toEffect (shadowShader twoSided)
 
 module Highlight =
     type UniformScope with
