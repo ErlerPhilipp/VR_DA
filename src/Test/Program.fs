@@ -415,6 +415,12 @@ let main argv =
             isColliding = false
         }
 
+//    let ObjectListToIdList(objectList : List<Object>) = objectList |> List.map (fun e -> e.id)
+
+    let ballObjects = replicate ([ball], 1)
+    let boxObjects = replicate ([box], 0)
+//    let ballObjectIds = ObjectListToIdList(ballObjects)
+
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
             l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
@@ -445,10 +451,7 @@ let main argv =
                         restitution = restitution
                     }
                 )
-
-        let manipulableObjects = replicate ((toObjects true manipulableModels), 1)
-        let ballObjects = replicate ([ball], 1)
-        let boxObjects = replicate ([box], 0)
+        let manipulableObjects = toObjects true manipulableModels
         
         manipulableObjects @ 
         ballObjects @ boxObjects @

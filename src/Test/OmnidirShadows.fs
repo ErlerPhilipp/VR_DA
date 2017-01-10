@@ -86,8 +86,8 @@ module OmnidirShadows =
                 |> Sg.set
                 |> Sg.blendMode(Mod.constant (BlendMode(false)))
 
-
-        let shadowMapSize = Mod.init (V2i(1024, 1024))
+        let shadowMapEdgeSize = 1024
+        let shadowMapSize = Mod.init (V2i(shadowMapEdgeSize, shadowMapEdgeSize))
     
         let lightViewTrafo(faceTrafo : Trafo3d) = 
             graphicsScene.lightPos
@@ -116,6 +116,7 @@ module OmnidirShadows =
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
                 |> Sg.uniform "AmbientFactor" (Mod.constant 0.2)
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
+                |> Sg.uniform "ShadowMapSize" (Mod.constant shadowMapEdgeSize)
                 |> Sg.uniform "LightPos" graphicsScene.lightPos
                 |> Sg.uniform "LightSpaceViewProjTrafoPosX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosX |> int]))
                 |> Sg.uniform "LightSpaceViewProjTrafoNegX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FaceNegX |> int]))

@@ -21,13 +21,14 @@ module OmnidirShadowShader =
         member x.AmbientFactor : float = x?AmbientFactor
         member x.LinearAttenuation : float = x?LinearAttenuation
         member x.LightPos : V3d = uniform?LightPos
+        member x.ShadowMapSize : float = uniform?ShadowMapSize
         
     let private shadowSamplerPosX =
         sampler2dShadow {
             texture uniform?ShadowTexturePosX
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -35,8 +36,8 @@ module OmnidirShadowShader =
         sampler2dShadow {
             texture uniform?ShadowTextureNegX
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -44,8 +45,8 @@ module OmnidirShadowShader =
         sampler2dShadow {
             texture uniform?ShadowTexturePosY
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -53,8 +54,8 @@ module OmnidirShadowShader =
         sampler2dShadow {
             texture uniform?ShadowTextureNegY
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -62,8 +63,8 @@ module OmnidirShadowShader =
         sampler2dShadow {
             texture uniform?ShadowTexturePosZ
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -71,8 +72,8 @@ module OmnidirShadowShader =
         sampler2dShadow {
             texture uniform?ShadowTextureNegZ
             filter Filter.MinMagLinear
-            addressU WrapMode.Border
-            addressV WrapMode.Border
+            addressU WrapMode.Clamp
+            addressV WrapMode.Clamp
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
@@ -108,23 +109,6 @@ module OmnidirShadowShader =
                     | 2 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosZ
                     | 2 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegZ
                     | _ -> uniform.LightSpaceViewProjTrafoPosX // M44d.Identity // should never happen
-
-            let lightSpace = lightSpaceViewProjTrafo * v.wp
-            let div = lightSpace.XYZ / lightSpace.W
-            let tc = V3d(0.5, 0.5,0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
-            let shadowFactor = 
-                let zOffset = 0.00017
-                let sampleValue = 
-                    match majorDim with
-                        | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, tc.Z - zOffset)
-                        | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, tc.Z - zOffset)
-                        | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, tc.Z - zOffset)
-                        | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, tc.Z - zOffset)
-                        | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, tc.Z - zOffset)
-                        | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, tc.Z - zOffset)
-                        | _ -> 100.0 // should never happen
-//                max 0.3 sampleValue
-                sampleValue
                 
             let n = v.n |> Vec.normalize
             let fragmentToLight = uniform.LightPos - v.wp.XYZ
@@ -136,15 +120,45 @@ module OmnidirShadowShader =
             let attenuation = (1.0 - distToLight * uniform.LinearAttenuation) |> clamp 0.0 1.0
             
             let ambient = uniform.AmbientFactor
+            let nDotl = Vec.dot n l
             let diffuse = 
-                if twoSided then Vec.dot l n |> abs
-                else Vec.dot l n |> max 0.0
+                if twoSided then nDotl |> abs
+                else nDotl |> max 0.0
                 
             let s = Vec.dot h n |> max 0.0
 
             let ambientPart =  ambient
             let diffusePart =  (1.0 - ambient) * diffuse * attenuation
             let specularPart = (pown s specularExponent) * attenuation
+
+            
+            let lightSpace = lightSpaceViewProjTrafo * v.wp
+            let div = lightSpace.XYZ / lightSpace.W
+            let tc = V3d(0.5, 0.5, 0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
+            
+            let constSlopeFactor = 0.001
+            let a = sqrt (1.0 - nDotl * nDotl) // = sin(acos(n dot l))
+            let slopeOffset = constSlopeFactor * a
+
+            let constZOffsetFactor = 0.005
+            let zOffset = constZOffsetFactor / uniform.ShadowMapSize
+            
+            let bias = (zOffset * 2.0 * distToLight + slopeOffset)
+            let depthCompare = tc.Z - bias
+
+            let shadowFactor = 
+                let sampleValue = 
+                    match majorDim with
+                        | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, depthCompare)
+                        | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, depthCompare)
+                        | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, depthCompare)
+                        | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, depthCompare)
+                        | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, depthCompare)
+                        | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, depthCompare)
+                        | _ -> 100.0 // should never happen
+//                max 0.3 sampleValue
+                sampleValue
+
 
             return V4d(v.c.XYZ * (ambientPart + (diffusePart + specularPart) * shadowFactor), v.c.W)
         }
