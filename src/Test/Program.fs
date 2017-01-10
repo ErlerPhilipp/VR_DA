@@ -210,6 +210,9 @@ let main argv =
             surface = Some diffuseSurface
             isColliding = false
         }
+    let simpleControllerBodyAssimpScene = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj") |> Loader.Assimp.load
+    let simpleControllerBodyTriangles = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root
+    let simpleControllerBodyCollShape = simpleControllerBodyTriangles |> BulletHelper.TriangleMesh
     let rightHandObject = 
         { defaultObject with
             id = newId()
@@ -218,7 +221,7 @@ let main argv =
             model = Some controllerSg
 //            effect = (diffuseEffect @ virtualHandEffect)
             surface = Some diffuseSurface
-            collisionShape = Some ( V3d(handBoxEdgeLength) |> BulletHelper.Shape.Box )
+            collisionShape = Some simpleControllerBodyCollShape
             isColliding = false
         }
     let camObject1 = 
