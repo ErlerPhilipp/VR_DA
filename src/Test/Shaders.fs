@@ -23,7 +23,7 @@ module OmnidirShadowShader =
         member x.LightPos : V3d = uniform?LightPos
         member x.ShadowMapSize : float = uniform?ShadowMapSize
         
-    let private shadowSamplerPosX =
+    let shadowSamplerPosX =
         sampler2dShadow {
             texture uniform?ShadowTexturePosX
             filter Filter.MinMagLinear
@@ -32,7 +32,7 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
-    let private shadowSamplerNegX =
+    let shadowSamplerNegX =
         sampler2dShadow {
             texture uniform?ShadowTextureNegX
             filter Filter.MinMagLinear
@@ -41,7 +41,7 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
-    let private shadowSamplerPosY =
+    let shadowSamplerPosY =
         sampler2dShadow {
             texture uniform?ShadowTexturePosY
             filter Filter.MinMagLinear
@@ -50,7 +50,7 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
-    let private shadowSamplerNegY =
+    let shadowSamplerNegY =
         sampler2dShadow {
             texture uniform?ShadowTextureNegY
             filter Filter.MinMagLinear
@@ -59,7 +59,7 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
-    let private shadowSamplerPosZ =
+    let shadowSamplerPosZ =
         sampler2dShadow {
             texture uniform?ShadowTexturePosZ
             filter Filter.MinMagLinear
@@ -68,7 +68,7 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
-    let private shadowSamplerNegZ =
+    let shadowSamplerNegZ =
         sampler2dShadow {
             texture uniform?ShadowTextureNegZ
             filter Filter.MinMagLinear
@@ -80,36 +80,81 @@ module OmnidirShadowShader =
 
     let internal shadowShader (twoSided : bool) (v : Vertex) =
         fragment {
-            let lightToVertex = v.wp.XYZ - uniform.LightPos
-            let absLightToVertex = V3d(abs(lightToVertex.X), abs(lightToVertex.Y), abs(lightToVertex.Z))
-
-            let getMajorDim(vec : V3d) =
-                if vec.X >= vec.Y then 
-                    if vec.X >= vec.Z then 0 else 2
-                else 
-                    if vec.Y >= vec.Z then 1 else 2
+//            let sampleShadow (sampleOffset : V3d, nDotl : float, distToLight : float) =
+            let getSamplePosition (sampleOffset : V3d, nDotl : float, distToLight : float) =
             
-            let majorDim = getMajorDim(absLightToVertex)
+                let samplePos = v.wp + V4d(sampleOffset, 0.0)
+                let lightDir = samplePos.XYZ - uniform.LightPos
+                let absLightDir = V3d(abs(lightDir.X), abs(lightDir.Y), abs(lightDir.Z))
 
-            let getVectorComponent(v : V3d, compIndex : int) =
-                if compIndex = 0 then v.X
-                elif compIndex = 1 then v.Y
-                elif compIndex = 2 then v.Z
-                else 100.0 // should never happen
+                let getMajorDim(vec : V3d) =
+                    if vec.X >= vec.Y then 
+                        if vec.X >= vec.Z then 0 else 2
+                    else 
+                        if vec.Y >= vec.Z then 1 else 2
+            
+                let majorDim = getMajorDim(absLightDir)
 
-            let majorComponent = getVectorComponent(lightToVertex, majorDim)
-            let positiveDir = majorComponent > 0.0
+                let getVectorComponent(v : V3d, compIndex : int) =
+                    if compIndex = 0 then v.X
+                    elif compIndex = 1 then v.Y
+                    elif compIndex = 2 then v.Z
+                    else 100.0 // should never happen
 
-            let lightSpaceViewProjTrafo = 
-                match majorDim with
-                    | 0 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosX
-                    | 0 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegX
-                    | 1 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosY
-                    | 1 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegY
-                    | 2 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosZ
-                    | 2 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegZ
-                    | _ -> uniform.LightSpaceViewProjTrafoPosX // M44d.Identity // should never happen
+                let majorComponent = getVectorComponent(lightDir, majorDim)
+                let positiveDir = majorComponent > 0.0
+
+                let lightSpaceViewProjTrafo = 
+                    match majorDim with
+                        | 0 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosX
+                        | 0 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegX
+                        | 1 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosY
+                        | 1 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegY
+                        | 2 when positiveDir ->     uniform.LightSpaceViewProjTrafoPosZ
+                        | 2 when not positiveDir -> uniform.LightSpaceViewProjTrafoNegZ
+                        | _ -> uniform.LightSpaceViewProjTrafoPosX // M44d.Identity // should never happen
                 
+                let lightSpace = lightSpaceViewProjTrafo * samplePos
+                let div = lightSpace.XYZ / lightSpace.W
+                let tc = V3d(0.5, 0.5, 0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
+            
+                let constSlopeFactor = 0.001
+                let a = sqrt (1.0 - nDotl * nDotl) // = sin(acos(n dot l))
+                let slopeOffset = constSlopeFactor * a
+
+                let constZOffsetFactor = 0.01
+                let zOffset = constZOffsetFactor / uniform.ShadowMapSize
+            
+                let bias = (zOffset * 2.0 * distToLight + slopeOffset)
+                let depthCompare = tc.Z - bias
+                
+//                let shadowFactor = 
+//                    match majorDim with
+//                        | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, depthCompare)
+//                        | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, depthCompare)
+//                        | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, depthCompare)
+//                        | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, depthCompare)
+//                        | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, depthCompare)
+//                        | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, depthCompare)
+//                        | _ -> 100.0 // should never happen
+//                shadowFactor
+                (V3d(tc.XY, depthCompare), majorDim, positiveDir)
+
+            
+            // array of offset direction for sampling
+//            let gridSamplingDisk = 
+//                [|
+//                   V3d(1, 1, 1);    V3d(1, -1, 1);  V3d(-1, -1, 1);     V3d(-1, 1, 1); 
+//                   V3d(1, 1, -1);   V3d(1, -1, -1); V3d(-1, -1, -1);    V3d(-1, 1, -1);
+//                   V3d(1, 1, 0);    V3d(1, -1, 0);  V3d(-1, -1, 0);     V3d(-1, 1, 0);
+//                   V3d(1, 0, 1);    V3d(-1, 0, 1);  V3d(1, 0, -1);      V3d(-1, 0, -1);
+//                   V3d(0, 1, 1);    V3d(0, -1, 1);  V3d(0, -1, -1);     V3d(0, 1, -1);
+//                |]
+            let gridSamplingDisk = 
+                [|
+                   V2d(1, 1); V2d(1, -1); V2d(-1, -1); V2d(-1, 1); 
+                |]
+
             let n = v.n |> Vec.normalize
             let fragmentToLight = uniform.LightPos - v.wp.XYZ
             let distToLight = fragmentToLight.Length
@@ -130,35 +175,51 @@ module OmnidirShadowShader =
             let ambientPart =  ambient
             let diffusePart =  (1.0 - ambient) * diffuse * attenuation
             let specularPart = (pown s specularExponent) * attenuation
-
             
-            let lightSpace = lightSpaceViewProjTrafo * v.wp
-            let div = lightSpace.XYZ / lightSpace.W
-            let tc = V3d(0.5, 0.5, 0.5) + V3d(0.5, 0.5, 0.5) * div.XYZ
+            // radius of PCF depending on distance from the light source
+//            let diskRadiusDistanceFactor = 0.002
+            let diskRadiusDistanceFactor = 0.0002
+            let diskRadius = distToLight * diskRadiusDistanceFactor
             
-            let constSlopeFactor = 0.001
-            let a = sqrt (1.0 - nDotl * nDotl) // = sin(acos(n dot l))
-            let slopeOffset = constSlopeFactor * a
-
-            let constZOffsetFactor = 0.005
-            let zOffset = constZOffsetFactor / uniform.ShadowMapSize
+            let mutable shadowSampleSum = 0.0
+            // first 8 are bounding box. If all are equal, expect everything inside to be like them.
+//            for i in 0..7 do
+            let samplingOffset = V3d(0.0, 0.0, 0.0)
+            let (samplePos, majorDim, positiveDir) = getSamplePosition(samplingOffset, nDotl, distToLight)
+            for i in 0..3 do
+//                let samplingOffset = V3d(gridSamplingDisk.[i] * diskRadius)
+//                shadowSampleSum <- shadowSampleSum + sampleShadow(samplingOffset, nDotl, distToLight)
+//                let (samplePos, majorDim, positiveDir) = getSamplePosition(samplingOffset, nDotl, distToLight)
+                let samplePos = V3d(samplePos.XY + gridSamplingDisk.[i] * diskRadius, samplePos.Z)
+                shadowSampleSum <- shadowSampleSum +
+                                    match majorDim with
+                                        | 0 when positiveDir ->     shadowSamplerPosX.Sample(samplePos.XY, samplePos.Z)
+                                        | 0 when not positiveDir -> shadowSamplerNegX.Sample(samplePos.XY, samplePos.Z)
+                                        | 1 when positiveDir ->     shadowSamplerPosY.Sample(samplePos.XY, samplePos.Z)
+                                        | 1 when not positiveDir -> shadowSamplerNegY.Sample(samplePos.XY, samplePos.Z)
+                                        | 2 when positiveDir ->     shadowSamplerPosZ.Sample(samplePos.XY, samplePos.Z)
+                                        | 2 when not positiveDir -> shadowSamplerNegZ.Sample(samplePos.XY, samplePos.Z)
+                                        | _ -> 100.0 // should never happen
+//            let mutable numSamples = 8.0
+            let mutable numSamples = 4.0
             
-            let bias = (zOffset * 2.0 * distToLight + slopeOffset)
-            let depthCompare = tc.Z - bias
+//            if shadowSampleSum = 0.0 || shadowSampleSum = 8.0 then
+//                for i in 8..20 do
+//                    let samplingOffset = V3d(gridSamplingDisk.[i] * diskRadius)
+//    //                shadowSampleSum <- shadowSampleSum + sampleShadow(samplingOffset, nDotl, distToLight)
+//                    let (samplePos, majorDim, positiveDir) = getSamplePosition(samplingOffset, nDotl, distToLight)
+//                    shadowSampleSum <- shadowSampleSum +
+//                                        match majorDim with
+//                                            | 0 when positiveDir ->    shadowSamplerPosX.Sample(samplePos.XY, samplePos.Z)
+//                                            | 0 when not positiveDir ->shadowSamplerNegX.Sample(samplePos.XY, samplePos.Z)
+//                                            | 1 when positiveDir ->    shadowSamplerPosY.Sample(samplePos.XY, samplePos.Z)
+//                                            | 1 when not positiveDir ->shadowSamplerNegY.Sample(samplePos.XY, samplePos.Z)
+//                                            | 2 when positiveDir ->    shadowSamplerPosZ.Sample(samplePos.XY, samplePos.Z)
+//                                            | 2 when not positiveDir ->shadowSamplerNegZ.Sample(samplePos.XY, samplePos.Z)
+//                                            | _ -> 100.0 // should never happen
+//                numSamples <- 20.0
 
-            let shadowFactor = 
-                let sampleValue = 
-                    match majorDim with
-                        | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, depthCompare)
-                        | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, depthCompare)
-                        | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, depthCompare)
-                        | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, depthCompare)
-                        | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, depthCompare)
-                        | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, depthCompare)
-                        | _ -> 100.0 // should never happen
-//                max 0.3 sampleValue
-                sampleValue
-
+            let shadowFactor = shadowSampleSum / numSamples
 
             return V4d(v.c.XYZ * (ambientPart + (diffusePart + specularPart) * shadowFactor), v.c.W)
         }

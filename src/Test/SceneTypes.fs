@@ -150,7 +150,7 @@ module LogicalSceneTypes =
             enablePhysics       = true
             gravity             = V3d(0.0, -9.81, 0.0)
             physicsDebugDraw    = false
-            numSubSteps         = 3
+            numSubSteps         = 6
             subStepTime         = 1.0 / 180.0
         }
 
