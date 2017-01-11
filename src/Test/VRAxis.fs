@@ -7,6 +7,10 @@ open Aardvark.Base.Incremental
 
 module VrAxis =
     open VrTypes
+    
+    type VrControllerAxis =
+        | Trackpad = 0
+        | Trigger = 1
 
     type VrAxis(system : CVRSystem, axisType : EVRControllerAxisType, deviceIndex : int, index : int) =
     

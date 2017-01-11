@@ -19,6 +19,17 @@ module LogicalSceneTypes =
         | Kinematic     // not moved by physics but by game logic
 
 //    type pset<'a> = PersistentHashSet<'a>
+
+    type GrabbedOptions = 
+        | NoGrab
+        | Controller1
+        | Controller2
+
+    type GrabbableOptions = 
+        | NoGrab
+        | Controller1
+        | Controller2
+        | BothControllers
     
     [<ReferenceEquality;NoComparison>]
     type Object =
@@ -29,9 +40,9 @@ module LogicalSceneTypes =
             objectType        : ObjectTypes
             isColliding       : bool
             isManipulable     : bool
-            isGrabbable       : bool
-            isGrabbed         : bool
-            wasGrabbed        : bool
+            isGrabbable       : GrabbableOptions
+            isGrabbed         : GrabbedOptions
+            wasGrabbed        : GrabbedOptions
             hitUpperTrigger   : bool
             hitLowerTrigger   : bool
             hasScored         : bool
@@ -62,9 +73,9 @@ module LogicalSceneTypes =
             objectType          = ObjectTypes.Static
             isColliding         = true
             isManipulable       = false
-            isGrabbable         = false
-            isGrabbed           = false
-            wasGrabbed          = false
+            isGrabbable         = GrabbableOptions.NoGrab
+            isGrabbed           = GrabbedOptions.NoGrab
+            wasGrabbed          = GrabbedOptions.NoGrab
             hitUpperTrigger     = false
             hitLowerTrigger     = false
             hasScored           = false
@@ -93,28 +104,55 @@ module LogicalSceneTypes =
             cam2ObjectId        : int
             controller1ObjectId : int
             controller2ObjectId : int
+            grabTrigger1Id      : int
+            grabTrigger2Id      : int
             headId              : int
             lowerHoopTriggerId  : int
             upperHoopTriggerId  : int
             lightId             : int
             groundObjectId      : int
-            grabTrigger0Id      : int
+        }
+
+    type RaycastInfo = 
+        {
+            wantsRayCast        : bool
+            rayCastStart        : V3d
+            rayCastEnd          : V3d
+            rayCastHasHit       : bool
+            rayCastHitPoint     : V3d
+            rayCastHitNormal    : V3d
+        }
+
+    let DefaultRaycastInfo = 
+        {
+            wantsRayCast        = false
+            rayCastStart        = V3d()
+            rayCastEnd          = V3d()
+            rayCastHasHit       = false
+            rayCastHitPoint     = V3d()
+            rayCastHitNormal    = V3d()
         }
 
     type InteractionInfo =
         {
             interactionType     : VrInteractions.VrInteractionTechnique
             armExtensionFactor  : float
-            movementType        : VrInteractions.VrMovementTechnique
             moveDirection       : V3d
+            lastContrTrafo      : Trafo3d
+            raycastInfo         : RaycastInfo
+            vibrationStrength   : float
+            vibStrLastFrame     : float
         }
 
     let DefaultInteractionInfo = 
         {
             interactionType     = VrInteractions.VrInteractionTechnique.VirtualHand
             armExtensionFactor  = 1.0
-            movementType        = VrInteractions.VrMovementTechnique.Flying
             moveDirection       = V3d.Zero
+            lastContrTrafo      = Trafo3d.Identity
+            raycastInfo         = DefaultRaycastInfo
+            vibrationStrength   = 0.0
+            vibStrLastFrame     = 0.0
         }
 
     type GameInfo = 
@@ -155,63 +193,22 @@ module LogicalSceneTypes =
             subStepTime         = 1.0 / 180.0
         }
 
-    type RaycastInfo = 
-        {
-            wantsRayCast        : bool
-            rayCastStart        : V3d
-            rayCastEnd          : V3d
-            rayCastHasHit       : bool
-            rayCastHitPoint     : V3d
-            rayCastHitNormal    : V3d
-            rayCastDirSg        : ISg
-            rayCastHitAreaSg    : ISg
-            rayCastHitPointSg   : ISg
-            rayCastCamSg        : ISg
-        }
-
-    let DefaultRaycastInfo (rayCastDirSg : ISg, rayCastHitPointSg : ISg, rayCastHitAreaSg : ISg, rayCastCamSg : ISg) = 
-        {
-            wantsRayCast        = false
-            rayCastStart        = V3d()
-            rayCastEnd          = V3d()
-            rayCastHasHit       = false
-            rayCastHitPoint     = V3d()
-            rayCastHitNormal    = V3d()
-            rayCastDirSg        = rayCastDirSg
-            rayCastHitPointSg   = rayCastHitPointSg
-            rayCastHitAreaSg    = rayCastHitAreaSg
-            rayCastCamSg        = rayCastCamSg
-        }
-
-    type VibrationInfo = 
-        {
-            ctr1VibStr          : float
-            ctr1VibStrLastFrame : float
-            ctr2VibStr          : float
-            ctr2VibStrLastFrame : float
-        }
-
-    let DefaultVibrationInfo = 
-        {
-            ctr1VibStr          = 0.0
-            ctr1VibStrLastFrame = 0.0
-            ctr2VibStr          = 0.0
-            ctr2VibStrLastFrame = 0.0
-        }
-
     type Scene =
         {
             objects             : PersistentHashSet<Object>
             viewTrafo           : Trafo3d
-            lastContr2Trafo     : Trafo3d
             trackingToWorld     : Trafo3d
             
+            rayCastDirSg        :ISg
+            rayCastHitPointSg   :ISg
+            rayCastHitAreaSg    :ISg
+            rayCastCamSg        :ISg
+            
             specialObjectIds    : SpecialObjectIds
-            interactionInfo     : InteractionInfo
+            interactionInfo1    : InteractionInfo
+            interactionInfo2    : InteractionInfo
             gameInfo            : GameInfo
             physicsInfo         : PhysicsInfo
-            raycastInfo         : RaycastInfo
-            vibrationInfo       : VibrationInfo
         }
         
     let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : PersistentHashSet<Object>, dt : float) = 
@@ -275,7 +272,7 @@ module LogicalSceneTypes =
         | TimeElapsed of System.TimeSpan
         | UpdateViewTrafo of Trafo3d
         | Collision of int * int
-        | RayCastResult of bool * V3d * V3d
+        | RayCastResult of int * bool * V3d * V3d
         
 module PhysicsSceneTypes = 
     open LogicalSceneTypes
@@ -344,6 +341,16 @@ module GraphicsSceneTypes =
             mtilingFactor       : ModRef<V2d>
         }
 
+    type RaycastMods = 
+        {
+            hasRayCastHit       : ModRef<bool>
+            drawHitPoint        : ModRef<bool>
+            drawHitArea         : ModRef<bool>
+            hasRayCastDir       : ModRef<Trafo3d>
+            rayCastHitTrafo     : ModRef<Trafo3d>
+            rayCastCam          : ModRef<Trafo3d>
+        }
+
     type GraphicsScene =
         {
             mutable original    : Scene
@@ -354,10 +361,6 @@ module GraphicsSceneTypes =
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>
             
-            hasRayCastHit       : ModRef<bool>
-            drawHitPoint        : ModRef<bool>
-            drawHitArea         : ModRef<bool>
-            hasRayCastDir       : ModRef<Trafo3d>
-            rayCastHitTrafo     : ModRef<Trafo3d>
-            rayCastCam          : ModRef<Trafo3d>
+            raycastMods1        : RaycastMods
+            raycastMods2        : RaycastMods
         }

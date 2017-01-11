@@ -38,12 +38,6 @@ let main argv =
     let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
     let defaultDiffuseTextureEffect = DefaultSurfaces.diffuseTexture |> toEffect
 
-    let virtualHandEffect =     [
-                                    defaultTrafoEffect
-                                    DefaultSurfaces.uniformColor (LogicalScene.virtualHandColor) |> toEffect
-                                    defaultSimpleLightingEffect
-                                ]
-    let virtualHandSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, virtualHandEffect) :> ISurface
     let constColorEffect =      [
                                     defaultTrafoEffect
                                     DefaultSurfaces.constantColor C4f.White |> toEffect
@@ -68,6 +62,13 @@ let main argv =
                                     OmnidirShadowShader.Effect false
                                 ] 
     let diffuseSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, diffuseEffect) :> ISurface
+    let diffuseContrEffect =    [
+                                    defaultTrafoEffect
+                                    defaultDiffuseTextureEffect
+                                    ControllerOverlayColor.Effect
+                                    OmnidirShadowShader.Effect false
+                                ] 
+    let diffuseContrSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, diffuseContrEffect) :> ISurface
     let normalDiffuseEffect =   [
                                     defaultTrafoEffect
                                     TextureTiling.Effect
@@ -171,6 +172,7 @@ let main argv =
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\lh_basestation_vive\lh_basestation_vive.png", textureParam) :> ITexture))
             
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
+                    |> Sg.effect beamEffect
     let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
                     |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
@@ -202,27 +204,22 @@ let main argv =
     let rayCastHitAreaSg = rayCastAreaSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastCamSg = rayCastCamSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
 
-    let leftHandObject = 
-        { defaultObject with
-            id = newId()
-            model = Some controllerSg
-            surface = Some diffuseSurface
-            isColliding = false
-        }
     let simpleControllerBodyAssimpScene = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj") |> Loader.Assimp.load
     let simpleControllerBodyTriangles = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root
     let simpleControllerBodyCollShape = simpleControllerBodyTriangles |> BulletHelper.TriangleMesh
-    let rightHandObject = 
+    let controller1Object = 
         { defaultObject with
             id = newId()
             objectType = ObjectTypes.Kinematic
             model = Some controllerSg
-//            effect = (diffuseEffect @ virtualHandEffect)
-            surface = Some diffuseSurface
+            surface = Some diffuseContrSurface
             collisionShape = Some simpleControllerBodyCollShape
+            ccdSpeedThreshold = 0.1f
+            ccdSphereRadius = 0.5f
             isColliding = true
         }
-    let grabTrigger0 = 
+    let controller2Object = { controller1Object with id = newId() }
+    let grabTrigger1 = 
         { defaultObject with
             id = newId()
             castsShadow = false
@@ -231,6 +228,7 @@ let main argv =
             collisionShape = Some (BulletHelper.Shape.CylinderZ (0.09, 0.25))
             isColliding = false
         }
+    let grabTrigger2 = { grabTrigger1 with id = newId() }
     let camObject1 = 
         { defaultObject with
             id = newId()
@@ -466,36 +464,40 @@ let main argv =
         @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
-        @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
-        @ [grabTrigger0;]
+        @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
+        @ [grabTrigger1; grabTrigger2]
         
     let specialObjectIds =
         {
             cam1ObjectId        = camObject1.id
             cam2ObjectId        = camObject2.id
-            controller1ObjectId = leftHandObject.id
-            controller2ObjectId = rightHandObject.id
+            controller1ObjectId = controller1Object.id
+            controller2ObjectId = controller2Object.id
             headId              = headCollider.id
             lightId             = lightObject.id
             lowerHoopTriggerId  = lowerHoopTrigger.id
             upperHoopTriggerId  = upperHoopTrigger.id
             groundObjectId      = goalRoomGroundObject.id
-            grabTrigger0Id      = grabTrigger0.id
+            grabTrigger1Id      = grabTrigger1.id
+            grabTrigger2Id      = grabTrigger2.id
         }
 
     let sceneObj =
         {
             objects             = PersistentHashSet.ofList objects
             viewTrafo           = Trafo3d.Identity
-            lastContr2Trafo     = Trafo3d.Identity
             trackingToWorld     = Trafo3d.Identity
+            
+            rayCastDirSg        = beamSg
+            rayCastHitPointSg   = rayCastHitPointSg
+            rayCastHitAreaSg    = rayCastHitAreaSg
+            rayCastCamSg        = rayCastCamSg
 
-            specialObjectIds = specialObjectIds
-            interactionInfo = DefaultInteractionInfo
-            gameInfo = DefaultGameInfo(scoreTrafo)
-            physicsInfo = DefaultPhysicsInfo
-            raycastInfo = DefaultRaycastInfo(beamSg |> Sg.effect beamEffect, rayCastHitPointSg, rayCastHitAreaSg, rayCastCamSg)
-            vibrationInfo = DefaultVibrationInfo
+            specialObjectIds    = specialObjectIds
+            interactionInfo1    = DefaultInteractionInfo
+            interactionInfo2    = DefaultInteractionInfo
+            gameInfo            = DefaultGameInfo(scoreTrafo)
+            physicsInfo         = DefaultPhysicsInfo
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin

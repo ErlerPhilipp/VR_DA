@@ -154,32 +154,35 @@ module PhysicsScene =
                             collisionObject.Activate()
 
                         // release grab
-                        if (o.wasGrabbed && not o.isGrabbed) then
+                        if (o.wasGrabbed <> GrabbedOptions.NoGrab && o.isGrabbed = GrabbedOptions.NoGrab) then
+                            let firstController = o.wasGrabbed = GrabbedOptions.Controller1
                             collisionObject.ClearForces()
                             // activate by setting normal mass
                             collisionObject.SetMassProps(o.mass, pb.inertia)
                             collisionObject.CollisionFlags <- collisionObject.CollisionFlags &&& ~~~(BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject)
 
                             // set object velocity to hand velocity
-                            let vel = VrDriver.inputDevices.controller2.Velocity
-                            let vel = s.trackingToWorld.Forward.TransformDir(vel)
+                            let controllerDevice = if firstController then VrDriver.inputDevices.controller1 else VrDriver.inputDevices.controller2
+                            let vel = s.trackingToWorld.Forward.TransformDir(controllerDevice.Velocity)
+                            let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
                             let handVelocity = 
-                                match s.interactionInfo.interactionType with
+                                match interactionInfo.interactionType with
                                     | VrInteractions.VrInteractionTechnique.VirtualHand -> toVector3(vel)
                                     | VrInteractions.VrInteractionTechnique.GoGo -> 
                                         // TODO: make more accurate, function of difference with last step
                                         //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
-                                        toVector3(vel * s.interactionInfo.armExtensionFactor)
+                                        toVector3(vel * interactionInfo.armExtensionFactor)
                                     | _ -> failwith "not implemented"
 
 //                            collisionObject.LinearVelocity <- handVelocity
                             collisionObject.LinearVelocity <- Vector3()
-                            let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller2ObjectId, s.objects).Forward.TransformPos(V3d())
+                            let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
+                            let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
                             let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
                             let relativePos = (colliderPos - controllerPos) |> toVector3
                             collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
 
-                            let angVel = VrDriver.inputDevices.controller2.AngularVelocity
+                            let angVel = controllerDevice.AngularVelocity
                             let handAngVelocity = toVector3(angVel)
 //                            collisionObject.AngularVelocity <- handAngVelocity
                             collisionObject.AngularVelocity <- Vector3()
@@ -190,7 +193,7 @@ module PhysicsScene =
                             collisionObject.ForceActivationState(ActivationState.ActiveTag)
                         
                         // grab
-                        else if not o.wasGrabbed && o.isGrabbed then
+                        else if (o.wasGrabbed = GrabbedOptions.NoGrab && o.isGrabbed <> GrabbedOptions.NoGrab) then
                             collisionObject.ClearForces()
                             // deactivate by setting infinite mass
                             collisionObject.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
@@ -350,10 +353,13 @@ module PhysicsScene =
                 for message in messages do
                     newScene <- LogicalScene.update newScene message
                    
-                if s.raycastInfo.wantsRayCast then
-                    let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(s.raycastInfo.rayCastStart), toVector3(s.raycastInfo.rayCastEnd), world.dynamicsWorld)
-                    let rayCastMsg = RayCastResult (hasHit, toV3d(hitPoint), toV3d(hitNormal))
-                    newScene <- LogicalScene.update newScene rayCastMsg
+                let performRayCast(source : int, raycastInfo : LogicalSceneTypes.RaycastInfo) =
+                    if raycastInfo.wantsRayCast then
+                        let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(raycastInfo.rayCastStart), toVector3(raycastInfo.rayCastEnd), world.dynamicsWorld)
+                        let rayCastMsg = RayCastResult (source, hasHit, toV3d(hitPoint), toV3d(hitNormal))
+                        newScene <- LogicalScene.update newScene rayCastMsg
+                performRayCast(0, s.interactionInfo1.raycastInfo)
+                performRayCast(1, s.interactionInfo2.raycastInfo)
 
                 newScene
             | None -> 

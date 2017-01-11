@@ -88,25 +88,26 @@ module OmnidirShadowShader =
             borderColor C4f.White
             comparison ComparisonFunction.LessOrEqual
         }
+        
+
+    let getVectorComponent(v : V3d, compIndex : int) =
+        if compIndex = 0 then v.X
+        elif compIndex = 1 then v.Y
+        elif compIndex = 2 then v.Z
+        else 100.0 // should never happen
+        
+    let getMajorDim(vec : V3d) =
+        if vec.X >= vec.Y then 
+            if vec.X >= vec.Z then 0 else 2
+        else 
+            if vec.Y >= vec.Z then 1 else 2
 
     let sampleShadow (wp : V4d, sampleOffset : V3d, nDotl : float, distToLight : float) =       
         let samplePos = wp + V4d(sampleOffset, 0.0)
         let lightDir = samplePos.XYZ - uniform.LightPos
         let absLightDir = V3d(abs(lightDir.X), abs(lightDir.Y), abs(lightDir.Z))
-        
-        let getMajorDim(vec : V3d) =
-            if vec.X >= vec.Y then 
-                if vec.X >= vec.Z then 0 else 2
-            else 
-                if vec.Y >= vec.Z then 1 else 2
             
         let majorDim = getMajorDim(absLightDir)
-
-        let getVectorComponent(v : V3d, compIndex : int) =
-            if compIndex = 0 then v.X
-            elif compIndex = 1 then v.Y
-            elif compIndex = 2 then v.Z
-            else 100.0 // should never happen
 
         let majorComponent = getVectorComponent(lightDir, majorDim)
         let positiveDir = majorComponent > 0.0
@@ -241,6 +242,18 @@ module Highlight =
     
     let Effect = 
         toEffect highlight
+        
+module ControllerOverlayColor =
+    type UniformScope with
+        member x.overlayColor : V4d = x?overlayColor
+
+    let controllerOverlayColor (v : Vertex) =
+        fragment {
+            return (1.0 - uniform.overlayColor.Z) * v.c + V4d(uniform.overlayColor.XYZ / uniform.overlayColor.Z, uniform.overlayColor.Z)
+        }
+    
+    let Effect = 
+        toEffect controllerOverlayColor
 
 module TextureTiling = 
 

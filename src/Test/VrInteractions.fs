@@ -10,13 +10,11 @@ module VrInteractions =
     open VrTypes
     
     type VrInteractionTechnique =
-        | VirtualHand = 1
-        | GoGo = 2
-        
-    type VrMovementTechnique =
-        | Flying = 1
-        | TeleportPos = 2
-        | TeleportArea = 3
+        | VirtualHand = 0
+        | GoGo = 1
+        | Flying = 2
+        | TeleportPos = 3
+        | TeleportArea = 4
 
     let getAxisValueWithDeathZone (value : float) = 
         let deathZone = 0.1
@@ -26,13 +24,19 @@ module VrInteractions =
     let nextInteractionTechnique (it : VrInteractionTechnique) =
         match it with
             | VrInteractionTechnique.VirtualHand -> VrInteractionTechnique.GoGo
-            | VrInteractionTechnique.GoGo -> VrInteractionTechnique.VirtualHand
+            | VrInteractionTechnique.GoGo -> VrInteractionTechnique.Flying
+            | VrInteractionTechnique.Flying -> VrInteractionTechnique.TeleportPos
+            | VrInteractionTechnique.TeleportPos -> VrInteractionTechnique.TeleportArea
+            | VrInteractionTechnique.TeleportArea -> VrInteractionTechnique.Flying
             | _ -> VrInteractionTechnique.VirtualHand
             
     let colorForInteractionTechnique(it : VrInteractionTechnique) =
         match it with
-            | VrInteractionTechnique.VirtualHand -> C4f.White
-            | VrInteractionTechnique.GoGo -> C4f.Green
+            | VrInteractionTechnique.VirtualHand -> C4f(1.0, 1.0, 1.0, 0.0)
+            | VrInteractionTechnique.GoGo -> C4f.Red
+            | VrInteractionTechnique.Flying -> C4f.Green
+            | VrInteractionTechnique.TeleportPos -> C4f.Blue
+            | VrInteractionTechnique.TeleportArea -> C4f.DarkBlue
             | _ -> C4f.White
 
     let getVirtualHandTrafoAndExtensionFactor (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, trackingToWorld : Trafo3d) = 
@@ -58,13 +62,6 @@ module VrInteractions =
             //printfn "arm length: %A gogo arm length: %A, pos: %A" headToHandDist (1.0+gogoAdditionalExtension) (gogoHandTrafo.GetViewPosition())
             (gogoHandTrafo, gogoAdditionalExtension)
         
-    let nextMovementTechnique (it : VrMovementTechnique) =
-        match it with
-            | VrMovementTechnique.Flying -> VrMovementTechnique.TeleportPos
-            | VrMovementTechnique.TeleportPos -> VrMovementTechnique.TeleportArea
-            | VrMovementTechnique.TeleportArea -> VrMovementTechnique.Flying
-            | _ -> VrMovementTechnique.Flying
-
     let getTrafoAfterFlying (trackingToWorld : Trafo3d, moveDirection : V3d, deltaTime : float, axisValue: float) = 
         let axisWithDeathZone = getAxisValueWithDeathZone(axisValue)
         let maxSpeed = 10.0

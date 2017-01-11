@@ -52,6 +52,10 @@ module OmnidirShadows =
                             |> Sg.uniform "isHighlighted" t.mhasHighlight
                             |> Sg.uniform "scoredState" t.mscoredState
                             |> Sg.uniform "tilingFactor" t.mtilingFactor
+                            |> if t.original.id = scene.specialObjectIds.controller1ObjectId then
+                                    Sg.uniform "overlayColor" LogicalScene.controller1OverlayColor
+                               else
+                                    Sg.uniform "overlayColor" LogicalScene.controller2OverlayColor
                             |> Sg.trafo t.mtrafo
                             |> Sg.surface (Mod.constant surface)
                     | _ ->
@@ -103,6 +107,11 @@ module OmnidirShadows =
                 DefaultSemantic.Depth, { format = RenderbufferFormat.DepthComponent32; samples = 1 }
             ] 
 
+//        let tex = vrWin.Runtime.CreateTextureCube()
+//        let fbo = vrWin.Runtime.Create
+//        let renderToDepthCube (size : IMod<V2i>) (t : IRenderTask) =
+//            t.Runtime.Value
+
         let shadowDepth (faceTrafo : Trafo3d) =
             shadowCasterInScene
                 |> Sg.uniform "ViewportSize" (Mod.constant (V2i(1024,1024)))
@@ -110,7 +119,7 @@ module OmnidirShadows =
                 |> Sg.projTrafo (shadowProj |> Frustum.projTrafo |> Mod.constant)
                 |> Sg.compile vrWin.Runtime signature   
                 |> RenderTask.renderToDepth shadowMapSize
-               
+
         let sg =
             objectsInScene
                 |> Sg.uniform "SpecularExponent" (Mod.constant 32)
