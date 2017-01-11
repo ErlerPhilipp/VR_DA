@@ -172,11 +172,18 @@ module PhysicsScene =
                                         toVector3(vel * s.interactionInfo.armExtensionFactor)
                                     | _ -> failwith "not implemented"
 
-                            collisionObject.LinearVelocity <- handVelocity
+//                            collisionObject.LinearVelocity <- handVelocity
+                            collisionObject.LinearVelocity <- Vector3()
+                            let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(s.specialObjectIds.controller2ObjectId, s.objects).Forward.TransformPos(V3d())
+                            let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
+                            let relativePos = (colliderPos - controllerPos) |> toVector3
+                            collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
 
                             let angVel = VrDriver.inputDevices.controller2.AngularVelocity
                             let handAngVelocity = toVector3(angVel)
-                            collisionObject.AngularVelocity <- handAngVelocity
+//                            collisionObject.AngularVelocity <- handAngVelocity
+                            collisionObject.AngularVelocity <- Vector3()
+                            collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
                             
                             // reset to normal state
                             collisionObject.Activate()
