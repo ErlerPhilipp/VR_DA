@@ -98,6 +98,7 @@ module LogicalSceneTypes =
             upperHoopTriggerId  : int
             lightId             : int
             groundObjectId      : int
+            grabTrigger0Id      : int
         }
 
     type InteractionInfo =

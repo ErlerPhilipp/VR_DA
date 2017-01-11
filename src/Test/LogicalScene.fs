@@ -54,6 +54,7 @@ module LogicalScene =
                                          |> PersistentHashSet.map (fun a ->
                                             if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                                          )
+                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.grabTrigger0Id, virtualHandTrafo, newObjects, scene.physicsInfo.deltaTime)
                         { scene with 
                             objects = newObjects
                             interactionInfo = { scene.interactionInfo with armExtensionFactor = 1.0 }
@@ -67,11 +68,12 @@ module LogicalScene =
                                          |> PersistentHashSet.map (fun a ->
                                             if a.isGrabbed then { a with trafo = a.trafo * deltaTrafo } else a
                                          )
+                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.grabTrigger0Id, virtualHandTrafo, newObjects, scene.physicsInfo.deltaTime)
 
         //                // attach light to grabbing hand
 //                        let lightPos = virtualHandTrafo
 //                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightPos, newObjects, scene.physicsInfo.deltaTime)
-
+                        
                         { scene with 
                             objects = newObjects
                             interactionInfo = { scene.interactionInfo with armExtensionFactor = extension }
@@ -121,7 +123,13 @@ module LogicalScene =
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o ->
-                                if o.isManipulable && o.isGrabbable then { o with isGrabbed = true; } else o
+                                if o.isManipulable && o.isGrabbable then 
+                                    let controller2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller2ObjectId, scene.objects)
+                                    { o with 
+                                        isGrabbed = true
+//                                        trafo = controller2Trafo
+                                    } 
+                                    else o
                             ) 
                         |> PersistentHashSet.map (fun a ->
                                 if a.hitLowerTrigger then { a with hitLowerTrigger = false } else a
@@ -295,9 +303,9 @@ module LogicalScene =
                                 else 
                                     o
                             )
-                        // check grabbable
+                        // check grabbable with controller
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithController = ghostId = scene.specialObjectIds.controller2ObjectId && o.id = colliderId
+                                let collidingWithController = ghostId = scene.specialObjectIds.grabTrigger0Id && o.id = colliderId && colliderId <> scene.specialObjectIds.controller2ObjectId
                                 if collidingWithController then
                                     let ghostLinearVelocity = getObjectWithId(ghostId, scene.objects).linearVelocity
                                     let colliderLinearVelocity = o.linearVelocity

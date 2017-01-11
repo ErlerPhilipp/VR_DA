@@ -205,7 +205,6 @@ let main argv =
     let leftHandObject = 
         { defaultObject with
             id = newId()
-            trafo = Trafo3d.Identity
             model = Some controllerSg
             surface = Some diffuseSurface
             isColliding = false
@@ -216,18 +215,25 @@ let main argv =
     let rightHandObject = 
         { defaultObject with
             id = newId()
-            objectType = ObjectTypes.Ghost
-            trafo = Trafo3d.Identity
+            objectType = ObjectTypes.Kinematic
             model = Some controllerSg
 //            effect = (diffuseEffect @ virtualHandEffect)
             surface = Some diffuseSurface
             collisionShape = Some simpleControllerBodyCollShape
+            isColliding = true
+        }
+    let grabTrigger0 = 
+        { defaultObject with
+            id = newId()
+            castsShadow = false
+            objectType = ObjectTypes.Ghost
+//            collisionShape = Some (BulletHelper.Shape.Sphere 0.15)
+            collisionShape = Some (BulletHelper.Shape.CylinderZ (0.09, 0.25))
             isColliding = false
         }
     let camObject1 = 
         { defaultObject with
             id = newId()
-            trafo = Trafo3d.Identity
             model = Some basestationSg
             surface = Some diffuseSurface
             isColliding = false
@@ -366,7 +372,6 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
-            trafo = Trafo3d.Identity
             model = Some ballSg
             surface = Some ballSurface
             mass = 0.625f
@@ -446,7 +451,6 @@ let main argv =
                     { defaultObject with
                         id = newId()
                         isManipulable = canMove
-                        trafo = Trafo3d.Identity
                         model = Some sg 
                         surface = Some diffuseSurface
                         mass = mass
@@ -463,6 +467,7 @@ let main argv =
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
         @ [leftHandObject; rightHandObject; camObject1; camObject2; headCollider]
+        @ [grabTrigger0;]
         
     let specialObjectIds =
         {
@@ -475,6 +480,7 @@ let main argv =
             lowerHoopTriggerId  = lowerHoopTrigger.id
             upperHoopTriggerId  = upperHoopTrigger.id
             groundObjectId      = goalRoomGroundObject.id
+            grabTrigger0Id      = grabTrigger0.id
         }
 
     let sceneObj =
