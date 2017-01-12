@@ -41,14 +41,17 @@ let main argv =
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
-        
+    
+    //#region CollisionGroups   
     let staticCollidesWith = CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.Avatar ||| CollisionGroups.TeleportRaycast |> int16
     let ballCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.HoopTrigger ||| CollisionGroups.Avatar |> int16
     let handTriggerCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball |> int16
     let hoopTriggerCollidesWith =  CollisionGroups.Ball |> int16
     let avatarCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball ||| CollisionGroups.Avatar |> int16
     let teleportRaycastCollidesWith =  CollisionGroups.Static |> int16
+    //#endregion
     
+    //#region Effects and Surfaces   
     let defaultTrafoEffect = DefaultSurfaces.trafo |> toEffect
     let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
     let defaultDiffuseTextureEffect = DefaultSurfaces.diffuseTexture |> toEffect
@@ -110,6 +113,24 @@ let main argv =
                                     Highlight.Effect
                                 ]
     let ballSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, ballEffect) :> ISurface
+    //#endregion
+    
+    //#region Textures   
+    let textureParam = { TextureParams.empty with wantMipMaps = true }
+    let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", textureParam) :> ITexture))
+    let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", textureParam) :> ITexture))
+    let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", textureParam) :> ITexture))
+    let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", textureParam) :> ITexture))
+    let cushionNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Tufted Leather\TexturesCom_TuftedLeather_normalmap_S.png", textureParam) :> ITexture))
+    let pedestalNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Marble Polished\TexturesCom_MarblePolishedWhite1_normalmap_S.png", textureParam) :> ITexture))
+
+    let groundDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg", textureParam) :> ITexture))
+    let ceilingDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg", textureParam) :> ITexture))
+    let wallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
+    let goalRoomWallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg", textureParam) :> ITexture))
+    let cushionDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Tufted Leather\TexturesCom_TuftedLeather_albedo_S.png", textureParam) :> ITexture))
+    let pedestalDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Marble Polished\TexturesCom_MarblePolishedWhite1_diffuse_S.png", textureParam) :> ITexture))
+    //#endregion
 
     let trackingAreaSize = 2.9
     let trackingAreaHight = 5.2
@@ -124,17 +145,6 @@ let main argv =
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
                         Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
-    
-    let textureParam = { TextureParams.empty with wantMipMaps = true }
-    let groundNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_normalmap_S.jpg", textureParam) :> ITexture))
-    let ceilingNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_normalmap_S.jpg", textureParam) :> ITexture))
-    let wallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_normalmap_S.jpg", textureParam) :> ITexture))
-    let goalRoomWallNormalMap = Sg.texture DefaultSemantic.NormalMapTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_normalmap_S.jpg", textureParam) :> ITexture))
-
-    let groundDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wood Floor\TexturesCom_Wood Floor A_albedo_S.jpg", textureParam) :> ITexture))
-    let ceilingDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Wooden Planks\TexturesCom_Wood Planks_albedo_S.jpg", textureParam) :> ITexture))
-    let wallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
-    let goalRoomWallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg", textureParam) :> ITexture))
 
     let staticModels =
         [
@@ -188,7 +198,8 @@ let main argv =
             
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
                     |> Sg.effect beamEffect
-    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1213)
+    let ballRadius = 0.1213
+    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius)
                     |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
     let rayCastAreaSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, 0.1, trackingAreaSize))))
@@ -207,6 +218,15 @@ let main argv =
                             |> ceilingDiffuseTexture |> ceilingNormalMap
     let goalRoomWallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, goalAreaHight, wallThickness))))
                             |> goalRoomWallDiffuseTexture |> goalRoomWallNormalMap
+    let pedestalHeight = 0.8
+    let pedestalRadius = 0.2
+//    let pedestalSg = Sg.cylinder 4 (Mod.constant C4b.Gray) (Mod.constant pedestalRadius) (Mod.constant pedestalHeight)
+    let pedestalSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(pedestalRadius, pedestalHeight, pedestalRadius))))
+                            |> pedestalDiffuseTexture |> pedestalNormalMap
+    let cushionHeight = pedestalRadius * 0.75
+    let cushionSize = pedestalRadius * 1.5
+    let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
+                            |> cushionDiffuseTexture |> cushionNormalMap
 
     let camBox = Box3d.FromCenterAndSize(V3d.OOO, 0.15 * V3d.III)
 
@@ -386,16 +406,51 @@ let main argv =
             trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-goalWallLateralOffset, goalWallHorizontalOffset, 0.0) * goalRoomOffset
             collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHight, wallThickness) |> BulletHelper.Shape.Box )
         }
-
+    
+    let pedestalPosition = V3d(trackingAreaSize / 2.0 - 0.5, pedestalHeight / 2.0, trackingAreaSize / 2.0 - 0.5)
+    let pedestal =
+        { defaultObject with
+            id = newId()
+            trafo = Trafo3d.Translation(pedestalPosition)
+            model = Some pedestalSg
+            surface = Some normalDiffuseSurface
+            tilingFactor = V2d(1.0, pedestalRadius / pedestalHeight)
+//            collisionShape = Some (BulletHelper.Shape.CylinderY (pedestalRadius, pedestalHeight))
+            collisionShape = Some ( V3d(pedestalRadius, pedestalHeight, pedestalRadius) |> BulletHelper.Shape.Box )
+            rollingFriction = 0.01f
+            restitution = 0.95f
+            friction = 0.75f
+            collisionGroup = CollisionGroups.Static |> int16
+            collisionMask = staticCollidesWith
+        }
+        
+    let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
+    let cushion =
+        { defaultObject with
+            id = newId()
+            trafo = Trafo3d.Translation(cushionPosition)
+            model = Some cushionSg
+            surface = Some normalDiffuseSurface
+            tilingFactor = V2d(0.25)
+            collisionShape = Some ( V3d(cushionSize, cushionHeight, cushionSize) |> BulletHelper.Shape.Box )
+            rollingFriction = 0.1f
+            restitution = 0.15f
+            friction = 0.95f
+            collisionGroup = CollisionGroups.Static |> int16
+            collisionMask = staticCollidesWith
+        }
+        
+    let ballResetPos = V3d(cushionPosition.X, cushionPosition.Y + ballRadius, cushionPosition.Z)
     let ball = 
         { defaultCollider with
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             model = Some ballSg
+            trafo = Trafo3d.Translation(ballResetPos)
             surface = Some ballSurface
             mass = 0.625f
-            collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
+            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
             collisionGroup = CollisionGroups.Ball |> int16
@@ -498,6 +553,7 @@ let main argv =
         @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
+        @ [pedestal; cushion]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
         @ [grabTrigger1; grabTrigger2]
         
@@ -515,12 +571,13 @@ let main argv =
             grabTrigger1Id      = grabTrigger1.id
             grabTrigger2Id      = grabTrigger2.id
         }
-
+        
     let sceneObj =
         {
             objects             = PersistentHashSet.ofList objects
             viewTrafo           = Trafo3d.Identity
             trackingToWorld     = Trafo3d.Identity
+            ballResetPos        = ballResetPos
             
             rayCastDirSg        = beamSg
             rayCastHitPointSg   = rayCastHitPointSg

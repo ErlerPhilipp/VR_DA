@@ -146,6 +146,7 @@ module LogicalSceneTypes =
             raycastInfo         : RaycastInfo
             vibrationStrength   : float
             vibStrLastFrame     : float
+            triggerPressed      : bool
         }
 
     let DefaultInteractionInfo = 
@@ -157,6 +158,7 @@ module LogicalSceneTypes =
             raycastInfo         = DefaultRaycastInfo
             vibrationStrength   = 0.0
             vibStrLastFrame     = 0.0
+            triggerPressed      = false
         }
 
     type GameInfo = 
@@ -207,6 +209,7 @@ module LogicalSceneTypes =
             objects             : PersistentHashSet<Object>
             viewTrafo           : Trafo3d
             trackingToWorld     : Trafo3d
+            ballResetPos        : V3d
             
             rayCastDirSg        :ISg
             rayCastHitPointSg   :ISg
@@ -279,6 +282,7 @@ module LogicalSceneTypes =
         | DeviceMove of int * Trafo3d
         | StartFrame
         | TimeElapsed of System.TimeSpan
+        | EndFrame
         | UpdateViewTrafo of Trafo3d
         | Collision of int * int
         | RayCastResult of int * bool * V3d * V3d
@@ -334,6 +338,14 @@ module PhysicsSceneTypes =
             mutable bodies   : System.Collections.Generic.HashSet<PhysicsBody>
         }
         
+    let getBodyWithId(id : int, bodies : System.Collections.Generic.HashSet<PhysicsBody>) =
+        let objectWithId = 
+            bodies |> Seq.fold ( fun found current -> if current.original.id = id then Some current else found) None
+        
+        match objectWithId with
+            | Some foundObject -> foundObject
+            | None -> failwith(sprintf "Object with id %A not found!" id) 
+
 module GraphicsSceneTypes = 
     open LogicalSceneTypes
     open Aardvark.Base
@@ -374,3 +386,4 @@ module GraphicsSceneTypes =
             raycastMods1        : RaycastMods
             raycastMods2        : RaycastMods
         }
+            

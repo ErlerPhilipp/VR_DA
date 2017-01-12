@@ -15,14 +15,14 @@ module LogicalScene =
             
     let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
     let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
+    
+    let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
+        if firstController then
+            { scene with interactionInfo1 = newInteractionInfo}
+        else
+            { scene with interactionInfo2 = newInteractionInfo}
 
     let update (scene : Scene) (message : Message) : Scene =
-
-        let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo) =
-            if firstController then
-                { scene with interactionInfo1 = newInteractionInfo}
-            else
-                { scene with interactionInfo2 = newInteractionInfo}
 
         match message with
             // move HMD
@@ -71,20 +71,20 @@ module LogicalScene =
                         let newObjects = updateControllerObjects(t, scene.objects)
                         let newObjects = updateGrabbedObjects(t, newObjects)
                         let newInteractionInfo = { interactionInfo with armExtensionFactor = 1.0; lastContrTrafo = t }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.GoGo ->
                         let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.trackingToWorld)
                         let newObjects = updateControllerObjects(virtualHandTrafo, scene.objects)
                         let newObjects = updateGrabbedObjects(virtualHandTrafo, newObjects)
                         let newInteractionInfo = { interactionInfo with armExtensionFactor = extension; lastContrTrafo = virtualHandTrafo }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.Flying ->
                         let direction = t.Forward.TransformDir(V3d.OOI)
                         let newObjects = updateControllerObjects(t, scene.objects)
                         let newInteractionInfo = { interactionInfo with moveDirection = direction }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.TeleportArea
                     | VrInteractionTechnique.TeleportPos ->     
@@ -99,7 +99,7 @@ module LogicalScene =
                                                                         rayCastEnd = rayCastStart + -100.0 * direction
                                                                     }
                                                  }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                         { newScene with objects = newObjects}
                     | _ -> failwith "Not implemented"
                  
@@ -119,7 +119,7 @@ module LogicalScene =
                 else
                     transact ( fun _ -> Mod.change controller2OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
 
-                makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
 
             // press menu button     
 //            | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id && a = 2 ->
@@ -131,6 +131,12 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
+                let scene = if not interactionInfo.triggerPressed then
+                                    let newInteractionInfo = { interactionInfo with triggerPressed = true}
+                                    makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
+                                else
+                                    scene
+
                 match interactionInfo.interactionType with
                     | VrInteractionTechnique.VirtualHand
                     | VrInteractionTechnique.GoGo ->
@@ -143,13 +149,16 @@ module LogicalScene =
                                             o.isGrabbable = GrabbableOptions.BothControllers) then 
                                             { o with 
                                                 isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
+                                                hitLowerTrigger = false
+                                                hitUpperTrigger = false
+                                                hasScored = false
         //                                        trafo = controller2Trafo // snap ball to controller
                                             } 
                                         else o
                                     ) 
-                                |> PersistentHashSet.map (fun a -> if a.hitLowerTrigger then { a with hitLowerTrigger = false } else a) 
-                                |> PersistentHashSet.map (fun a -> if a.hitUpperTrigger then { a with hitUpperTrigger = false } else a)
-                                |> PersistentHashSet.map (fun a -> if a.hasScored then { a with hasScored = false } else a)
+//                                |> PersistentHashSet.map (fun a -> if a.hitLowerTrigger then { a with hitLowerTrigger = false } else a) 
+//                                |> PersistentHashSet.map (fun a -> if a.hitUpperTrigger then { a with hitUpperTrigger = false } else a)
+//                                |> PersistentHashSet.map (fun a -> if a.hasScored then { a with hasScored = false } else a)
                         { scene with objects = newObjects }
                     | VrInteractionTechnique.Flying -> scene // handled in time elapsed message
                     | VrInteractionTechnique.TeleportArea
@@ -170,21 +179,23 @@ module LogicalScene =
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-
+                
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun a ->
-                                let newGrabbedState = match a.isGrabbed with
-                                                        | GrabbedOptions.NoGrab -> GrabbedOptions.NoGrab
-                                                        | GrabbedOptions.Controller1 when firstController -> GrabbedOptions.NoGrab
-                                                        | GrabbedOptions.Controller1 when not firstController -> GrabbedOptions.Controller1
-                                                        | GrabbedOptions.Controller2 when firstController -> GrabbedOptions.Controller2
-                                                        | GrabbedOptions.Controller2 when not firstController -> GrabbedOptions.NoGrab
-                                                        | _ -> GrabbedOptions.NoGrab // should never happen
-                                if a.isGrabbed = newGrabbedState then a else { a with isGrabbed = newGrabbedState }
+                                if a.isManipulable then
+                                    let newGrabbedState = match a.isGrabbed with
+                                                            | GrabbedOptions.NoGrab -> GrabbedOptions.NoGrab
+                                                            | GrabbedOptions.Controller1 when firstController -> GrabbedOptions.NoGrab
+                                                            | GrabbedOptions.Controller1 when not firstController -> GrabbedOptions.Controller1
+                                                            | GrabbedOptions.Controller2 when firstController -> GrabbedOptions.Controller2
+                                                            | GrabbedOptions.Controller2 when not firstController -> GrabbedOptions.NoGrab
+                                                            | _ -> GrabbedOptions.NoGrab // should never happen
+                                    if a.isGrabbed = newGrabbedState then a else { a with isGrabbed = newGrabbedState }
+                                else a
                             ) 
-                let newInteractionInfo = {interactionInfo with lastContrTrafo = Trafo3d.Identity }
-                let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                let newInteractionInfo = {interactionInfo with lastContrTrafo = Trafo3d.Identity; triggerPressed = false }
+                let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 { newScene with objects = newObjects}
 
             | StartFrame ->
@@ -204,7 +215,7 @@ module LogicalScene =
                                         isGrabbed = GrabbedOptions.NoGrab
                                         willReset = false
                                         timeToReset = 0.0
-                                        trafo = Trafo3d.Translation(0.0, 0.5, 0.0)
+                                        trafo = Trafo3d.Translation(scene.ballResetPos)
                                         linearVelocity = V3d()
                                         angularVelocity = V3d()
                                     }
@@ -223,22 +234,6 @@ module LogicalScene =
                 }
 
             | TimeElapsed(dt) ->
-                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        { o with 
-                            wasGrabbed = o.isGrabbed
-                        }
-                    ) 
-                // reset balls below the ground
-                let newObjects = newObjects |> PersistentHashSet.map (fun o -> 
-                        if o.trafo.Forward.TransformPos(V3d()).Y < -100.0 then
-                            { o with 
-                                willReset = true
-                                timeToReset = scene.gameInfo.timeSinceStart 
-                            } 
-                        else
-                            o
-                    )
-
                 let getAxisValue(deviceId : uint32) = 
                     let mutable state = VRControllerState_t()
                     let axisPosition =
@@ -280,7 +275,6 @@ module LogicalScene =
                 Vibration.updateVibration(uint32 assignedInputs.controller2Id, dt.TotalSeconds)
 
                 { scene with
-                    objects = newObjects
                     trackingToWorld = newTrackingToWorld
                     physicsInfo = { scene.physicsInfo with deltaTime = dt.TotalSeconds }
                     gameInfo = { scene.gameInfo with timeSinceStart = newTimeSinceStart }
@@ -288,6 +282,28 @@ module LogicalScene =
                     interactionInfo2 = { scene.interactionInfo2 with vibStrLastFrame = scene.interactionInfo2.vibrationStrength }
                 }
             
+            | EndFrame ->
+                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
+                        if o.isManipulable then
+                            { o with 
+                                wasGrabbed = o.isGrabbed
+                            }
+                        else o
+                    )
+                // reset balls below the ground
+                let newObjects = newObjects |> PersistentHashSet.map (fun o -> 
+                        if o.trafo.Forward.TransformPos(V3d()).Y < -100.0 then
+                            { o with 
+                                willReset = true
+                                timeToReset = scene.gameInfo.timeSinceStart 
+                            } 
+                        else
+                            o
+                    )
+                { scene with
+                    objects = newObjects
+                }
+
             | Collision (ghostId, colliderId) ->
                 let mutable newScore = scene.gameInfo.score
                 let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
@@ -361,19 +377,42 @@ module LogicalScene =
 //                                     printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
                                     
                                     let firstController = ghostId = scene.specialObjectIds.grabTrigger1Id
+                                    let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
+                                    let thisControllerCanGrab = interactionInfo.interactionType = VrInteractionTechnique.VirtualHand || interactionInfo.interactionType = VrInteractionTechnique.GoGo
                                     if firstController then
                                         if strength > newCtr1VibStrength then newCtr1VibStrength <- strength
                                     else
                                         if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
 
-                                    if colliderObject.isManipulable then
+                                    if colliderObject.isManipulable && thisControllerCanGrab then
                                         let newGrabbableState = 
                                             match o.isGrabbable with
                                                 | GrabbableOptions.NoGrab -> if firstController then GrabbableOptions.Controller1 else GrabbableOptions.Controller2
                                                 | GrabbableOptions.Controller1 -> if firstController then GrabbableOptions.Controller1 else GrabbableOptions.BothControllers
                                                 | GrabbableOptions.Controller2 -> if firstController then GrabbableOptions.BothControllers else GrabbableOptions.Controller2
                                                 | GrabbableOptions.BothControllers -> GrabbableOptions.BothControllers
-                                        { o with isGrabbable = newGrabbableState } 
+                                                
+                                        let grabNow = interactionInfo.triggerPressed && o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
+                                                       ((newGrabbableState = GrabbableOptions.Controller1 && firstController) || 
+                                                        (newGrabbableState = GrabbableOptions.Controller2 && not firstController) || 
+                                                        newGrabbableState = GrabbableOptions.BothControllers)
+
+                                        if grabNow then 
+                                            printfn "isGrabbed = %A" (if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2)
+                                            { o with 
+                                                isGrabbable = newGrabbableState 
+                                                isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
+//                                                wasGrabbed = GrabbedOptions.NoGrab
+                                                hitLowerTrigger = false
+                                                hitUpperTrigger = false
+                                                hasScored = false
+        //                                        trafo = controller2Trafo // snap ball to controller
+                                            } 
+                                        else
+                                            { o with 
+                                                isGrabbable = newGrabbableState 
+                                            } 
+                                        
                                     else o
                                 else  o
                             )
@@ -407,5 +446,5 @@ module LogicalScene =
                                                                 wantsRayCast = false
                                                           }
                                          }
-                makeSceneWithInteractionInfo(firstController, newInteractionInfo)
+                makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
             | _ -> scene

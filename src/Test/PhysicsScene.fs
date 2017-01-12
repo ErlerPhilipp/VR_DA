@@ -13,6 +13,58 @@ module PhysicsScene =
 
     let mutable currentWorld = None
     let debugDrawer = BulletHelper.DebugDrawer()
+    
+    let releaseGrab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
+//        printfn "release"
+        let firstController = o.wasGrabbed = GrabbedOptions.Controller1
+        collisionObject.ClearForces()
+        // activate by setting normal mass
+        collisionObject.SetMassProps(o.mass, pb.inertia)
+        collisionObject.CollisionFlags <- collisionObject.CollisionFlags &&& ~~~(BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject)
+
+        // set object velocity to hand velocity
+        let controllerDevice = if firstController then VrDriver.inputDevices.controller1 else VrDriver.inputDevices.controller2
+        let vel = s.trackingToWorld.Forward.TransformDir(controllerDevice.Velocity)
+        let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
+        let handVelocity = 
+            match interactionInfo.interactionType with
+                | VrInteractions.VrInteractionTechnique.GoGo -> 
+                    // TODO: make more accurate, function of difference with last step
+                    //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
+                    toVector3(vel * interactionInfo.armExtensionFactor)
+                | _ -> toVector3(vel)
+
+//                            collisionObject.LinearVelocity <- handVelocity
+        collisionObject.LinearVelocity <- Vector3()
+        let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
+        let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
+        let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
+        let relativePos = (colliderPos - controllerPos) |> toVector3
+        collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
+
+        let angVel = controllerDevice.AngularVelocity
+        let handAngVelocity = toVector3(angVel)
+//                            collisionObject.AngularVelocity <- handAngVelocity
+        collisionObject.AngularVelocity <- Vector3()
+        collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
+                            
+        // reset to normal state
+        collisionObject.Activate()
+        collisionObject.ForceActivationState(ActivationState.ActiveTag)
+
+    let grab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
+//        printfn "grab"
+        collisionObject.ClearForces()
+        // deactivate by setting infinite mass
+        collisionObject.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
+        collisionObject.CollisionFlags <- collisionObject.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
+
+        collisionObject.LinearVelocity <- Vector3()
+        collisionObject.AngularVelocity <- Vector3()
+
+        // keep always active
+        collisionObject.Activate()
+        collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
 
     // Replay changes into physics world....
     type Conversion private() =
@@ -99,7 +151,6 @@ module PhysicsScene =
                             body
                 | None -> { original = o; collisionObject = CollisionObject.NoObject; inertia = Vector3.Zero; trafo = initialTrafo }
 
-
         static member Create(s : Scene) : PhysicsWorld =
             let collConf = new DefaultCollisionConfiguration()
             let dispatcher = new CollisionDispatcher(collConf)
@@ -153,57 +204,11 @@ module PhysicsScene =
                             collisionObject.AngularVelocity <- newAngularVelocity
                             collisionObject.Activate()
 
-                        // release grab
                         if (o.wasGrabbed <> GrabbedOptions.NoGrab && o.isGrabbed = GrabbedOptions.NoGrab) then
-                            let firstController = o.wasGrabbed = GrabbedOptions.Controller1
-                            collisionObject.ClearForces()
-                            // activate by setting normal mass
-                            collisionObject.SetMassProps(o.mass, pb.inertia)
-                            collisionObject.CollisionFlags <- collisionObject.CollisionFlags &&& ~~~(BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject)
-
-                            // set object velocity to hand velocity
-                            let controllerDevice = if firstController then VrDriver.inputDevices.controller1 else VrDriver.inputDevices.controller2
-                            let vel = s.trackingToWorld.Forward.TransformDir(controllerDevice.Velocity)
-                            let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
-                            let handVelocity = 
-                                match interactionInfo.interactionType with
-                                    | VrInteractions.VrInteractionTechnique.GoGo -> 
-                                        // TODO: make more accurate, function of difference with last step
-                                        //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
-                                        toVector3(vel * interactionInfo.armExtensionFactor)
-                                    | _ -> toVector3(vel)
-
-//                            collisionObject.LinearVelocity <- handVelocity
-                            collisionObject.LinearVelocity <- Vector3()
-                            let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
-                            let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
-                            let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
-                            let relativePos = (colliderPos - controllerPos) |> toVector3
-                            collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
-
-                            let angVel = controllerDevice.AngularVelocity
-                            let handAngVelocity = toVector3(angVel)
-//                            collisionObject.AngularVelocity <- handAngVelocity
-                            collisionObject.AngularVelocity <- Vector3()
-                            collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
-                            
-                            // reset to normal state
-                            collisionObject.Activate()
-                            collisionObject.ForceActivationState(ActivationState.ActiveTag)
-                        
-                        // grab
+                            releaseGrab(s, collisionObject, pb, o)
                         else if (o.wasGrabbed = GrabbedOptions.NoGrab && o.isGrabbed <> GrabbedOptions.NoGrab) then
-                            collisionObject.ClearForces()
-                            // deactivate by setting infinite mass
-                            collisionObject.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
-                            collisionObject.CollisionFlags <- collisionObject.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
+                            grab(s, collisionObject, pb, o)
 
-                            collisionObject.LinearVelocity <- Vector3()
-                            collisionObject.AngularVelocity <- Vector3()
-
-                            // keep always active
-                            collisionObject.Activate()
-                            collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
                     | CollisionObject.StaticBody collisionObject -> 
                         updateCollisionObjectSettings(collisionObject, o)
                         // TODO: make static objects grabbable?
@@ -319,6 +324,18 @@ module PhysicsScene =
 
                                             if hasContact then
                                                 messages.Add (Collision(ghostObjectId, collidingObjectId))
+
+                                                let o = LogicalSceneTypes.getObjectWithId(collidingObjectId, s.objects)
+                                                let firstController = ghostObjectId = s.specialObjectIds.grabTrigger1Id
+                                                let secondController = ghostObjectId = s.specialObjectIds.grabTrigger2Id
+                                                if firstController || secondController then
+                                                    let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
+                                                    if interactionInfo.triggerPressed && o.isGrabbed = GrabbedOptions.NoGrab then
+                                                        let pb = getBodyWithId(o.id, world.bodies)
+                                                        match pb.collisionObject with
+                                                            | CollisionObject.RigidBody collisionObject -> 
+                                                                grab(s, collisionObject, pb, o)
+                                                            | _ -> ()
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects
