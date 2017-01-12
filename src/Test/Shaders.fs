@@ -102,8 +102,10 @@ module OmnidirShadowShader =
         else 
             if vec.Y >= vec.Z then 1 else 2
 
-    let sampleShadow (wp : V4d, sampleOffset : V3d, nDotl : float, distToLight : float) =       
-        let samplePos = wp + V4d(sampleOffset, 0.0)
+//    let sampleShadow (wp : V4d, sampleOffset : V3d, nDotl : float, distToLight : float) =       
+//        let samplePos = wp + V4d(sampleOffset, 0.0)
+    let sampleShadow (wp : V4d, sampleOffset : V2d, nDotl : float, distToLight : float) =       
+        let samplePos = wp
         let lightDir = samplePos.XYZ - uniform.LightPos
         let absLightDir = V3d(abs(lightDir.X), abs(lightDir.Y), abs(lightDir.Z))
             
@@ -135,15 +137,17 @@ module OmnidirShadowShader =
             
         let bias = (zOffset * 2.0 * distToLight + slopeOffset)
         let depthCompare = tc.Z - bias
+
+        let samplePos = tc.XY + sampleOffset
                 
         let shadowFactor = 
             match majorDim with
-                | 0 when positiveDir ->    shadowSamplerPosX.Sample(tc.XY, depthCompare)
-                | 0 when not positiveDir ->shadowSamplerNegX.Sample(tc.XY, depthCompare)
-                | 1 when positiveDir ->    shadowSamplerPosY.Sample(tc.XY, depthCompare)
-                | 1 when not positiveDir ->shadowSamplerNegY.Sample(tc.XY, depthCompare)
-                | 2 when positiveDir ->    shadowSamplerPosZ.Sample(tc.XY, depthCompare)
-                | 2 when not positiveDir ->shadowSamplerNegZ.Sample(tc.XY, depthCompare)
+                | 0 when positiveDir ->    shadowSamplerPosX.Sample(samplePos, depthCompare)
+                | 0 when not positiveDir ->shadowSamplerNegX.Sample(samplePos, depthCompare)
+                | 1 when positiveDir ->    shadowSamplerPosY.Sample(samplePos, depthCompare)
+                | 1 when not positiveDir ->shadowSamplerNegY.Sample(samplePos, depthCompare)
+                | 2 when positiveDir ->    shadowSamplerPosZ.Sample(samplePos, depthCompare)
+                | 2 when not positiveDir ->shadowSamplerNegZ.Sample(samplePos, depthCompare)
                 | _ -> 100.0 // should never happen
         shadowFactor
 
@@ -154,18 +158,18 @@ module OmnidirShadowShader =
 
             
             // array of offset direction for sampling
-            let gridSamplingDisk = 
-                [|
-                   V3d(1, 1, 1);    V3d(1, -1, 1);  V3d(-1, -1, 1);     V3d(-1, 1, 1); 
-                   V3d(1, 1, -1);   V3d(1, -1, -1); V3d(-1, -1, -1);    V3d(-1, 1, -1);
-                   V3d(1, 1, 0);    V3d(1, -1, 0);  V3d(-1, -1, 0);     V3d(-1, 1, 0);
-                   V3d(1, 0, 1);    V3d(-1, 0, 1);  V3d(1, 0, -1);      V3d(-1, 0, -1);
-                   V3d(0, 1, 1);    V3d(0, -1, 1);  V3d(0, -1, -1);     V3d(0, 1, -1);
-                |]
 //            let gridSamplingDisk = 
 //                [|
-//                   V2d(1, 1); V2d(1, -1); V2d(-1, -1); V2d(-1, 1); 
+//                   V3d(1, 1, 1);    V3d(1, -1, 1);  V3d(-1, -1, 1);     V3d(-1, 1, 1); 
+//                   V3d(1, 1, -1);   V3d(1, -1, -1); V3d(-1, -1, -1);    V3d(-1, 1, -1);
+//                   V3d(1, 1, 0);    V3d(1, -1, 0);  V3d(-1, -1, 0);     V3d(-1, 1, 0);
+//                   V3d(1, 0, 1);    V3d(-1, 0, 1);  V3d(1, 0, -1);      V3d(-1, 0, -1);
+//                   V3d(0, 1, 1);    V3d(0, -1, 1);  V3d(0, -1, -1);     V3d(0, 1, -1);
 //                |]
+            let gridSamplingDisk = 
+                [|
+                   V2d(1, 1); V2d(1, -1); V2d(-1, -1); V2d(-1, 1); 
+                |]
 
             let n = v.n |> Vec.normalize
             let fragmentToLight = uniform.LightPos - v.wp.XYZ
@@ -196,9 +200,8 @@ module OmnidirShadowShader =
             let mutable shadowSampleSum = 0.0
             // first 8 are bounding box. If all are equal, expect everything inside to be like them.
 //            for i in 0..7 do
-            let samplingOffset = V3d(0.0, 0.0, 0.0)
             for i in 0..3 do
-                let samplingOffset = V3d(gridSamplingDisk.[i] * diskRadius)
+                let samplingOffset = gridSamplingDisk.[i] * diskRadius
                 shadowSampleSum <- shadowSampleSum + sampleShadow(v.wp, samplingOffset, nDotl, distToLight)
 //            let mutable numSamples = 8.0
             let mutable numSamples = 4.0
@@ -249,7 +252,7 @@ module ControllerOverlayColor =
 
     let controllerOverlayColor (v : Vertex) =
         fragment {
-            return (1.0 - uniform.overlayColor.Z) * v.c + V4d(uniform.overlayColor.XYZ / uniform.overlayColor.Z, uniform.overlayColor.Z)
+            return V4d((1.0 - uniform.overlayColor.W) * v.c.XYZ + uniform.overlayColor.W * uniform.overlayColor.XYZ, v.c.W)
         }
     
     let Effect = 

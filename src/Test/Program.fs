@@ -24,6 +24,14 @@ open TextureTiling
 open Lighting
 open Highlight
 
+type CollisionGroups =
+    | Static =          0b0000000000000001s
+    | Ball =            0b0000000000000010s
+    | HandTrigger =     0b0000000000000100s
+    | HoopTrigger =     0b0000000000001000s
+    | Avatar =          0b0000000000010000s
+    | TeleportRaycast = 0b0000000000100000s
+
 [<EntryPoint>]
 let main argv =
     Ag.initialize()
@@ -33,6 +41,13 @@ let main argv =
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
+        
+    let staticCollidesWith = CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.Avatar ||| CollisionGroups.TeleportRaycast |> int16
+    let ballCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.HoopTrigger ||| CollisionGroups.Avatar |> int16
+    let handTriggerCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball |> int16
+    let hoopTriggerCollidesWith =  CollisionGroups.Ball |> int16
+    let avatarCollidesWith =  CollisionGroups.Static ||| CollisionGroups.Ball ||| CollisionGroups.Avatar |> int16
+    let teleportRaycastCollidesWith =  CollisionGroups.Static |> int16
     
     let defaultTrafoEffect = DefaultSurfaces.trafo |> toEffect
     let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
@@ -216,7 +231,8 @@ let main argv =
             collisionShape = Some simpleControllerBodyCollShape
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
-            isColliding = true
+            collisionGroup = CollisionGroups.Avatar |> int16
+            collisionMask = avatarCollidesWith
         }
     let controller2Object = { controller1Object with id = newId() }
     let grabTrigger1 = 
@@ -227,6 +243,8 @@ let main argv =
 //            collisionShape = Some (BulletHelper.Shape.Sphere 0.15)
             collisionShape = Some (BulletHelper.Shape.CylinderZ (0.09, 0.25))
             isColliding = false
+            collisionGroup = CollisionGroups.HandTrigger |> int16
+            collisionMask = handTriggerCollidesWith
         }
     let grabTrigger2 = { grabTrigger1 with id = newId() }
     let camObject1 = 
@@ -236,10 +254,7 @@ let main argv =
             surface = Some diffuseSurface
             isColliding = false
         }
-    let camObject2 = 
-        { camObject1 with
-            id = newId()
-        }
+    let camObject2 = { camObject1 with id = newId() }
     let lightObject =
         { defaultObject with
             id = newId()
@@ -247,6 +262,7 @@ let main argv =
             trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
+            isColliding = false
         }
 
     let defaultCollider =
@@ -256,10 +272,16 @@ let main argv =
             friction = 0.75f
         }
 
+    let staticDefaultCollider =
+        { defaultCollider with
+            collisionGroup = CollisionGroups.Static |> int16
+            collisionMask = staticCollidesWith
+        }
+
     let groundTilingFactor = 0.3
     let ceilingTilingFactor = 0.4
     let groundObject = 
-        { defaultCollider with
+        { staticDefaultCollider with
             id = newId()
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0)
             model = Some groundSg
@@ -269,7 +291,7 @@ let main argv =
         }
 
     let ceilingObject = 
-        { defaultCollider with
+        { staticDefaultCollider with
             id = newId()
             trafo = Trafo3d.Translation(0.0, trackingAreaHight - 1.5 * wallThickness, 0.0)
             model = Some ceilingSg
@@ -279,7 +301,7 @@ let main argv =
         }
 
     let wallBase = 
-        { defaultCollider with
+        { staticDefaultCollider with
             model = Some wallSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.25 * trackingAreaSize)
@@ -312,7 +334,7 @@ let main argv =
         }
 
     let goalRoomGroundObject = 
-        { defaultCollider with
+        { staticDefaultCollider with
             id = newId()
             objectType = ObjectTypes.Ghost
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
@@ -323,7 +345,7 @@ let main argv =
         }
 
     let goalRoomCeilingObject = 
-        { defaultCollider with
+        { staticDefaultCollider with
             id = newId()
             trafo = Trafo3d.Translation(0.0, goalAreaHight - 1.5 * wallThickness, 0.0) * goalRoomOffset
             model = Some goalRoomCeilingSg
@@ -333,7 +355,7 @@ let main argv =
         }
 
     let goalRoomWallBase = 
-        { defaultCollider with
+        { staticDefaultCollider with
             model = Some goalRoomWallSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.5 * goalAreaSize)
@@ -376,6 +398,8 @@ let main argv =
             collisionShape = Some (BulletHelper.Shape.Sphere 0.1213)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
+            collisionGroup = CollisionGroups.Ball |> int16
+            collisionMask = ballCollidesWith
         }
     let box = 
         { defaultCollider with
@@ -390,6 +414,8 @@ let main argv =
             restitution = 0.1f
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
+            collisionGroup = CollisionGroups.Ball |> int16
+            collisionMask = ballCollidesWith
         }
     let headCollider = 
         { defaultCollider with
@@ -401,6 +427,8 @@ let main argv =
             collisionShape = Some (BulletHelper.Shape.Sphere 0.12)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
+            collisionGroup = CollisionGroups.Avatar |> int16
+            collisionMask = avatarCollidesWith
         }
     let lowerHoopTrigger = 
         { defaultObject with
@@ -410,6 +438,8 @@ let main argv =
             trafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
+            collisionGroup = CollisionGroups.HoopTrigger |> int16
+            collisionMask = hoopTriggerCollidesWith
         }
     let upperHoopTrigger = 
         { lowerHoopTrigger with
@@ -419,6 +449,8 @@ let main argv =
             trafo = lowerHoopTrigger.trafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
+            collisionGroup = CollisionGroups.HoopTrigger |> int16
+            collisionMask = hoopTriggerCollidesWith
         }
 
 //    let ObjectListToIdList(objectList : List<Object>) = objectList |> List.map (fun e -> e.id)
@@ -454,6 +486,8 @@ let main argv =
                         mass = mass
                         collisionShape = collShape
                         restitution = restitution
+                        collisionGroup = CollisionGroups.Static |> int16
+                        collisionMask = staticCollidesWith
                     }
                 )
         let manipulableObjects = toObjects true manipulableModels
@@ -497,7 +531,10 @@ let main argv =
             interactionInfo1    = DefaultInteractionInfo
             interactionInfo2    = DefaultInteractionInfo
             gameInfo            = DefaultGameInfo(scoreTrafo)
-            physicsInfo         = DefaultPhysicsInfo
+            physicsInfo         = { DefaultPhysicsInfo with
+                                        raycastCollGroup = CollisionGroups.TeleportRaycast |> int16
+                                        raycastCollMask  = teleportRaycastCollidesWith
+                                  }
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin

@@ -25,8 +25,10 @@ module BulletHelper =
         | TriangleMesh   of Triangle3d[]
         | Compound       of list<Trafo3d * Shape>
 
-    let rayCast (startPos : Vector3, endPos : Vector3, world : BulletSharp.CollisionWorld) = 
+    let rayCast (startPos : Vector3, endPos : Vector3, world : BulletSharp.CollisionWorld, collisionFilterGroup : int16, collisionFilterMask : int16) = 
         let raycastResult = new BulletSharp.ClosestRayResultCallback(ref startPos, ref endPos)
+        raycastResult.CollisionFilterGroup <- collisionFilterGroup
+        raycastResult.CollisionFilterMask <- collisionFilterMask
         world.RayTest(startPos, endPos, raycastResult)
         (raycastResult.HasHit, raycastResult.HitPointWorld, raycastResult.HitNormalWorld)
 

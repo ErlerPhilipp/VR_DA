@@ -48,16 +48,18 @@ module GraphicsScene =
                 
                 raycastMods1       =    {
                                             hasRayCastHit       = Mod.init s.interactionInfo1.raycastInfo.rayCastHasHit
-                                            drawHitPoint        = Mod.init (s.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.TeleportPos)
-                                            drawHitArea         = Mod.init (s.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.TeleportArea)
+                                            drawRayCastDir      = Mod.init (s.interactionInfo1.interactionType = VrInteractionTechnique.Flying || s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportPos || s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportArea)
+                                            drawHitPoint        = Mod.init (s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportPos)
+                                            drawHitArea         = Mod.init (s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportArea)
                                             hasRayCastDir       = Mod.init (getTrafoOfFirstObjectWithId(s.specialObjectIds.controller1ObjectId, s.objects))
                                             rayCastHitTrafo     = Mod.init (Trafo3d.Translation(s.interactionInfo1.raycastInfo.rayCastHitPoint))
                                             rayCastCam          = Mod.init (Trafo3d.Translation(s.interactionInfo1.raycastInfo.rayCastHitPoint))
                                         }
                 raycastMods2       =    {
                                             hasRayCastHit       = Mod.init s.interactionInfo2.raycastInfo.rayCastHasHit
-                                            drawHitPoint        = Mod.init (s.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.TeleportPos)
-                                            drawHitArea         = Mod.init (s.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.TeleportArea)
+                                            drawRayCastDir      = Mod.init (s.interactionInfo2.interactionType = VrInteractionTechnique.Flying || s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportPos || s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportArea)
+                                            drawHitPoint        = Mod.init (s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportPos)
+                                            drawHitArea         = Mod.init (s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportArea)
                                             hasRayCastDir       = Mod.init (getTrafoOfFirstObjectWithId(s.specialObjectIds.controller2ObjectId, s.objects))
                                             rayCastHitTrafo     = Mod.init (Trafo3d.Translation(s.interactionInfo2.raycastInfo.rayCastHitPoint))
                                             rayCastCam          = Mod.init (Trafo3d.Translation(s.interactionInfo2.raycastInfo.rayCastHitPoint))
@@ -98,6 +100,7 @@ module GraphicsScene =
                 ms.graphicsObjects.ExceptWith table.Values
                 
                 ms.raycastMods1.hasRayCastHit.Value <- s.interactionInfo1.raycastInfo.rayCastHasHit
+                ms.raycastMods1.drawRayCastDir.Value <- (s.interactionInfo1.interactionType = VrInteractionTechnique.Flying || s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportPos || s.interactionInfo1.interactionType = VrInteractionTechnique.TeleportArea)
                 ms.raycastMods1.drawHitPoint.Value <- s.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.TeleportPos
                 ms.raycastMods1.drawHitArea.Value <- s.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.TeleportArea
                 let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.headId, s.objects)
@@ -108,6 +111,7 @@ module GraphicsScene =
                 ms.raycastMods1.rayCastHitTrafo.Value <- if recenter then Trafo3d.Translation(s.interactionInfo1.raycastInfo.rayCastHitPoint) else newTrackingToWorld
                 
                 ms.raycastMods2.hasRayCastHit.Value <- s.interactionInfo2.raycastInfo.rayCastHasHit
+                ms.raycastMods2.drawRayCastDir.Value <- (s.interactionInfo2.interactionType = VrInteractionTechnique.Flying || s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportPos || s.interactionInfo2.interactionType = VrInteractionTechnique.TeleportArea)
                 ms.raycastMods2.drawHitPoint.Value <- s.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.TeleportPos
                 ms.raycastMods2.drawHitArea.Value <- s.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.TeleportArea
                 let hmdWorldTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.headId, s.objects)
@@ -175,6 +179,7 @@ module GraphicsScene =
             let rayCastDirSg =
                 initialScene.rayCastDirSg
                     |> Sg.trafo raycastMods.hasRayCastDir
+                    |> Sg.onOff raycastMods.drawRayCastDir
                 
             let rayCastHitPointSg =
                 initialScene.rayCastHitPointSg

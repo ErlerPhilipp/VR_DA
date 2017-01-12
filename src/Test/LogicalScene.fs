@@ -13,8 +13,8 @@ module LogicalScene =
     open VrInteractions
     open VrDriver
             
-    let controller1OverlayColor = Mod.init (C4f())
-    let controller2OverlayColor = Mod.init (C4f())
+    let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
+    let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
 
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -42,50 +42,54 @@ module LogicalScene =
             | DeviceMove(deviceId, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let (controllerObjectId, grabTriggerId, interactionInfo) = 
-                    if deviceId = assignedInputs.controller1Id then
+                    if firstController then
                         (scene.specialObjectIds.controller1ObjectId, scene.specialObjectIds.grabTrigger1Id, scene.interactionInfo1)
-                    else // if deviceId = assignedInputs.controller2Id
+                    else
                         (scene.specialObjectIds.controller2ObjectId, scene.specialObjectIds.grabTrigger2Id, scene.interactionInfo2)
-
-                let updateObjects(virtualHandTrafo : Trafo3d) = 
+                        
+                let updateControllerObjects(virtualHandTrafo : Trafo3d, objects : PersistentHashSet<Object>) = 
                     let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * virtualHandTrafo
-                    let newObjects = setTrafoOfObjectsWithId(controllerObjectId, virtualHandTrafo, scene.objects, scene.physicsInfo.deltaTime)
-                                        |> PersistentHashSet.map (fun a ->
-                                            if (a.isGrabbed = GrabbedOptions.Controller1 && firstController) || 
-                                               (a.isGrabbed = GrabbedOptions.Controller2 && not firstController) then 
-                                                { a with trafo = a.trafo * deltaTrafo } else a
-                                        )
+                    let newObjects = setTrafoOfObjectsWithId(controllerObjectId, virtualHandTrafo, objects, scene.physicsInfo.deltaTime)
                     let newObjects = setTrafoOfObjectsWithId(grabTriggerId, virtualHandTrafo, newObjects, scene.physicsInfo.deltaTime)
-
         //                // attach light to grabbing hand
 //                        let lightPos = virtualHandTrafo
 //                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightPos, newObjects, scene.physicsInfo.deltaTime)
-
                     newObjects
+
+                let updateGrabbedObjects(virtualHandTrafo : Trafo3d, objects : PersistentHashSet<Object>) = 
+                    let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * virtualHandTrafo
+                    objects
+                        |> PersistentHashSet.map (fun a ->
+                            if (a.isGrabbed = GrabbedOptions.Controller1 && firstController) || 
+                                (a.isGrabbed = GrabbedOptions.Controller2 && not firstController) then 
+                                { a with trafo = a.trafo * deltaTrafo } else a
+                        )
+
 
                 match interactionInfo.interactionType with
                     | VrInteractionTechnique.VirtualHand ->
-                        let virtualHandTrafo = t
-                        let newObjects = updateObjects(virtualHandTrafo)
-                        let newInteractionInfo = { interactionInfo with armExtensionFactor = 1.0; lastContrTrafo = virtualHandTrafo }
+                        let newObjects = updateControllerObjects(t, scene.objects)
+                        let newObjects = updateGrabbedObjects(t, newObjects)
+                        let newInteractionInfo = { interactionInfo with armExtensionFactor = 1.0; lastContrTrafo = t }
                         let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.GoGo ->
                         let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.trackingToWorld)
-                        let newObjects = updateObjects(virtualHandTrafo)
+                        let newObjects = updateControllerObjects(virtualHandTrafo, scene.objects)
+                        let newObjects = updateGrabbedObjects(virtualHandTrafo, newObjects)
                         let newInteractionInfo = { interactionInfo with armExtensionFactor = extension; lastContrTrafo = virtualHandTrafo }
                         let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.Flying ->
-                        let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects, scene.physicsInfo.deltaTime)
                         let direction = t.Forward.TransformDir(V3d.OOI)
+                        let newObjects = updateControllerObjects(t, scene.objects)
                         let newInteractionInfo = { interactionInfo with moveDirection = direction }
                         let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)
                         { newScene with objects = newObjects}
                     | VrInteractionTechnique.TeleportArea
                     | VrInteractionTechnique.TeleportPos ->     
-                        let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects, scene.physicsInfo.deltaTime)
                         let direction = t.Forward.TransformDir(V3d.OOI)
+                        let newObjects = updateControllerObjects(t, scene.objects)
                         let rayCastStart = t.Forward.TransformPos(V3d())
                         let newInteractionInfo = { interactionInfo with 
                                                     moveDirection = direction 
@@ -102,11 +106,7 @@ module LogicalScene =
             // press track pad
             | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
                 let firstController = deviceId = assignedInputs.controller1Id
-                let interactionInfo = 
-                    if deviceId = assignedInputs.controller1Id then
-                        scene.interactionInfo1
-                    else // if deviceId = assignedInputs.controller2Id
-                        scene.interactionInfo2
+                let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
                 let newInteractionTechnique = VrInteractions.nextInteractionTechnique interactionInfo.interactionType
                 let newInteractionInfo = { interactionInfo with 
@@ -114,9 +114,9 @@ module LogicalScene =
                                             raycastInfo = { interactionInfo.raycastInfo with wantsRayCast = false; rayCastHasHit = false }
                                          }
 
-                if deviceId = assignedInputs.controller1Id then
+                if firstController then
                     transact ( fun _ -> Mod.change controller1OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
-                else // deviceId = assignedInputs.controller2Id then
+                else
                     transact ( fun _ -> Mod.change controller2OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
 
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo)
@@ -129,7 +129,7 @@ module LogicalScene =
             // press trigger
             | DeviceTouch(deviceId, a, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
-                let interactionInfo = if deviceId = assignedInputs.controller1Id then scene.interactionInfo1 else scene.interactionInfo2
+                let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
                 match interactionInfo.interactionType with
                     | VrInteractionTechnique.VirtualHand
@@ -137,9 +137,10 @@ module LogicalScene =
                         let newObjects = 
                             scene.objects 
                                 |> PersistentHashSet.map (fun o ->
-                                        if o.isManipulable && (o.isGrabbable = GrabbableOptions.Controller1 && firstController) || 
-                                                              (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
-                                                               o.isGrabbable = GrabbableOptions.BothControllers then 
+                                        if o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
+                                           ((o.isGrabbable = GrabbableOptions.Controller1 && firstController) || 
+                                            (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
+                                            o.isGrabbable = GrabbableOptions.BothControllers) then 
                                             { o with 
                                                 isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
         //                                        trafo = controller2Trafo // snap ball to controller
@@ -168,12 +169,19 @@ module LogicalScene =
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
-                let interactionInfo = if deviceId = assignedInputs.controller1Id then scene.interactionInfo1 else scene.interactionInfo2
+                let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
 
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun a ->
-                                if a.isGrabbed = GrabbedOptions.NoGrab then a else { a with isGrabbed = GrabbedOptions.NoGrab }
+                                let newGrabbedState = match a.isGrabbed with
+                                                        | GrabbedOptions.NoGrab -> GrabbedOptions.NoGrab
+                                                        | GrabbedOptions.Controller1 when firstController -> GrabbedOptions.NoGrab
+                                                        | GrabbedOptions.Controller1 when not firstController -> GrabbedOptions.Controller1
+                                                        | GrabbedOptions.Controller2 when firstController -> GrabbedOptions.Controller2
+                                                        | GrabbedOptions.Controller2 when not firstController -> GrabbedOptions.NoGrab
+                                                        | _ -> GrabbedOptions.NoGrab // should never happen
+                                if a.isGrabbed = newGrabbedState then a else { a with isGrabbed = newGrabbedState }
                             ) 
                 let newInteractionInfo = {interactionInfo with lastContrTrafo = Trafo3d.Identity }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo)

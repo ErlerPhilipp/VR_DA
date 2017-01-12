@@ -27,17 +27,17 @@ module VrInteractions =
             | VrInteractionTechnique.GoGo -> VrInteractionTechnique.Flying
             | VrInteractionTechnique.Flying -> VrInteractionTechnique.TeleportPos
             | VrInteractionTechnique.TeleportPos -> VrInteractionTechnique.TeleportArea
-            | VrInteractionTechnique.TeleportArea -> VrInteractionTechnique.Flying
+            | VrInteractionTechnique.TeleportArea -> VrInteractionTechnique.VirtualHand
             | _ -> VrInteractionTechnique.VirtualHand
             
     let colorForInteractionTechnique(it : VrInteractionTechnique) =
         match it with
-            | VrInteractionTechnique.VirtualHand -> C4f(1.0, 1.0, 1.0, 0.0)
-            | VrInteractionTechnique.GoGo -> C4f.Red
-            | VrInteractionTechnique.Flying -> C4f.Green
-            | VrInteractionTechnique.TeleportPos -> C4f.Blue
-            | VrInteractionTechnique.TeleportArea -> C4f.DarkBlue
-            | _ -> C4f.White
+            | VrInteractionTechnique.VirtualHand -> C4d(1.0, 1.0, 1.0, 0.0)
+            | VrInteractionTechnique.GoGo -> C4d(1.0, 1.0, 1.0, 0.5)
+            | VrInteractionTechnique.Flying -> C4d(0.0, 1.0, 0.0, 0.5)
+            | VrInteractionTechnique.TeleportPos -> C4d(1.0, 1.0, 0.0, 0.5)
+            | VrInteractionTechnique.TeleportArea -> C4d(0.0, 1.0, 1.0, 0.5)
+            | _ -> C4d(1.0, 0.0, 0.0, 1.0)
 
     let getVirtualHandTrafoAndExtensionFactor (realHandTrafo : Trafo3d, realHeadTrafo: Trafo3d, trackingToWorld : Trafo3d) = 
         let handPosTrackingSpace = (realHandTrafo * trackingToWorld).Forward.TransformPos(V3d.Zero)

@@ -63,6 +63,8 @@ module LogicalSceneTypes =
             ccdSphereRadius   : float32
             rollingFriction   : float32
             collisionShape    : Option<BulletHelper.Shape> 
+            collisionGroup    : int16
+            collisionMask     : int16
         }
 
     let defaultObject = 
@@ -96,6 +98,8 @@ module LogicalSceneTypes =
             ccdSphereRadius     = 0.0f
             rollingFriction     = 0.0f
             collisionShape      = None
+            collisionGroup      = 0xFFFFs
+            collisionMask       = 0xFFFFs
         }
 
     type SpecialObjectIds =
@@ -181,6 +185,9 @@ module LogicalSceneTypes =
             gravity             : V3d
             numSubSteps         : int
             subStepTime         : float
+            
+            raycastCollGroup    : int16
+            raycastCollMask     : int16
         }
 
     let DefaultPhysicsInfo = 
@@ -191,6 +198,8 @@ module LogicalSceneTypes =
             physicsDebugDraw    = false
             numSubSteps         = 6
             subStepTime         = 1.0 / 180.0
+            raycastCollGroup    = 0xFFFFs
+            raycastCollMask     = 0xFFFFs
         }
 
     type Scene =
@@ -344,6 +353,7 @@ module GraphicsSceneTypes =
     type RaycastMods = 
         {
             hasRayCastHit       : ModRef<bool>
+            drawRayCastDir      : ModRef<bool>
             drawHitPoint        : ModRef<bool>
             drawHitArea         : ModRef<bool>
             hasRayCastDir       : ModRef<Trafo3d>

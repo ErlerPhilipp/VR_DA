@@ -39,7 +39,7 @@ module PhysicsScene =
                         | ObjectTypes.Static ->
                             let collObj = new BulletSharp.CollisionObject()
                             setProperties(collObj, o)
-                            scene.dynamicsWorld.AddCollisionObject(collObj)
+                            scene.dynamicsWorld.AddCollisionObject(collObj, o.collisionGroup, o.collisionMask)
                             { 
                                 original = o
                                 collisionObject = StaticBody collObj 
@@ -57,7 +57,7 @@ module PhysicsScene =
                             rigidBody.LinearVelocity <- (o.linearVelocity |> toVector3)
                             rigidBody.AngularVelocity <- (o.angularVelocity |> toVector3)
                                 
-                            scene.dynamicsWorld.AddRigidBody(rigidBody)
+                            scene.dynamicsWorld.AddRigidBody(rigidBody, o.collisionGroup, o.collisionMask)
                             let body =  { 
                                             original = o
                                             collisionObject = CollisionObject.RigidBody rigidBody 
@@ -70,7 +70,7 @@ module PhysicsScene =
                             let ghost = new BulletSharp.PairCachingGhostObject()
                             setProperties(ghost, o)
                             ghost.CollisionFlags <- ghost.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
-                            scene.dynamicsWorld.AddCollisionObject(ghost)
+                            scene.dynamicsWorld.AddCollisionObject(ghost, o.collisionGroup, o.collisionMask)
                             { 
                                 original = o
                                 collisionObject = Ghost ghost 
@@ -88,7 +88,7 @@ module PhysicsScene =
                             rigidBody.CollisionFlags <- rigidBody.CollisionFlags ||| BulletSharp.CollisionFlags.StaticObject ||| BulletSharp.CollisionFlags.KinematicObject
                             rigidBody.ForceActivationState(ActivationState.DisableDeactivation)
                                 
-                            scene.dynamicsWorld.AddRigidBody(rigidBody)
+                            scene.dynamicsWorld.AddRigidBody(rigidBody, o.collisionGroup, o.collisionMask)
                             let body =  { 
                                             original = o
                                             collisionObject = CollisionObject.RigidBody rigidBody 
@@ -167,12 +167,11 @@ module PhysicsScene =
                             let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
                             let handVelocity = 
                                 match interactionInfo.interactionType with
-                                    | VrInteractions.VrInteractionTechnique.VirtualHand -> toVector3(vel)
                                     | VrInteractions.VrInteractionTechnique.GoGo -> 
                                         // TODO: make more accurate, function of difference with last step
                                         //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
                                         toVector3(vel * interactionInfo.armExtensionFactor)
-                                    | _ -> failwith "not implemented"
+                                    | _ -> toVector3(vel)
 
 //                            collisionObject.LinearVelocity <- handVelocity
                             collisionObject.LinearVelocity <- Vector3()
@@ -355,7 +354,11 @@ module PhysicsScene =
                    
                 let performRayCast(source : int, raycastInfo : LogicalSceneTypes.RaycastInfo) =
                     if raycastInfo.wantsRayCast then
-                        let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(toVector3(raycastInfo.rayCastStart), toVector3(raycastInfo.rayCastEnd), world.dynamicsWorld)
+                        let rayCastStart = toVector3(raycastInfo.rayCastStart)
+                        let rayCastEnd = toVector3(raycastInfo.rayCastEnd)
+                        let collisionFilterGroup = s.physicsInfo.raycastCollGroup
+                        let collisionFilterMask = s.physicsInfo.raycastCollMask
+                        let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(rayCastStart, rayCastEnd, world.dynamicsWorld, collisionFilterGroup, collisionFilterMask)
                         let rayCastMsg = RayCastResult (source, hasHit, toV3d(hitPoint), toV3d(hitNormal))
                         newScene <- LogicalScene.update newScene rayCastMsg
                 performRayCast(0, s.interactionInfo1.raycastInfo)
