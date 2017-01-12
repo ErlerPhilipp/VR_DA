@@ -172,10 +172,10 @@ module VrWindow =
                 OpenTK.Graphics.OpenGL4.GL.Flush()
                 OpenTK.Graphics.OpenGL4.GL.Finish()
 
-                if timeRemaining > lastFrameTook then    
-                    Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
-                    else
-                        printfn "long frame; last frame: %Ams, remaining: %Ams" (lastFrameTook  * 1000.0) (timeRemaining * 1000.0)
+//                if timeRemaining > lastFrameTook then    
+//                    Thread.Sleep(1000.0 * (timeRemaining - lastFrameTook) |> int)
+//                else
+//                    printfn "long frame; last frame: %Ams, remaining: %Ams" (lastFrameTook  * 1000.0) (timeRemaining * 1000.0)
 
                 do
                     let mutable leftTex = Texture_t(eColorSpace = EColorSpace.Gamma, eType = EGraphicsAPIConvention.API_OpenGL, handle = nativeint (unbox<int> lColor.Handle))
