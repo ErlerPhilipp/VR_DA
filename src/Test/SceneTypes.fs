@@ -1,5 +1,7 @@
 ﻿namespace Aardvark.VR
 
+open Audio
+
 module LogicalSceneTypes = 
     open Aardvark.Base
     open Aardvark.SceneGraph
@@ -210,11 +212,13 @@ module LogicalSceneTypes =
             viewTrafo           : Trafo3d
             trackingToWorld     : Trafo3d
             ballResetPos        : V3d
+
+            bounceSoundSource   : Audio.Sound
             
-            rayCastDirSg        :ISg
-            rayCastHitPointSg   :ISg
-            rayCastHitAreaSg    :ISg
-            rayCastCamSg        :ISg
+            rayCastDirSg        : ISg
+            rayCastHitPointSg   : ISg
+            rayCastHitAreaSg    : ISg
+            rayCastCamSg        : ISg
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

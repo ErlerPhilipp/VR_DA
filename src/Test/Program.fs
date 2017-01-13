@@ -23,6 +23,7 @@ open NormalMap
 open TextureTiling
 open Lighting
 open Highlight
+open Audio
 
 type CollisionGroups =
     | Static =          0b0000000000000001s
@@ -41,6 +42,12 @@ let main argv =
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
+    
+    let bounceSound = Audio.Sound.ofFile(@"..\..\resources\sound\ball-bouncing.wav")
+    bounceSound.Loop <- true
+//    let s = Audio.Sound.ofFile(@"..\..\resources\sound\37154__volivieri__soccer-ball-hit-ground-01.wav")
+//    let s = Audio.Sound.ofFile(@"..\..\resources\sound\the_ring_that_fell.wav")
+//    let s = Audio.Sound.ofFile(@"C:\Users\erler\Desktop\aardvark-vr\resources\sound\the_ring_that_fell.wav")
     
     //#region CollisionGroups   
     let staticCollidesWith = CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.Avatar ||| CollisionGroups.TeleportRaycast |> int16
@@ -578,6 +585,8 @@ let main argv =
             viewTrafo           = Trafo3d.Identity
             trackingToWorld     = Trafo3d.Identity
             ballResetPos        = ballResetPos
+
+            bounceSoundSource   = bounceSound
             
             rayCastDirSg        = beamSg
             rayCastHitPointSg   = rayCastHitPointSg

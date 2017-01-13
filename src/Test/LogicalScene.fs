@@ -310,6 +310,7 @@ module LogicalScene =
                 let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
                 let newObjects = 
                     scene.objects 
+                        // TODO: ball with something -> bounceSound.Play()
                         // hit upper hoop trigger
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithUpperHoop = ghostId = scene.specialObjectIds.upperHoopTriggerId && o.id = colliderId
@@ -398,7 +399,6 @@ module LogicalScene =
                                                         newGrabbableState = GrabbableOptions.BothControllers)
 
                                         if grabNow then 
-                                            printfn "isGrabbed = %A" (if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2)
                                             { o with 
                                                 isGrabbable = newGrabbableState 
                                                 isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2

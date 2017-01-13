@@ -70,6 +70,7 @@
     <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
     <Compile Include="SGHelper.fs" />
+    <Compile Include="Audio.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
