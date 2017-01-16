@@ -266,27 +266,10 @@ module LogicalScene =
 
                 let newTimeSinceStart = scene.gameInfo.timeSinceStart + dt.TotalSeconds
 
-                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
-                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
-
-                // hit object
-                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
-                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
-                    
-                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
-                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.interactionInfo2.vibrationStrength)
-                
-                Vibration.updateVibration(uint32 assignedInputs.controller1Id, dt.TotalSeconds)
-                Vibration.updateVibration(uint32 assignedInputs.controller2Id, dt.TotalSeconds)
-
                 { scene with
                     trackingToWorld = newTrackingToWorld
                     physicsInfo = { scene.physicsInfo with deltaTime = dt.TotalSeconds }
                     gameInfo = { scene.gameInfo with timeSinceStart = newTimeSinceStart }
-                    interactionInfo1 = { scene.interactionInfo1 with vibStrLastFrame = scene.interactionInfo1.vibrationStrength }
-                    interactionInfo2 = { scene.interactionInfo2 with vibStrLastFrame = scene.interactionInfo2.vibrationStrength }
                 }
             
             | EndFrame ->
@@ -307,8 +290,27 @@ module LogicalScene =
                         else
                             o
                     )
+
+                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
+                Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
+
+                // hit object
+                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
+                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
+                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
+                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
+                
+                // overlap
+                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
+                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.interactionInfo2.vibrationStrength)
+                
+                Vibration.updateVibration(uint32 assignedInputs.controller1Id, scene.physicsInfo.deltaTime)
+                Vibration.updateVibration(uint32 assignedInputs.controller2Id, scene.physicsInfo.deltaTime)
+
                 { scene with
                     objects = newObjects
+                    interactionInfo1 = { scene.interactionInfo1 with vibStrLastFrame = scene.interactionInfo1.vibrationStrength }
+                    interactionInfo2 = { scene.interactionInfo2 with vibStrLastFrame = scene.interactionInfo2.vibrationStrength }
                 }
 
             | Collision (ghostId, colliderId) ->
@@ -354,16 +356,19 @@ module LogicalScene =
                                 else 
                                     o
                             )
-                        // check grabbable with controller
+                        // grab trigger
                         |> PersistentHashSet.map (fun o -> 
-//                                let interactionInfo = if deviceId = assignedInputs.controller1Id then scene.interactionInfo1 else scene.interactionInfo2
-    
                                 let colliderObject = getObjectWithId(colliderId, scene.objects)
                                 let collidingWithController = o.id = colliderId && 
                                                               ((ghostId = scene.specialObjectIds.grabTrigger1Id && 
                                                                 colliderId <> scene.specialObjectIds.controller1ObjectId) ||
                                                                (ghostId = scene.specialObjectIds.grabTrigger2Id && 
                                                                 colliderId <> scene.specialObjectIds.controller2ObjectId))
+                                                                
+                                let firstController = ghostId = scene.specialObjectIds.grabTrigger1Id
+                                let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
+                                let thisControllerCanGrab = interactionInfo.interactionType = VrInteractionTechnique.VirtualHand || interactionInfo.interactionType = VrInteractionTechnique.GoGo
+
                                 if collidingWithController then
                                     let velToStrength(vel : float) = 
                                         let maxTrackingNoiseLevel = 0.1
@@ -382,14 +387,12 @@ module LogicalScene =
                                     let strength = velToStrength(relativeVel)
 //                                     printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
                                     
-                                    let firstController = ghostId = scene.specialObjectIds.grabTrigger1Id
-                                    let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-                                    let thisControllerCanGrab = interactionInfo.interactionType = VrInteractionTechnique.VirtualHand || interactionInfo.interactionType = VrInteractionTechnique.GoGo
                                     if firstController then
                                         if strength > newCtr1VibStrength then newCtr1VibStrength <- strength
                                     else
                                         if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
 
+                                    // check grabbable with
                                     if colliderObject.isManipulable && thisControllerCanGrab then
                                         let newGrabbableState = 
                                             match o.isGrabbable with
@@ -407,7 +410,6 @@ module LogicalScene =
                                             { o with 
                                                 isGrabbable = newGrabbableState 
                                                 isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
-//                                                wasGrabbed = GrabbedOptions.NoGrab
                                                 hitLowerTrigger = false
                                                 hitUpperTrigger = false
                                                 hasScored = false
@@ -416,8 +418,7 @@ module LogicalScene =
                                         else
                                             { o with 
                                                 isGrabbable = newGrabbableState 
-                                            } 
-                                        
+                                            }
                                     else o
                                 else  o
                             )
@@ -433,7 +434,7 @@ module LogicalScene =
                                 else 
                                     o
                             )
-                                 
+                
                 { scene with 
                     objects = newObjects
                     gameInfo = { scene.gameInfo with score = newScore }
@@ -450,21 +451,59 @@ module LogicalScene =
                         let ballObj = if firstObjIsBall then obj0 else obj1
                         let otherObj = if firstObjIsBall then obj1 else obj0
 
-                        // test
-                        if otherObj.id = scene.specialObjectIds.controller1ObjectId || otherObj.id = scene.specialObjectIds.controller2ObjectId then
-                            printfn "controller vel: %A" otherObj.linearVelocity
-
                         if otherObj.id <> scene.specialObjectIds.grabTrigger1Id && otherObj.id <> scene.specialObjectIds.grabTrigger2Id then
                             if not (scene.bounceSoundSource.IsPlaying()) then
                                 let impulseStrength = (obj0.linearVelocity - obj1.linearVelocity).Length
                                 if impulseStrength > 0.1 then
                                     let volume = clamp 0.0 1.0 (impulseStrength * 0.5)
-//                                    let volume = impulseStrength * 0.5
-                                    printfn "ball impulse: %A, vol: %A at %A" impulseStrength volume contactWorldPos
-    //                                let contactWorldPos = scene.viewTrafo.Backward.TransformPos(V3d())
+//                                    printfn "ball impulse: %A, vol: %A at %A" impulseStrength volume contactWorldPos
                                     scene.bounceSoundSource.Location <- ballObj.trafo.Forward.TransformPos(V3d())
                                     scene.bounceSoundSource.Volume <- volume
                                     scene.bounceSoundSource.Play()
+
+//                // vibrate if controller collides with something
+//                let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
+//                let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
+//                for o in scene.objects do
+//                    let obj0 = getObjectWithId(collider0Id, scene.objects)
+//                    let obj1 = getObjectWithId(collider1Id, scene.objects)
+//                    let obj0IsController = (obj0.id = scene.specialObjectIds.controller1ObjectId) || (obj0.id = scene.specialObjectIds.controller2ObjectId)
+//                    let obj1IsController = (obj1.id = scene.specialObjectIds.controller1ObjectId) || (obj1.id = scene.specialObjectIds.controller2ObjectId)
+//                    let controllerCollidesWithSomething = obj0IsController <> obj1IsController // only 1 controller
+//                    
+//                    if controllerCollidesWithSomething then
+//                        printfn "controllerCollidesWithSomething"
+//                        let controllerObj = if obj0IsController then obj0 else obj1
+//                        let otherObj = if obj0IsController then obj1 else obj0
+//                        let firstController = controllerObj.id = scene.specialObjectIds.controller1ObjectId
+//
+//                        let velToStrength(vel : float) = 
+//                            let maxTrackingNoiseLevel = 0.1
+//                            let velWithoutTrackingNoise = (max (vel - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
+//
+//                            let velocityToStrength = 0.6
+//                            let constVibrationOffset = 0.1
+//                            let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
+//
+//                            let clampedStrength = clamp 0.0 1.0 linearStrength
+//                            clampedStrength
+//                                        
+//                        let controllerLinearVelocity = controllerObj.linearVelocity
+//                        let colliderLinearVelocity = otherObj.linearVelocity
+//                        let relativeVel = (controllerLinearVelocity - colliderLinearVelocity).Length
+//                        let strength = velToStrength(relativeVel)
+////                                     printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
+//                                    
+//                        printfn "update vibration"
+//                        if firstController then
+//                            if strength > newCtr1VibStrength then newCtr1VibStrength <- strength
+//                        else
+//                            if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
+//                         
+//                { scene with 
+//                    interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
+//                    interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
+//                }
                 scene
             | RayCastResult (source, hasHit, hitPoint, hitNormal) ->
                 let firstController = source = 0
