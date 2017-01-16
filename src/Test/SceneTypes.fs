@@ -50,6 +50,7 @@ module LogicalSceneTypes =
             hasScored         : bool
             willReset         : bool
             timeToReset       : float
+            collisionCallback : bool
 
             trafo             : Trafo3d
             model             : Option<ISg>
@@ -85,6 +86,7 @@ module LogicalSceneTypes =
             hasScored           = false
             willReset           = false
             timeToReset         = 0.0
+            collisionCallback   = false
 
             trafo               = Trafo3d.Identity
             model               = None
@@ -231,7 +233,7 @@ module LogicalSceneTypes =
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
                 let newTrafo = t
-                if o.objectType = ObjectTypes.Ghost then
+                if o.objectType <> ObjectTypes.Dynamic then
                     let linVel = (newTrafo.Forward.TransformPos(V3d()) - o.trafo.Forward.TransformPos(V3d())) / dt
                     {o with 
                         trafo = newTrafo
@@ -248,7 +250,7 @@ module LogicalSceneTypes =
         let newObjects = objects |> PersistentHashSet.map (fun o -> 
             if o.id = id then
                 let newTrafo = o.trafo * t
-                if o.objectType = ObjectTypes.Ghost then
+                if o.objectType <> ObjectTypes.Dynamic then
                     let linVel = (newTrafo.Forward.TransformPos(V3d()) - o.trafo.Forward.TransformPos(V3d())) / dt
                     {o with 
                         trafo = newTrafo
@@ -289,6 +291,8 @@ module LogicalSceneTypes =
         | EndFrame
         | UpdateViewTrafo of Trafo3d
         | Collision of int * int
+        | CollisionAdded of int * int * V3d * V3d
+//        | CollisionProcessed of int * int * float * V3d
         | RayCastResult of int * bool * V3d * V3d
         
 module PhysicsSceneTypes = 

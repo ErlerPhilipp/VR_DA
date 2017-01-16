@@ -44,7 +44,7 @@ let main argv =
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
     let bounceSound = Audio.Sound.ofFile(@"..\..\resources\sound\ball-bouncing.wav")
-    bounceSound.Loop <- true
+//    bounceSound.Loop <- true
 //    let s = Audio.Sound.ofFile(@"..\..\resources\sound\37154__volivieri__soccer-ball-hit-ground-01.wav")
 //    let s = Audio.Sound.ofFile(@"..\..\resources\sound\the_ring_that_fell.wav")
 //    let s = Audio.Sound.ofFile(@"C:\Users\erler\Desktop\aardvark-vr\resources\sound\the_ring_that_fell.wav")
@@ -253,6 +253,7 @@ let main argv =
         { defaultObject with
             id = newId()
             objectType = ObjectTypes.Kinematic
+            collisionCallback = true
             model = Some controllerSg
             surface = Some diffuseContrSurface
             collisionShape = Some simpleControllerBodyCollShape
@@ -297,6 +298,7 @@ let main argv =
             rollingFriction = 0.01f
             restitution = 0.95f
             friction = 0.75f
+            collisionCallback = true
         }
 
     let staticDefaultCollider =
@@ -453,6 +455,7 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
+            collisionCallback = true
             model = Some ballSg
             trafo = Trafo3d.Translation(ballResetPos)
             surface = Some ballSurface
@@ -468,6 +471,7 @@ let main argv =
             id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
+            collisionCallback = true
             trafo = Trafo3d.Translation(-0.5, 0.0, 0.0)
             model = Some boxSg
             surface = Some boxSurface

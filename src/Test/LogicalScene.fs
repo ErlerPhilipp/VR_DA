@@ -28,6 +28,13 @@ module LogicalScene =
             // move HMD
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.hmdId ->
                 let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.headId, t, scene.objects, scene.physicsInfo.deltaTime)
+
+                let hmdPos = t.Forward.TransformPos(V3d())
+                let hmdLookAt = t.Forward.TransformDir(-V3d.OOI)
+                let hmdUp = t.Forward.TransformDir(V3d.OIO)
+                Audio.setListenerPosition(hmdPos)
+                Audio.setListenerOrientation(hmdLookAt, hmdUp)
+
                 { scene with objects = newObjects; viewTrafo = t.Inverse }
             // move cam 1
             | DeviceMove(deviceId, t) when deviceId = assignedInputs.cam1Id ->
@@ -310,7 +317,6 @@ module LogicalScene =
                 let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
                 let newObjects = 
                     scene.objects 
-                        // TODO: ball with something -> bounceSound.Play()
                         // hit upper hoop trigger
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithUpperHoop = ghostId = scene.specialObjectIds.upperHoopTriggerId && o.id = colliderId
@@ -350,7 +356,6 @@ module LogicalScene =
                             )
                         // check grabbable with controller
                         |> PersistentHashSet.map (fun o -> 
-                                // TODO: only if virtual hand or gogo
 //                                let interactionInfo = if deviceId = assignedInputs.controller1Id then scene.interactionInfo1 else scene.interactionInfo2
     
                                 let colliderObject = getObjectWithId(colliderId, scene.objects)
@@ -435,6 +440,32 @@ module LogicalScene =
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }
+            | CollisionAdded (collider0Id, collider1Id, impulseStrength, contactWorldPos : V3d) ->
+                // play bounce sound if the ball collides with something
+                for o in scene.objects do
+                    let obj0 = getObjectWithId(collider0Id, scene.objects)
+                    let obj1 = getObjectWithId(collider1Id, scene.objects)
+                    if (obj0.objectType = ObjectTypes.Dynamic || obj1.objectType = ObjectTypes.Dynamic) then
+                        let firstObjIsBall = obj0.objectType = ObjectTypes.Dynamic
+                        let ballObj = if firstObjIsBall then obj0 else obj1
+                        let otherObj = if firstObjIsBall then obj1 else obj0
+
+                        // test
+                        if otherObj.id = scene.specialObjectIds.controller1ObjectId || otherObj.id = scene.specialObjectIds.controller2ObjectId then
+                            printfn "controller vel: %A" otherObj.linearVelocity
+
+                        if otherObj.id <> scene.specialObjectIds.grabTrigger1Id && otherObj.id <> scene.specialObjectIds.grabTrigger2Id then
+                            if not (scene.bounceSoundSource.IsPlaying()) then
+                                let impulseStrength = (obj0.linearVelocity - obj1.linearVelocity).Length
+                                if impulseStrength > 0.1 then
+                                    let volume = clamp 0.0 1.0 (impulseStrength * 0.5)
+//                                    let volume = impulseStrength * 0.5
+                                    printfn "ball impulse: %A, vol: %A at %A" impulseStrength volume contactWorldPos
+    //                                let contactWorldPos = scene.viewTrafo.Backward.TransformPos(V3d())
+                                    scene.bounceSoundSource.Location <- ballObj.trafo.Forward.TransformPos(V3d())
+                                    scene.bounceSoundSource.Volume <- volume
+                                    scene.bounceSoundSource.Play()
+                scene
             | RayCastResult (source, hasHit, hitPoint, hitNormal) ->
                 let firstController = source = 0
                 let oldInteractionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2

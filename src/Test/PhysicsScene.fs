@@ -13,6 +13,10 @@ module PhysicsScene =
 
     let mutable currentWorld = None
     let debugDrawer = BulletHelper.DebugDrawer()
+
+    let mutable callbackMessages = System.Collections.Generic.List()
+
+    let maxPenetrationDepth = -0.001f
     
     let releaseGrab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
 //        printfn "release"
@@ -65,6 +69,40 @@ module PhysicsScene =
         // keep always active
         collisionObject.Activate()
         collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
+    
+    let addContactMessage (manPoint : ManifoldPoint) (obj0 : CollisionObject) (obj1 : CollisionObject) =
+        let impulseStrength = float(manPoint.AppliedImpulse) // Error in Bullet? only impulse by constraint solver, not collision impulse
+        let collisionNormal = toV3d manPoint.NormalWorldOnB
+        let normalImpulse = collisionNormal * impulseStrength
+//        let impulse = float(max manPoint.AppliedImpulseLateral1 manPoint.AppliedImpulseLateral2)
+        let contactWP = toV3d(manPoint.PositionWorldOnA)
+
+        let obj0Id = obj0.UserIndex
+        let obj1Id = obj1.UserIndex
+
+        let mutable found = false
+        callbackMessages <- callbackMessages.Map 
+            (fun d -> match d with
+                        | CollisionAdded (collider0Id, collider1Id, impulse, contactWorldPos : V3d) ->
+                                let sameColliders = (collider0Id = obj0.UserIndex && collider1Id = obj1.UserIndex) || (collider0Id = obj1.UserIndex && collider1Id = obj0.UserIndex)
+                                found <- true
+                                let (newImpulse, newContactWP) = 
+                                    if normalImpulse.LengthSquared > impulse.LengthSquared then 
+                                        (normalImpulse, contactWP)
+                                    else 
+                                        (impulse, contactWorldPos)
+                                CollisionAdded (collider0Id, collider1Id, newImpulse, newContactWP)
+                        | _ -> d
+            )
+        if not found then //&& manPoint.Distance < -maxPenetrationDepth then
+//            printfn "CollisionAdded"
+            callbackMessages.Add (CollisionAdded(obj0Id, obj1Id, normalImpulse, contactWP))
+
+    let contactAdded (manPoint : ManifoldPoint) (collObjA : CollisionObjectWrapper) (partIdA : int) (idA : int) (collObjB : CollisionObjectWrapper) (partIdB : int) (idB : int) = 
+        addContactMessage manPoint collObjA.CollisionObject collObjB.CollisionObject
+            
+    let contactProcessed (manPoint : ManifoldPoint) (collObjA : CollisionObject) (collObjB : CollisionObject) = 
+        addContactMessage manPoint collObjA collObjB
 
     // Replay changes into physics world....
     type Conversion private() =
@@ -74,9 +112,10 @@ module PhysicsScene =
             match o.collisionShape with
                 | Some (collisionShape) -> 
                     let cshape = toCollisionShape collisionShape
-
+                
                     let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
-                        if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| BulletSharp.CollisionFlags.NoContactResponse
+                        if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| CollisionFlags.NoContactResponse
+                        if o.collisionCallback then collObj.CollisionFlags <- collObj.CollisionFlags ||| CollisionFlags.CustomMaterialCallback
                         collObj.UserIndex <- o.id
                         collObj.Friction <- float32 o.friction
                         collObj.RollingFriction <- float32 o.rollingFriction
@@ -168,6 +207,9 @@ module PhysicsScene =
             let ghostCB = new BulletSharp.GhostPairCallback();
             broad.OverlappingPairCache.SetInternalGhostPairCallback(ghostCB)
 
+            PersistentManifold.add_ContactProcessed(ContactProcessedEventHandler(contactProcessed))
+//            ManifoldPoint.add_ContactAdded(ContactAddedEventHandler(contactAdded))
+            
             let scene = { original = s; collisionConf = collConf; collisionDisp = dispatcher; broadPhase = broad; dynamicsWorld = dynWorld; bodies = null;  }
             scene.bodies <- HashSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map (fun o -> Conversion.Create(o,scene)))
             scene
@@ -271,7 +313,14 @@ module PhysicsScene =
                 simulationSw.Stop()
 //                System.Console.WriteLine(simulationSw.MicroTime.ToString())
 
-                let mutable messages = System.Collections.Generic.List()
+                let mutable newScene = s
+
+                for message in callbackMessages do
+                    newScene <- LogicalScene.update newScene message
+
+                callbackMessages.Clear()
+
+                let mutable ghostMessages = System.Collections.Generic.List()
 
                 let objects =
                     [
@@ -318,12 +367,11 @@ module PhysicsScene =
                                                         if not hasContact then
                                                             let contactPoint = manifold.GetContactPoint(contactPointIndex)
                                                             let dist = contactPoint.Distance
-                                                            let maxPenetrationDepth = -0.001f
                                                             if dist < -maxPenetrationDepth then
                                                                 hasContact <- true
 
                                             if hasContact then
-                                                messages.Add (Collision(ghostObjectId, collidingObjectId))
+                                                ghostMessages.Add (Collision(ghostObjectId, collidingObjectId))
 
                                                 let o = LogicalSceneTypes.getObjectWithId(collidingObjectId, s.objects)
                                                 let firstController = ghostObjectId = s.specialObjectIds.grabTrigger1Id
@@ -343,7 +391,7 @@ module PhysicsScene =
 //                                        let userObject = ghostObject.GetOverlappingObject(i).UserObject :?> Object
 //                                        if userObject.objectType = ObjectTypes.Dynamic then
 //                                            //printfn "collision with ghost: %A" userObject.id
-//                                            messages <- messages @ [Collision(transformedObject, userObject)].v
+//                                            ghostMessages <- ghostMessages @ [Collision(transformedObject, userObject)].v
                                     yield transformedObject
                                 | CollisionObject.RigidBody rigidBody -> 
                                     // only rigidbodies should be moved by the physics
@@ -364,9 +412,9 @@ module PhysicsScene =
 
                 world.dynamicsWorld.DebugDrawWorld()
 
-                let mutable newScene = { s with objects = PersistentHashSet.ofList objects }
+                newScene <- { newScene with objects = PersistentHashSet.ofList objects }
 
-                for message in messages do
+                for message in ghostMessages do
                     newScene <- LogicalScene.update newScene message
                    
                 let performRayCast(source : int, raycastInfo : LogicalSceneTypes.RaycastInfo) =
