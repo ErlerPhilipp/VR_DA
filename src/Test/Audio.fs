@@ -32,6 +32,7 @@ module Audio =
         let mutable loop = false
         let mutable volume = 1.0
         let mutable pitch = 1.0
+        let mutable rolloffFactor = 1.0
 
         member x.Loop
             with get() = loop
@@ -69,6 +70,13 @@ module Audio =
                 ctx.MakeCurrent()
                 pitch <- p
                 AL.Source(source, ALSourcef.Pitch, float32 pitch)
+
+        member x.RolloffFactor
+            with get() = rolloffFactor
+            and set r =
+                ctx.MakeCurrent()
+                rolloffFactor <- r
+                AL.Source(source, ALSourcef.RolloffFactor, float32 rolloffFactor)
 
         member x.Play() =
             ctx.MakeCurrent()

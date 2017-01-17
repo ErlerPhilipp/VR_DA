@@ -214,8 +214,10 @@ module LogicalSceneTypes =
             viewTrafo           : Trafo3d
             trackingToWorld     : Trafo3d
             ballResetPos        : V3d
-
+            
             bounceSoundSources  : list<Audio.Sound>
+            sireneSoundSource   : Audio.Sound
+            popSoundSource      : Audio.Sound
             
             rayCastDirSg        : ISg
             rayCastHitPointSg   : ISg

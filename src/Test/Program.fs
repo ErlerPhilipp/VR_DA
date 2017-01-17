@@ -43,8 +43,38 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
+    
+    //#region Trafos / Architecture   
+    let trackingAreaSize = 2.9
+    let trackingAreaHeight = 6.2
+    let goalAreaSize = 4.5
+    let goalAreaHeight = 7.5
+    let wallThickness = 1.0
+    let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
+
+    let hoopScale = 2.0
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(0.5, 0.0, 0.0)
+    let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
+    let scoreScale = 0.1
+    let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
+                        Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
+    let lowerHoopTriggerTrafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
+    let upperHoopTriggerTrafo = lowerHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
+    //#endregion
+        
+    //#region Audio   
     let bounceBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\ball-bouncing.wav")
     let bounceSound = [ for i in 1 .. 10 -> Audio.Sound.sourceFromBuffer(bounceBuffer) ]
+    
+    let sireneBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\170825__santino-c__sirene-horn.wav")
+    let sireneSound = Audio.Sound.sourceFromBuffer(sireneBuffer)
+    sireneSound.Volume <- 2.5
+    sireneSound.RolloffFactor <- 0.25
+    sireneSound.Location <- upperHoopTriggerTrafo.Forward.TransformPos(V3d())
+
+    let popBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\222373__qubodup__balloon-pop.wav")
+    let popSound = Audio.Sound.sourceFromBuffer(popBuffer)
+    popSound.Volume <- 0.5
 
     let ambient1Buffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\245187__patricklieberkind__dark-ambience-2.wav")
     let ambient1Sound = Audio.Sound.sourceFromBuffer(ambient1Buffer)
@@ -59,6 +89,7 @@ let main argv =
     ambient2Sound.Location <- V3d(-25.0, 0.0, -5.0)
     ambient2Sound.Loop <- true
     ambient2Sound.Play()
+    //#endregion
     
     //#region CollisionGroups   
     let staticCollidesWith = CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.Avatar ||| CollisionGroups.TeleportRaycast |> int16
@@ -150,20 +181,6 @@ let main argv =
     let pedestalDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Marble Polished\TexturesCom_MarblePolishedWhite1_diffuse_S.png", textureParam) :> ITexture))
     //#endregion
 
-    let trackingAreaSize = 2.9
-    let trackingAreaHight = 5.2
-    let goalAreaSize = 4.5
-    let goalAreaHight = 6.5
-    let wallThickness = 1.0
-    let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
-
-    let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(-1.1, -1.1, 0.0)
-    let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
-    let scoreScale = 0.1
-    let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
-                        Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
-
     let staticModels =
         [
             //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite, None, 0.5f
@@ -228,13 +245,13 @@ let main argv =
                             |> groundDiffuseTexture |> groundNormalMap
     let ceilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, wallThickness, trackingAreaSize))))
                             |> ceilingDiffuseTexture |> ceilingNormalMap
-    let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaHight, wallThickness))))
+    let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaHeight, wallThickness))))
                             |> wallDiffuseTexture |> wallNormalMap
     let goalRoomGroundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
                             |> groundDiffuseTexture |> groundNormalMap
     let goalRoomCeilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
                             |> ceilingDiffuseTexture |> ceilingNormalMap
-    let goalRoomWallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, goalAreaHight, wallThickness))))
+    let goalRoomWallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, goalAreaHeight, wallThickness))))
                             |> goalRoomWallDiffuseTexture |> goalRoomWallNormalMap
     let pedestalHeight = 0.8
     let pedestalRadius = 0.2
@@ -289,8 +306,8 @@ let main argv =
     let camObject1 = 
         { defaultObject with
             id = newId()
-            model = Some basestationSg
-            surface = Some diffuseSurface
+//            model = Some basestationSg
+//            surface = Some diffuseSurface
             isColliding = false
         }
     let camObject2 = { camObject1 with id = newId() }
@@ -298,7 +315,7 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 2.0), trackingAreaHight - wallThickness * 2.5, 0.0)
+            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 3.0), trackingAreaHeight - wallThickness * 2.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
             isColliding = false
@@ -333,7 +350,7 @@ let main argv =
     let ceilingObject = 
         { staticDefaultCollider with
             id = newId()
-            trafo = Trafo3d.Translation(0.0, trackingAreaHight - 1.5 * wallThickness, 0.0)
+            trafo = Trafo3d.Translation(0.0, trackingAreaHeight - 1.5 * wallThickness, 0.0)
             model = Some ceilingSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(ceilingTilingFactor * trackingAreaSize)
@@ -347,30 +364,30 @@ let main argv =
             tilingFactor = V2d(0.25 * trackingAreaSize)
         }
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
-    let wallHorizontalOffset = trackingAreaHight * 0.5 - wallThickness
+    let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
     let wall1 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.Translation(0.0, wallHorizontalOffset, -wallLateralOffset)
-            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall2 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (-90.0) * Trafo3d.Translation(wallLateralOffset, wallHorizontalOffset, 0.0)
-            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall3 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (180.0) * Trafo3d.Translation(0.0, wallHorizontalOffset, wallLateralOffset)
-            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let wall4 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-wallLateralOffset, wallHorizontalOffset, 0.0)
-            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
 
     let goalRoomGroundObject = 
@@ -387,7 +404,7 @@ let main argv =
     let goalRoomCeilingObject = 
         { staticDefaultCollider with
             id = newId()
-            trafo = Trafo3d.Translation(0.0, goalAreaHight - 1.5 * wallThickness, 0.0) * goalRoomOffset
+            trafo = Trafo3d.Translation(0.0, goalAreaHeight - 1.5 * wallThickness, 0.0) * goalRoomOffset
             model = Some goalRoomCeilingSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(ceilingTilingFactor * goalAreaSize)
@@ -401,30 +418,30 @@ let main argv =
             tilingFactor = V2d(0.5 * goalAreaSize)
         }
     let goalWallLateralOffset = goalAreaSize * 0.5 + wallThickness * 0.5
-    let goalWallHorizontalOffset = goalAreaHight * 0.5 - wallThickness
+    let goalWallHorizontalOffset = goalAreaHeight * 0.5 - wallThickness
     let goalRoomWall1 = 
         { goalRoomWallBase with 
             id = newId()
             trafo = Trafo3d.Translation(0.0, goalWallHorizontalOffset, -goalWallLateralOffset) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize, goalAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(goalAreaSize, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let goalRoomWall2 = 
         { goalRoomWallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (-90.0) * Trafo3d.Translation(goalWallLateralOffset, goalWallHorizontalOffset, 0.0) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let goalRoomWall3 = 
         { goalRoomWallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (180.0) * Trafo3d.Translation(0.0, goalWallHorizontalOffset, goalWallLateralOffset) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize, goalAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(goalAreaSize, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     let goalRoomWall4 = 
         { goalRoomWallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-goalWallLateralOffset, goalWallHorizontalOffset, 0.0) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     
     let pedestalPosition = V3d(trackingAreaSize / 2.0 - 0.5, pedestalHeight / 2.0, trackingAreaSize / 2.0 - 0.5)
@@ -512,7 +529,7 @@ let main argv =
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
-            trafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
+            trafo = lowerHoopTriggerTrafo
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
             collisionGroup = CollisionGroups.HoopTrigger |> int16
@@ -523,7 +540,7 @@ let main argv =
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
-            trafo = lowerHoopTrigger.trafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
+            trafo = upperHoopTriggerTrafo
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
             isColliding = false
             collisionGroup = CollisionGroups.HoopTrigger |> int16
@@ -602,6 +619,8 @@ let main argv =
             ballResetPos        = ballResetPos
 
             bounceSoundSources  = bounceSound
+            sireneSoundSource   = sireneSound
+            popSoundSource      = popSound
             
             rayCastDirSg        = beamSg
             rayCastHitPointSg   = rayCastHitPointSg

@@ -14,6 +14,7 @@ module LogicalScene =
     open VrDriver
 
     let randomNumberGen = System.Random()
+    let resetDelay = 1.0
             
     let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
     let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
@@ -216,6 +217,8 @@ module LogicalScene =
                         |> PersistentHashSet.map (fun o -> 
                                 let reset = o.willReset && (scene.gameInfo.timeSinceStart > o.timeToReset)
                                 if reset then
+                                    scene.popSoundSource.Location <- scene.ballResetPos
+                                    scene.popSoundSource.Play()
                                     //printfn "Ball reset at %A" scene.timeSinceStart 
                                     { o with 
                                         hasScored = false
@@ -287,7 +290,7 @@ module LogicalScene =
                         if o.trafo.Forward.TransformPos(V3d()).Y < -100.0 then
                             { o with 
                                 willReset = true
-                                timeToReset = scene.gameInfo.timeSinceStart 
+                                timeToReset = scene.gameInfo.timeSinceStart + resetDelay
                             } 
                         else
                             o
@@ -346,6 +349,7 @@ module LogicalScene =
                                 let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
                                 let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
                                 if scored then
+                                    scene.sireneSoundSource.Play()
                                     newScore <- newScore + 1
                                     printfn "Scored %A at %A" newScore scene.gameInfo.timeSinceStart
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
@@ -427,7 +431,6 @@ module LogicalScene =
                         // check reset on ground
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithGround = ghostId = scene.specialObjectIds.groundObjectId && o.id = colliderId && o.isManipulable && not o.willReset && o.isGrabbed = GrabbedOptions.NoGrab
-                                let resetDelay = 3.0
                                 if collidingWithGround then 
                                     { o with 
                                         willReset = true
