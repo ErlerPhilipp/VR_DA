@@ -158,7 +158,7 @@ module VrWindow =
             task.Use (fun () ->
                             
                 // render left
-                clear.Run(lFbo) |> ignore
+                clear.Run(RenderToken.Zero, lFbo) |> ignore
                 transact(fun () -> projection.Value <- lHeadToEye * lProj)
                 task.Run(null, OutputDescription.ofFramebuffer lFbo) |> ignore
                 OpenTK.Graphics.OpenGL4.GL.Flush()
@@ -166,7 +166,7 @@ module VrWindow =
 
 
                 // render right
-                clear.Run(rFbo) |> ignore
+                clear.Run(RenderToken.Zero, rFbo) |> ignore
                 transact(fun () -> projection.Value <- rHeadToEye * rProj)
                 task.Run(null, OutputDescription.ofFramebuffer rFbo) |> ignore
                 OpenTK.Graphics.OpenGL4.GL.Flush()
@@ -222,8 +222,8 @@ module VrWindow =
                 let fbo = !screenA
                 let proj = Frustum.perspective 60.0 0.1 100.0 (float fbo.Size.X / float fbo.Size.Y) |> Frustum.projTrafo
                 transact(fun () -> projection.Value <- proj)
-                clear.Run(fbo) |> ignore
-                task.Run(fbo) |> ignore
+                clear.Run(RenderToken.Zero, fbo) |> ignore
+                task.Run(RenderToken.Zero, fbo) |> ignore
                 lock screenB (fun () -> Fun.Swap(&screenA.contents, &screenB.contents))
 
             transact (fun () -> time.Value <- DateTime.Now)
