@@ -70,39 +70,61 @@ module PhysicsScene =
         collisionObject.Activate()
         collisionObject.ForceActivationState(ActivationState.DisableDeactivation)
     
-    let addContactMessage (manPoint : ManifoldPoint) (obj0 : CollisionObject) (obj1 : CollisionObject) =
-        let impulseStrength = float(manPoint.AppliedImpulse) // Error in Bullet? only impulse by constraint solver, not collision impulse
-        let collisionNormal = toV3d manPoint.NormalWorldOnB
-        let normalImpulse = collisionNormal * impulseStrength
-//        let impulse = float(max manPoint.AppliedImpulseLateral1 manPoint.AppliedImpulseLateral2)
-        let contactWP = toV3d(manPoint.PositionWorldOnA)
-
-        let obj0Id = obj0.UserIndex
-        let obj1Id = obj1.UserIndex
-
-        let mutable found = false
-        callbackMessages <- callbackMessages.Map 
-            (fun d -> match d with
-                        | CollisionAdded (collider0Id, collider1Id, impulse, contactWorldPos : V3d) ->
-                                let sameColliders = (collider0Id = obj0.UserIndex && collider1Id = obj1.UserIndex) || (collider0Id = obj1.UserIndex && collider1Id = obj0.UserIndex)
-                                found <- true
-                                let (newImpulse, newContactWP) = 
-                                    if normalImpulse.LengthSquared > impulse.LengthSquared then 
-                                        (normalImpulse, contactWP)
-                                    else 
-                                        (impulse, contactWorldPos)
-                                CollisionAdded (collider0Id, collider1Id, newImpulse, newContactWP)
-                        | _ -> d
-            )
-        if not found then //&& manPoint.Distance < -maxPenetrationDepth then
+    let addContactMessage (contactNormal : V3d) (contactWP : V3d) (obj0Id : int) (obj1Id : int) =
+        let found = callbackMessages.Exists 
+                        (fun d -> match d with
+                                    | CollisionAdded (collider0Id, collider1Id, impulse, contactWorldPos : V3d) ->
+                                            (collider0Id = obj0Id && collider1Id = obj1Id) || (collider0Id = obj1Id && collider1Id = obj0Id)
+                                    | _ -> false
+                        )
+        if not found then
 //            printfn "CollisionAdded"
-            callbackMessages.Add (CollisionAdded(obj0Id, obj1Id, normalImpulse, contactWP))
+            callbackMessages.Add (CollisionAdded(obj0Id, obj1Id, contactNormal, contactWP))
 
+    let processContactPoint (manPoint : ManifoldPoint) (obj0 : CollisionObject) (obj1 : CollisionObject) =
+        if manPoint.Distance < -maxPenetrationDepth then
+            let impulseStrength = float(manPoint.AppliedImpulse) // Error in Bullet? most of the time zero. only impulse by constraint solver, not collision impulse
+            let collisionNormal = toV3d manPoint.NormalWorldOnB
+            let contactNormal = collisionNormal
+            let contactWP = toV3d(manPoint.PositionWorldOnA)
+
+            let obj0Id = obj0.UserIndex
+            let obj1Id = obj1.UserIndex
+
+            addContactMessage contactNormal contactWP obj0Id obj1Id
+        
     let contactAdded (manPoint : ManifoldPoint) (collObjA : CollisionObjectWrapper) (partIdA : int) (idA : int) (collObjB : CollisionObjectWrapper) (partIdB : int) (idB : int) = 
-        addContactMessage manPoint collObjA.CollisionObject collObjB.CollisionObject
+        processContactPoint manPoint collObjA.CollisionObject collObjB.CollisionObject
             
     let contactProcessed (manPoint : ManifoldPoint) (collObjA : CollisionObject) (collObjB : CollisionObject) = 
-        addContactMessage manPoint collObjA collObjB
+        processContactPoint manPoint collObjA collObjB
+
+    let subStep (dynWorld : DynamicsWorld) (dt : float32) = 
+        let numManifolds = dynWorld.Dispatcher.NumManifolds
+        for i in 0..numManifolds-1 do
+            let manifold = dynWorld.Dispatcher.GetManifoldByIndexInternal(i)
+            let numContacts = manifold.NumContacts
+
+            if numContacts > 0 then
+                let bodyA = manifold.Body0
+                let bodyB = manifold.Body1
+                let objAId = bodyA.UserIndex
+                let objBId = bodyB.UserIndex
+
+                let mutable averageImpulse = 0.0f
+                let mutable averageNormal = Vector3()
+                let mutable averageWP = Vector3()
+                for c in 0..numContacts-1 do
+                    let contact = manifold.GetContactPoint(c)
+                    averageImpulse <- averageImpulse + contact.AppliedImpulse
+                    averageNormal <- averageNormal + contact.NormalWorldOnB
+                    averageWP <- averageWP + contact.PositionWorldOnB
+                
+                averageImpulse <- averageImpulse / float32 numContacts
+                let averageNormalV3d = toV3d(averageNormal) / (float numContacts) * (float averageImpulse)
+                let averagePositionV3d = toV3d(averageWP) / (float numContacts)
+            
+                addContactMessage averageNormalV3d averagePositionV3d objAId objBId
 
     // Replay changes into physics world....
     type Conversion private() =
@@ -207,7 +229,8 @@ module PhysicsScene =
             let ghostCB = new BulletSharp.GhostPairCallback();
             broad.OverlappingPairCache.SetInternalGhostPairCallback(ghostCB)
 
-            PersistentManifold.add_ContactProcessed(ContactProcessedEventHandler(contactProcessed))
+            dynWorld.SetInternalTickCallback(DynamicsWorld.InternalTickCallback(subStep))
+//            PersistentManifold.add_ContactProcessed(ContactProcessedEventHandler(contactProcessed))
 //            ManifoldPoint.add_ContactAdded(ContactAddedEventHandler(contactAdded))
             
             let scene = { original = s; collisionConf = collConf; collisionDisp = dispatcher; broadPhase = broad; dynamicsWorld = dynWorld; bodies = null;  }

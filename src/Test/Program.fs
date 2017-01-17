@@ -43,7 +43,9 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
-    let bounceSound = Audio.Sound.ofFile(@"..\..\resources\sound\ball-bouncing.wav")
+    let bounceBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\ball-bouncing.wav")
+    let bounceSound = [ for i in 1 .. 10 -> Audio.Sound.sourceFromBuffer(bounceBuffer) ]
+
 //    bounceSound.Loop <- true
 //    let s = Audio.Sound.ofFile(@"..\..\resources\sound\37154__volivieri__soccer-ball-hit-ground-01.wav")
 //    let s = Audio.Sound.ofFile(@"..\..\resources\sound\the_ring_that_fell.wav")
@@ -590,7 +592,7 @@ let main argv =
             trackingToWorld     = Trafo3d.Identity
             ballResetPos        = ballResetPos
 
-            bounceSoundSource   = bounceSound
+            bounceSoundSources  = bounceSound
             
             rayCastDirSg        = beamSg
             rayCastHitPointSg   = rayCastHitPointSg

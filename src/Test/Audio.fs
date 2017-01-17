@@ -31,6 +31,7 @@ module Audio =
         let mutable velocity = V3d.Zero
         let mutable loop = false
         let mutable volume = 1.0
+        let mutable pitch = 1.0
 
         member x.Loop
             with get() = loop
@@ -61,6 +62,13 @@ module Audio =
                 ctx.MakeCurrent()
                 volume <- v
                 AL.Source(source, ALSourcef.Gain, float32 volume)
+
+        member x.Pitch
+            with get() = pitch
+            and set p =
+                ctx.MakeCurrent()
+                pitch <- p
+                AL.Source(source, ALSourcef.Pitch, float32 pitch)
 
         member x.Play() =
             ctx.MakeCurrent()
@@ -131,16 +139,17 @@ module Audio =
                 | 2s -> if bits = 8s then ALFormat.Stereo8 else ALFormat.Stereo16
                 | _ -> failwith("The specified sound format is not supported.")
 
-        let ofFile (file : string) =
+        let bufferFromFile (file : string) =
 
             ctx.MakeCurrent()
 
             let buffer = AL.GenBuffer()
             let (sound_data, channels, bits_per_sample, sample_rate) = LoadWave(File.Open(file, FileMode.Open))
             AL.BufferData(buffer, GetSoundFormat(channels, bits_per_sample), sound_data, sound_data.Length, sample_rate)
+            buffer
 
+        let sourceFromBuffer(bufferIndex : int) =
             let source = AL.GenSource()
-            AL.Source(source, ALSourcei.Buffer, buffer)
-            AL.SourcePlay(source)
-
+            AL.Source(source, ALSourcei.Buffer, bufferIndex)
             Sound(ctx, source)
+            

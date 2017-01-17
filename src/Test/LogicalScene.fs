@@ -12,6 +12,8 @@ module LogicalScene =
     open VrTypes
     open VrInteractions
     open VrDriver
+
+    let randomNumberGen = System.Random()
             
     let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
     let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
@@ -441,70 +443,72 @@ module LogicalScene =
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }
-            | CollisionAdded (collider0Id, collider1Id, impulseStrength, contactWorldPos : V3d) ->
+            | CollisionAdded (collider0Id, collider1Id, contactNormal, contactWorldPos : V3d) ->
                 // play bounce sound if the ball collides with something
-                for o in scene.objects do
-                    let obj0 = getObjectWithId(collider0Id, scene.objects)
-                    let obj1 = getObjectWithId(collider1Id, scene.objects)
-                    if (obj0.objectType = ObjectTypes.Dynamic || obj1.objectType = ObjectTypes.Dynamic) then
-                        let firstObjIsBall = obj0.objectType = ObjectTypes.Dynamic
-                        let ballObj = if firstObjIsBall then obj0 else obj1
-                        let otherObj = if firstObjIsBall then obj1 else obj0
+                let obj0 = getObjectWithId(collider0Id, scene.objects)
+                let obj1 = getObjectWithId(collider1Id, scene.objects)
+                if (obj0.objectType = ObjectTypes.Dynamic || obj1.objectType = ObjectTypes.Dynamic) then
+                    let firstObjIsBall = obj0.objectType = ObjectTypes.Dynamic
+                    let ballObj = if firstObjIsBall then obj0 else obj1
+                    let otherObj = if firstObjIsBall then obj1 else obj0
 
-                        if otherObj.id <> scene.specialObjectIds.grabTrigger1Id && otherObj.id <> scene.specialObjectIds.grabTrigger2Id then
-                            if not (scene.bounceSoundSource.IsPlaying()) then
-                                let impulseStrength = (obj0.linearVelocity - obj1.linearVelocity).Length
+                    if otherObj.id <> scene.specialObjectIds.grabTrigger1Id && otherObj.id <> scene.specialObjectIds.grabTrigger2Id then
+                        let mutable startedSound = false
+//                        printfn "ball %A collides with %A" ballObj.id otherObj.id
+                        for bounceSound in scene.bounceSoundSources do
+                            if not startedSound && not (bounceSound.IsPlaying()) then
+//                              let impulseStrength = (obj0.linearVelocity - obj1.linearVelocity).Length //.Dot(contactNormal)
+//                              let impulseStrength = obj0.linearVelocity.Dot(obj1.linearVelocity)
+                                let impulseStrength = contactNormal.Length
                                 if impulseStrength > 0.1 then
                                     let volume = clamp 0.0 1.0 (impulseStrength * 0.5)
-//                                    printfn "ball impulse: %A, vol: %A at %A" impulseStrength volume contactWorldPos
-                                    scene.bounceSoundSource.Location <- ballObj.trafo.Forward.TransformPos(V3d())
-                                    scene.bounceSoundSource.Volume <- volume
-                                    scene.bounceSoundSource.Play()
+//                                    printfn "play bounce of %A with %A, impulse: %A, vol: %A at %A" ballObj.id otherObj.id impulseStrength volume contactWorldPos
+                                    bounceSound.Location <- ballObj.trafo.Forward.TransformPos(V3d())
+                                    bounceSound.Volume <- volume
+                                    let pitchOffset = 0.8 * (randomNumberGen.NextDouble() - 0.5)
+                                    bounceSound.Pitch <- 1.0 + pitchOffset
+                                    bounceSound.Play()
+                                    startedSound <- true
 
-//                // vibrate if controller collides with something
-//                let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
-//                let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
-//                for o in scene.objects do
-//                    let obj0 = getObjectWithId(collider0Id, scene.objects)
-//                    let obj1 = getObjectWithId(collider1Id, scene.objects)
-//                    let obj0IsController = (obj0.id = scene.specialObjectIds.controller1ObjectId) || (obj0.id = scene.specialObjectIds.controller2ObjectId)
-//                    let obj1IsController = (obj1.id = scene.specialObjectIds.controller1ObjectId) || (obj1.id = scene.specialObjectIds.controller2ObjectId)
-//                    let controllerCollidesWithSomething = obj0IsController <> obj1IsController // only 1 controller
-//                    
-//                    if controllerCollidesWithSomething then
+                // vibrate if controller collides with something
+                let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
+                let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
+                let obj0IsController = (obj0.id = scene.specialObjectIds.controller1ObjectId) || (obj0.id = scene.specialObjectIds.controller2ObjectId)
+                let obj1IsController = (obj1.id = scene.specialObjectIds.controller1ObjectId) || (obj1.id = scene.specialObjectIds.controller2ObjectId)
+                let controllerCollidesWithSomething = obj0IsController <> obj1IsController // only 1 controller
+                    
+                if controllerCollidesWithSomething then
 //                        printfn "controllerCollidesWithSomething"
-//                        let controllerObj = if obj0IsController then obj0 else obj1
-//                        let otherObj = if obj0IsController then obj1 else obj0
-//                        let firstController = controllerObj.id = scene.specialObjectIds.controller1ObjectId
-//
-//                        let velToStrength(vel : float) = 
-//                            let maxTrackingNoiseLevel = 0.1
-//                            let velWithoutTrackingNoise = (max (vel - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
-//
-//                            let velocityToStrength = 0.6
-//                            let constVibrationOffset = 0.1
-//                            let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
-//
-//                            let clampedStrength = clamp 0.0 1.0 linearStrength
-//                            clampedStrength
-//                                        
-//                        let controllerLinearVelocity = controllerObj.linearVelocity
-//                        let colliderLinearVelocity = otherObj.linearVelocity
-//                        let relativeVel = (controllerLinearVelocity - colliderLinearVelocity).Length
-//                        let strength = velToStrength(relativeVel)
-////                                     printfn "ghostLinearVelocity: %A, colliderLinearVelocity: %A, strength %A" (ghostLinearVelocity.Length) (colliderLinearVelocity.Length) strength
-//                                    
-//                        printfn "update vibration"
-//                        if firstController then
-//                            if strength > newCtr1VibStrength then newCtr1VibStrength <- strength
-//                        else
-//                            if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
-//                         
-//                { scene with 
-//                    interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
-//                    interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
-//                }
-                scene
+                    let controllerObj = if obj0IsController then obj0 else obj1
+                    let otherObj = if obj0IsController then obj1 else obj0
+                    let firstController = controllerObj.id = scene.specialObjectIds.controller1ObjectId
+
+                    let hitImpulseToStrength(impulse : float) = 
+                        let maxTrackingNoiseLevel = 0.1
+                        let velWithoutTrackingNoise = (max (impulse - maxTrackingNoiseLevel) 0.0) * 1.0 / (1.0 - maxTrackingNoiseLevel) // -a, clamp, to 0..1
+
+                        let velocityToStrength = 5.0
+                        let constVibrationOffset = 0.2
+                        let linearStrength = constVibrationOffset + velWithoutTrackingNoise * velocityToStrength
+
+                        let clampedStrength = clamp 0.0 1.0 linearStrength
+                        clampedStrength
+                                      
+                    let impulseStrength = contactNormal.Length
+                    if impulseStrength > 0.01 then
+                        let strength = hitImpulseToStrength(impulseStrength)
+//                        printfn "impulseStrength %A -> strength %A" impulseStrength strength
+                                    
+                        if firstController then
+                            if strength > newCtr1VibStrength then newCtr1VibStrength <- strength
+                        else
+                            if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
+                         
+                { scene with 
+                    interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
+                    interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
+                }
+//                scene
             | RayCastResult (source, hasHit, hitPoint, hitNormal) ->
                 let firstController = source = 0
                 let oldInteractionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
