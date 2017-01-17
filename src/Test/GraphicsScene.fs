@@ -172,10 +172,10 @@ module GraphicsScene =
 
         let sg = OmnidirShadows.init(win, scene, graphicsScene)
 
-//        let textSg =
-////            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
-//            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
-//                |> Sg.trafo graphicsScene.scoreTrafo
+        let textSg =
+//            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
+            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
+                |> Sg.trafo graphicsScene.scoreTrafo
                 
         let makeRaycastSg (raycastMods : RaycastMods) =
             let rayCastDirSg =
@@ -205,8 +205,7 @@ module GraphicsScene =
         let raycastSg1 = makeRaycastSg(graphicsScene.raycastMods1)
         let raycastSg2 = makeRaycastSg(graphicsScene.raycastMods2)
 
-        // scene.scoreSg at last because markdown messes with stencil buffer
-        Sg.ofList ([sg; PhysicsScene.debugDrawer.debugDrawerSg] @ raycastSg1 @ raycastSg2)
+        Sg.ofList ([sg; textSg; PhysicsScene.debugDrawer.debugDrawerSg] @ raycastSg1 @ raycastSg2)
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
