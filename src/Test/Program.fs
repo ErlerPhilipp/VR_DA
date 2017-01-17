@@ -46,10 +46,19 @@ let main argv =
     let bounceBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\ball-bouncing.wav")
     let bounceSound = [ for i in 1 .. 10 -> Audio.Sound.sourceFromBuffer(bounceBuffer) ]
 
-//    bounceSound.Loop <- true
-//    let s = Audio.Sound.ofFile(@"..\..\resources\sound\37154__volivieri__soccer-ball-hit-ground-01.wav")
-//    let s = Audio.Sound.ofFile(@"..\..\resources\sound\the_ring_that_fell.wav")
-//    let s = Audio.Sound.ofFile(@"C:\Users\erler\Desktop\aardvark-vr\resources\sound\the_ring_that_fell.wav")
+    let ambient1Buffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\245187__patricklieberkind__dark-ambience-2.wav")
+    let ambient1Sound = Audio.Sound.sourceFromBuffer(ambient1Buffer)
+    ambient1Sound.Volume <- 0.02
+    ambient1Sound.Location <- V3d(15.0, 0.0, 15.0)
+    ambient1Sound.Loop <- true
+    ambient1Sound.Play()
+
+    let ambient2Buffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\371277__goulven__dark-ambient-loop.wav")
+    let ambient2Sound = Audio.Sound.sourceFromBuffer(ambient1Buffer)
+    ambient2Sound.Volume <- 0.02
+    ambient2Sound.Location <- V3d(-25.0, 0.0, -5.0)
+    ambient2Sound.Loop <- true
+    ambient2Sound.Play()
     
     //#region CollisionGroups   
     let staticCollidesWith = CollisionGroups.Ball ||| CollisionGroups.HandTrigger ||| CollisionGroups.Avatar ||| CollisionGroups.TeleportRaycast |> int16
