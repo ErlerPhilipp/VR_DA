@@ -208,26 +208,27 @@ let main argv =
         //Assimp.PostProcessSteps.FlipWindingOrder |||
         Assimp.PostProcessSteps.MakeLeftHanded ||| 
         Assimp.PostProcessSteps.Triangulate
+
+    let loadVR f = Loader.Assimp.Load(f,assimpFlagsSteamVR)
    
 
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox)
     let controllerSg = 
-        let controllerBody = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerButton = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\buttontri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerLGrip = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\lgriptri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerRGrip = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\rgriptri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerSysButton = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerTrackpad = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
-        let controllerTrigger = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj") |> Loader.Assimp.load |> Sg.AdapterNode :> ISg
+        let controllerBody = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj"|> loadVR |> Sg.AdapterNode :> ISg
+        let controllerButton =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\buttontri.obj" |> loadVR|> Sg.AdapterNode :> ISg
+        let controllerLGrip =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\lgriptri.obj"|> loadVR |> Sg.AdapterNode :> ISg
+        let controllerRGrip = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\rgriptri.obj" |> loadVR|> Sg.AdapterNode :> ISg
+        let controllerSysButton = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj" |> loadVR |> Sg.AdapterNode :> ISg
+        let controllerTrackpad =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj" |> loadVR |> Sg.AdapterNode :> ISg
+        let controllerTrigger =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj"|> loadVR |> Sg.AdapterNode :> ISg
         [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
 
     let basestationSg = 
-        (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\lh_basestation_vive\basestationtri.obj")
-            |> Loader.Assimp.load
+            Loader.Assimp.Load(@"..\..\resources\models\SteamVR\lh_basestation_vive\basestationtri.obj", assimpFlagsSteamVR)
             |> Sg.AdapterNode :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\lh_basestation_vive\lh_basestation_vive.png", textureParam) :> ITexture))
             
@@ -274,7 +275,7 @@ let main argv =
     let rayCastHitAreaSg = rayCastAreaSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastCamSg = rayCastCamSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
 
-    let simpleControllerBodyAssimpScene = (assimpFlagsSteamVR, @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj") |> Loader.Assimp.load
+    let simpleControllerBodyAssimpScene = Loader.Assimp.Load(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj", assimpFlagsSteamVR) 
     let simpleControllerBodyTriangles = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root
     let simpleControllerBodyCollShape = simpleControllerBodyTriangles |> BulletHelper.TriangleMesh
     let controller1Object = 
@@ -556,7 +557,7 @@ let main argv =
     let objects =
         let toObjects (canMove : bool) (l : list<_>) =
             l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
-                    let assimpScene : Loader.Scene = (assimpFlags, file) |> Loader.Assimp.load 
+                    let assimpScene : Loader.Scene =  Loader.Assimp.Load(file, assimpFlags) 
                     let triangles = createShape trafo assimpScene.root
                     let bounds = triangles |> Seq.collect (fun t -> [t.P0; t.P1; t.P2]) |> Box3d
 

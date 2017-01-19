@@ -63,7 +63,7 @@ module VRTest =
         let scene =
             let flip = Trafo3d.FromBasis(V3d.IOO, V3d.OOI, -V3d.OIO, V3d.Zero)
             models
-                |> List.map (fun (file, trafo) -> Loader.Assimp.load(assimpFlags, file) |> Sg.AdapterNode |> Sg.transform (flip * trafo))
+                |> List.map (fun (file, trafo) -> Loader.Assimp.Load(file, assimpFlags) |> Sg.AdapterNode |> Sg.transform (flip * trafo))
                 |> Sg.ofList
                 |> Sg.effect [
                     DefaultSurfaces.trafo |> toEffect

@@ -84,7 +84,7 @@ module GraphicsScene =
 
                 
                 ms.scoreTrafo.Value <- s.gameInfo.scoreTrafo
-                //ms.scoreText.Value <- s.gameInfo.scoreText
+                ms.scoreText.Value <- s.gameInfo.scoreText
 
                 let table = 
                     ms.graphicsObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq

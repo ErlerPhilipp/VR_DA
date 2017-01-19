@@ -234,13 +234,29 @@ module LogicalScene =
                                 else
                                     o
                             )
+
+                let timePerRound = 3.0 * 60.0 
+                let remainingTime = timePerRound - scene.gameInfo.timeSinceStart
+                let (newTimeSinceStart, newRunning) =   if remainingTime < 0.0 then
+                                                            printfn "Time's up!"
+                                                            (0.0, false)
+                                                        else
+                                                            (scene.gameInfo.timeSinceStart, scene.gameInfo.running)
                             
                 let culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
-                let newText = sprintf "Score: %A\r\nTime: %A" (scene.gameInfo.score.ToString("000", culture)) (scene.gameInfo.timeSinceStart.ToString("000.00", culture))
+                let newText =   if not scene.gameInfo.running then 
+                                    let pointsUntilStart = 3
+                                    let remainingScoreString = ((pointsUntilStart - scene.gameInfo.score).ToString("000", culture))
+                                    sprintf "Score %A until start" remainingScoreString
+                                else
+                                    let remainingTimeString = (remainingTime.ToString("000.00", culture))
+                                    let scoreString = (scene.gameInfo.score.ToString("000", culture))
+                                    let timeString = (scene.gameInfo.timeSinceStart.ToString("000.00", culture))
+                                    sprintf "Score: %A\r\nTime: %A" scoreString timeString
 
                 { scene with 
                     objects = newObjects
-                    gameInfo = {scene.gameInfo with scoreText = newText }
+                    gameInfo = {scene.gameInfo with scoreText = newText; running = newRunning; timeSinceStart = newTimeSinceStart }
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = 0.0 }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = 0.0 }
                 }
@@ -269,7 +285,7 @@ module LogicalScene =
 //                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
 //                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
 
-                let newTimeSinceStart = scene.gameInfo.timeSinceStart + dt.TotalSeconds
+                let newTimeSinceStart = if scene.gameInfo.running then scene.gameInfo.timeSinceStart + dt.TotalSeconds else scene.gameInfo.timeSinceStart
 
                 { scene with
                     trackingToWorld = newTrackingToWorld
@@ -320,6 +336,7 @@ module LogicalScene =
 
             | Collision (ghostId, colliderId) ->
                 let mutable newScore = scene.gameInfo.score
+                let mutable newRunning = scene.gameInfo.running
                 let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
                 let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
                 let newObjects = 
@@ -351,6 +368,10 @@ module LogicalScene =
                                 if scored then
                                     scene.sireneSoundSource.Play()
                                     newScore <- newScore + 1
+                                    if not scene.gameInfo.running && newScore = 3 then
+                                        newRunning <- true
+                                        printfn "Warm-up finished, starting round!"
+                                        newScore <- 0
                                     printfn "Scored %A at %A" newScore scene.gameInfo.timeSinceStart
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
@@ -442,7 +463,7 @@ module LogicalScene =
                 
                 { scene with 
                     objects = newObjects
-                    gameInfo = { scene.gameInfo with score = newScore }
+                    gameInfo = { scene.gameInfo with score = newScore; running = newRunning }
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }
