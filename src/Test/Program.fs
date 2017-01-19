@@ -657,6 +657,8 @@ let main argv =
     vrWin.RenderTask <- task
     
     vrWin.Run()
+    
+    Logging.endSession()
 
     OpenVR.Shutdown()
 

@@ -7,6 +7,24 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
+module Logging =
+    open System.IO
+    let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+    let sessionFileName = startupTimeString + ".txt"
+    let streamWriter = new StreamWriter(sessionFileName, true)
+    streamWriter.AutoFlush <- true
+    streamWriter.WriteLine(startupTimeString + ": Start session")
+
+    let log(text : string) =
+        streamWriter.WriteLine(text)
+        printfn "%A" text
+
+    let endSession() =
+        let endTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+        streamWriter.WriteLine(endTimeString + ": End session")
+        streamWriter.Flush() // doesn't do anything?
+        streamWriter.Dispose()
+
 module LogicalScene =
     open LogicalSceneTypes
     open VrTypes
@@ -278,7 +296,8 @@ module LogicalScene =
                 let timePerRound = 3.0 * 60.0 
                 let remainingTime = timePerRound - scene.gameInfo.timeSinceStart
                 let newGameInfo =   if remainingTime < 0.0 && scene.gameInfo.running then
-                                        printfn "%A: Time's up!" scene.gameInfo.timeSinceStart
+                                        Logging.log (scene.gameInfo.timeSinceStart.ToString() + ": Time's up!")
+                                        
                                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
                                         { scene.gameInfo with
                                             score = 0
@@ -384,10 +403,10 @@ module LogicalScene =
                                 if scored then
                                     scene.sireneSoundSource.Play()
                                     newGameInfo <- {newGameInfo with score = newGameInfo.score + 1}
-                                    printfn "%A: Scored %A" scene.gameInfo.timeSinceStart newGameInfo.score
+                                    Logging.log (scene.gameInfo.timeSinceStart.ToString() + ": Scored " + newGameInfo.score.ToString())
                                     if not scene.gameInfo.running && newGameInfo.score = 3 then
                                         newGameInfo <- {newGameInfo with running = true; numRounds = newGameInfo.numRounds + 1; timeSinceStart = 0.0; score = 0}
-                                        printfn "%A: Warm-up finished, starting round %A!" newGameInfo.timeSinceStart newGameInfo.numRounds
+                                        Logging.log (scene.gameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
