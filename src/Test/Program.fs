@@ -394,12 +394,23 @@ let main argv =
     let goalRoomGroundObject = 
         { staticDefaultCollider with
             id = newId()
-            objectType = ObjectTypes.Ghost
             trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
             model = Some goalRoomGroundSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(groundTilingFactor * goalAreaSize)
             collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
+        }
+
+    let goalRoomGroundTrigger = 
+        { defaultObject with
+            id = newId()
+            castsShadow = false
+            objectType = ObjectTypes.Ghost
+            trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness + 0.3, 0.0) * goalRoomOffset
+            collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
+            isColliding = false
+            collisionGroup = CollisionGroups.HoopTrigger |> int16
+            collisionMask = hoopTriggerCollidesWith
         }
 
     let goalRoomCeilingObject = 
@@ -590,7 +601,7 @@ let main argv =
         manipulableObjects @ 
         ballObjects @ boxObjects @
         toObjects false staticModels 
-        @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
+        @ [lowerHoopTrigger; upperHoopTrigger; goalRoomGroundTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
         @ [pedestal; cushion]
@@ -607,7 +618,7 @@ let main argv =
             lightId             = lightObject.id
             lowerHoopTriggerId  = lowerHoopTrigger.id
             upperHoopTriggerId  = upperHoopTrigger.id
-            groundObjectId      = goalRoomGroundObject.id
+            groundTriggerId     = goalRoomGroundTrigger.id
             grabTrigger1Id      = grabTrigger1.id
             grabTrigger2Id      = grabTrigger2.id
         }

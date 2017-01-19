@@ -468,7 +468,7 @@ module LogicalScene =
                             )
                         // check reset on ground
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithGround = ghostId = scene.specialObjectIds.groundObjectId && o.id = colliderId && o.isManipulable && not o.willReset && o.isGrabbed = GrabbedOptions.NoGrab
+                                let collidingWithGround = ghostId = scene.specialObjectIds.groundTriggerId && o.id = colliderId && o.isManipulable && not o.willReset && o.isGrabbed = GrabbedOptions.NoGrab
                                 if collidingWithGround then 
                                     { o with 
                                         willReset = true

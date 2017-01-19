@@ -118,7 +118,7 @@ module LogicalSceneTypes =
             lowerHoopTriggerId  : int
             upperHoopTriggerId  : int
             lightId             : int
-            groundObjectId      : int
+            groundTriggerId     : int
         }
 
     type RaycastInfo = 
