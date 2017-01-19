@@ -115,21 +115,24 @@ module LogicalScene =
                  
             // press track pad
             | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
-                let firstController = deviceId = assignedInputs.controller1Id
-                let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
+                if scene.enableExperimental then
+                    let firstController = deviceId = assignedInputs.controller1Id
+                    let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
-                let newInteractionTechnique = VrInteractions.nextInteractionTechnique interactionInfo.interactionType
-                let newInteractionInfo = { interactionInfo with 
-                                            interactionType = newInteractionTechnique
-                                            raycastInfo = { interactionInfo.raycastInfo with wantsRayCast = false; rayCastHasHit = false }
-                                         }
+                    let newInteractionTechnique = VrInteractions.nextInteractionTechnique interactionInfo.interactionType
+                    let newInteractionInfo = { interactionInfo with 
+                                                interactionType = newInteractionTechnique
+                                                raycastInfo = { interactionInfo.raycastInfo with wantsRayCast = false; rayCastHasHit = false }
+                                             }
 
-                if firstController then
-                    transact ( fun _ -> Mod.change controller1OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
+                    if firstController then
+                        transact ( fun _ -> Mod.change controller1OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
+                    else
+                        transact ( fun _ -> Mod.change controller2OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
+
+                    makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 else
-                    transact ( fun _ -> Mod.change controller2OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
-
-                makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
+                    scene
 
             // press menu button     
 //            | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id && a = 2 ->
@@ -214,12 +217,49 @@ module LogicalScene =
                         |> PersistentHashSet.map (fun o -> 
                                 if o.isGrabbable <> GrabbableOptions.NoGrab then { o with isGrabbable = GrabbableOptions.NoGrab } else o
                             )
+                { scene with 
+                    objects = newObjects
+                    interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = 0.0 }
+                    interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = 0.0 }
+                }
+
+            | TimeElapsed(dt) ->
+                let dt = dt.TotalSeconds
+
+                // flying
+                let getAxisValue(deviceId : uint32) = 
+                    let mutable state = VRControllerState_t()
+                    let axisPosition =
+                        if system.GetControllerState(deviceId, &state) then
+                            Some (V2d(state.[1].x, state.[1].y))
+                        else None
+                    let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
+                    axisValue
+
+                let newTrackingToWorld = 
+                    if scene.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.Flying then
+                        VrInteractions.getTrafoAfterFlying(scene.trackingToWorld, scene.interactionInfo1.moveDirection, dt, getAxisValue(uint32 assignedInputs.controller1Id))
+                    else
+                        scene.trackingToWorld
+                let newTrackingToWorld = 
+                    if scene.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.Flying then
+                        VrInteractions.getTrafoAfterFlying(newTrackingToWorld, scene.interactionInfo2.moveDirection, dt, getAxisValue(uint32 assignedInputs.controller2Id))
+                    else
+                        newTrackingToWorld
+                
+//                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt)
+//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
+
+                let newTimeSinceStart = scene.gameInfo.timeSinceStart + dt 
+                
+                let newObjects = 
+                    scene.objects 
                         |> PersistentHashSet.map (fun o -> 
-                                let reset = o.willReset && (scene.gameInfo.timeSinceStart > o.timeToReset)
+                                let newTimeToReset = o.timeToReset - dt
+                                let reset = o.willReset && newTimeToReset < 0.0
                                 if reset then
                                     scene.popSoundSource.Location <- scene.ballResetPos
                                     scene.popSoundSource.Play()
-                                    //printfn "Ball reset at %A" scene.timeSinceStart 
                                     { o with 
                                         hasScored = false
                                         hitLowerTrigger = false
@@ -232,65 +272,44 @@ module LogicalScene =
                                         angularVelocity = V3d()
                                     }
                                 else
-                                    o
+                                    { o with timeToReset = newTimeToReset }
                             )
-
+                            
                 let timePerRound = 3.0 * 60.0 
                 let remainingTime = timePerRound - scene.gameInfo.timeSinceStart
-                let (newTimeSinceStart, newRunning) =   if remainingTime < 0.0 then
-                                                            printfn "Time's up!"
-                                                            (0.0, false)
-                                                        else
-                                                            (scene.gameInfo.timeSinceStart, scene.gameInfo.running)
+                let newGameInfo =   if remainingTime < 0.0 && scene.gameInfo.running then
+                                        printfn "%A: Time's up!" scene.gameInfo.timeSinceStart
+                                        if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
+                                        { scene.gameInfo with
+                                            score = 0
+                                            timeSinceStart = 0.0
+                                            running = false
+                                            lastRoundScore = scene.gameInfo.score
+                                        }
+                                    else
+                                        scene.gameInfo
                             
                 let culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
                 let newText =   if not scene.gameInfo.running then 
                                     let pointsUntilStart = 3
-                                    let remainingScoreString = ((pointsUntilStart - scene.gameInfo.score).ToString("000", culture))
-                                    sprintf "Score %A until start" remainingScoreString
+                                    let remainingScoreString = ((pointsUntilStart - scene.gameInfo.score).ToString("0", culture))
+                                    let lastRoundScoreString = (scene.gameInfo.lastRoundScore.ToString("000", culture))
+                                    "Score:    " + lastRoundScoreString + "\r\n" + 
+                                    "Start in:    " + remainingScoreString
                                 else
-                                    let remainingTimeString = (remainingTime.ToString("000.00", culture))
+                                    let remainingTimeString = (remainingTime.ToString("000", culture))
                                     let scoreString = (scene.gameInfo.score.ToString("000", culture))
-                                    let timeString = (scene.gameInfo.timeSinceStart.ToString("000.00", culture))
-                                    sprintf "Score: %A\r\nTime: %A" scoreString timeString
+//                                    let timeString = (scene.gameInfo.timeSinceStart.ToString("000.00", culture))
+                                    "Score:    " + scoreString + "\r\n" + 
+                                    "Time:    " + remainingTimeString
 
-                { scene with 
-                    objects = newObjects
-                    gameInfo = {scene.gameInfo with scoreText = newText; running = newRunning; timeSinceStart = newTimeSinceStart }
-                    interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = 0.0 }
-                    interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = 0.0 }
-                }
-
-            | TimeElapsed(dt) ->
-                let getAxisValue(deviceId : uint32) = 
-                    let mutable state = VRControllerState_t()
-                    let axisPosition =
-                        if system.GetControllerState(deviceId, &state) then
-                            Some (V2d(state.[1].x, state.[1].y))
-                        else None
-                    let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
-                    axisValue
-
-                let newTrackingToWorld = 
-                    if scene.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.Flying then
-                        VrInteractions.getTrafoAfterFlying(scene.trackingToWorld, scene.interactionInfo1.moveDirection, dt.TotalSeconds, getAxisValue(uint32 assignedInputs.controller1Id))
-                    else
-                        scene.trackingToWorld
-                let newTrackingToWorld = 
-                    if scene.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.Flying then
-                        VrInteractions.getTrafoAfterFlying(newTrackingToWorld, scene.interactionInfo2.moveDirection, dt.TotalSeconds, getAxisValue(uint32 assignedInputs.controller2Id))
-                    else
-                        newTrackingToWorld
-                
-//                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt.TotalSeconds)
-//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
-
-                let newTimeSinceStart = if scene.gameInfo.running then scene.gameInfo.timeSinceStart + dt.TotalSeconds else scene.gameInfo.timeSinceStart
+                let newGameInfo = {newGameInfo with scoreText = newText; timeSinceStart = newTimeSinceStart}
 
                 { scene with
+                    objects = newObjects
                     trackingToWorld = newTrackingToWorld
-                    physicsInfo = { scene.physicsInfo with deltaTime = dt.TotalSeconds }
-                    gameInfo = { scene.gameInfo with timeSinceStart = newTimeSinceStart }
+                    gameInfo = newGameInfo
+                    physicsInfo = { scene.physicsInfo with deltaTime = dt }
                 }
             
             | EndFrame ->
@@ -306,7 +325,7 @@ module LogicalScene =
                         if o.trafo.Forward.TransformPos(V3d()).Y < -100.0 then
                             { o with 
                                 willReset = true
-                                timeToReset = scene.gameInfo.timeSinceStart + resetDelay
+                                timeToReset = resetDelay
                             } 
                         else
                             o
@@ -335,8 +354,7 @@ module LogicalScene =
                 }
 
             | Collision (ghostId, colliderId) ->
-                let mutable newScore = scene.gameInfo.score
-                let mutable newRunning = scene.gameInfo.running
+                let mutable newGameInfo = scene.gameInfo
                 let mutable newCtr1VibStrength = scene.interactionInfo1.vibrationStrength
                 let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
                 let newObjects = 
@@ -346,7 +364,6 @@ module LogicalScene =
                                 let collidingWithUpperHoop = ghostId = scene.specialObjectIds.upperHoopTriggerId && o.id = colliderId
                                 let hitUpperTrigger = collidingWithUpperHoop && not o.hitUpperTrigger && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab && o.linearVelocity.Y < 0.0
                                 if hitUpperTrigger then
-                                    //printfn "hit upper trigger at %A" scene.timeSinceStart
                                     { o with hitUpperTrigger = true } 
                                 else 
                                     o
@@ -356,7 +373,6 @@ module LogicalScene =
                                 let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
                                 let hitLowerTrigger = collidingWithLowerHoop && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab
                                 if hitLowerTrigger then
-                                    //printfn "hit lower trigger at %A" scene.timeSinceStart
                                     { o with hitLowerTrigger = true } 
                                 else 
                                     o
@@ -367,18 +383,19 @@ module LogicalScene =
                                 let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
                                 if scored then
                                     scene.sireneSoundSource.Play()
-                                    newScore <- newScore + 1
-                                    if not scene.gameInfo.running && newScore = 3 then
-                                        newRunning <- true
-                                        printfn "Warm-up finished, starting round!"
-                                        newScore <- 0
-                                    printfn "Scored %A at %A" newScore scene.gameInfo.timeSinceStart
+                                    newGameInfo <- {newGameInfo with score = newGameInfo.score + 1}
+                                    printfn "%A: Scored %A" scene.gameInfo.timeSinceStart newGameInfo.score
+                                    if not scene.gameInfo.running && newGameInfo.score = 3 then
+                                        newGameInfo <- {newGameInfo with running = true; numRounds = newGameInfo.numRounds + 1; timeSinceStart = 0.0; score = 0}
+                                        printfn "%A: Warm-up finished, starting round %A!" newGameInfo.timeSinceStart newGameInfo.numRounds
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     { o with 
                                         hasScored = true
+                                        willReset = true
+                                        timeToReset = resetDelay 
                                     } 
                                 else 
                                     o
@@ -455,7 +472,7 @@ module LogicalScene =
                                 if collidingWithGround then 
                                     { o with 
                                         willReset = true
-                                        timeToReset = scene.gameInfo.timeSinceStart + resetDelay 
+                                        timeToReset = resetDelay 
                                     } 
                                 else 
                                     o
@@ -463,7 +480,7 @@ module LogicalScene =
                 
                 { scene with 
                     objects = newObjects
-                    gameInfo = { scene.gameInfo with score = newScore; running = newRunning }
+                    gameInfo = newGameInfo
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }

@@ -172,6 +172,8 @@ module LogicalSceneTypes =
             scoreTrafo          : Trafo3d
             scoreText           : string
             running             : bool
+            lastRoundScore      : int
+            numRounds           : int
         }
 
     let DefaultGameInfo (scoreTrafo : Trafo3d) = 
@@ -181,6 +183,8 @@ module LogicalSceneTypes =
             scoreTrafo          = scoreTrafo
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
+            lastRoundScore      = 0
+            numRounds           = 0
         }
 
     type PhysicsInfo = 
@@ -229,6 +233,8 @@ module LogicalSceneTypes =
             interactionInfo2    : InteractionInfo
             gameInfo            : GameInfo
             physicsInfo         : PhysicsInfo
+
+            enableExperimental  : bool
         }
         
     let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : PersistentHashSet<Object>, dt : float) = 

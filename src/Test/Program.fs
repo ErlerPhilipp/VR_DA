@@ -53,7 +53,7 @@ let main argv =
     let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
     let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(0.5, 0.0, 0.0)
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(0.1, 0.0, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
@@ -636,6 +636,8 @@ let main argv =
                                         raycastCollGroup = CollisionGroups.TeleportRaycast |> int16
                                         raycastCollMask  = teleportRaycastCollidesWith
                                   }
+
+            enableExperimental  = false
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin
