@@ -119,6 +119,7 @@ module LogicalSceneTypes =
             upperHoopTriggerId  : int
             lightId             : int
             groundTriggerId     : int
+            hoopObjectId        : int
         }
 
     type RaycastInfo = 
@@ -170,21 +171,33 @@ module LogicalSceneTypes =
             score               : int
             timeSinceStart      : float
             scoreTrafo          : Trafo3d
+            scoreStartTrafo     : Trafo3d
             scoreText           : string
             running             : bool
             lastRoundScore      : int
             numRounds           : int
+            hoopStartTrafo      : Trafo3d
+            upperTriggerTrafo   : Trafo3d
+            lowerTriggerTrafo   : Trafo3d
+            goalAreaSize        : float
+            goalMovementPhase   : float
         }
 
-    let DefaultGameInfo (scoreTrafo : Trafo3d) = 
+    let DefaultGameInfo = 
         {
             score               = 0
             timeSinceStart      = 0.0
-            scoreTrafo          = scoreTrafo
+            scoreTrafo          = Trafo3d()
+            scoreStartTrafo     = Trafo3d()
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
             lastRoundScore      = 0
             numRounds           = 0
+            hoopStartTrafo      = Trafo3d()
+            upperTriggerTrafo   = Trafo3d()
+            lowerTriggerTrafo   = Trafo3d()
+            goalAreaSize        = 0.0
+            goalMovementPhase   = 0.0
         }
 
     type PhysicsInfo = 

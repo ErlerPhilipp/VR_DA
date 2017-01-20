@@ -8,7 +8,7 @@
     <ProjectGuid>7f8ea77d-af88-4d25-b5ad-3ae316302dca</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>Test</RootNamespace>
-    <AssemblyName>Test</AssemblyName>
+    <AssemblyName>Basketball</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>

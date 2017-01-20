@@ -53,7 +53,7 @@ let main argv =
     let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
     let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset * Trafo3d.Translation(0.1, 0.0, 0.0)
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset// * Trafo3d.Translation(0.1, 0.0, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
@@ -565,46 +565,49 @@ let main argv =
     let boxObjects = replicate ([box], 0)
 //    let ballObjectIds = ObjectListToIdList(ballObjects)
 
-    let objects =
-        let toObjects (canMove : bool) (l : list<_>) =
-            l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
-                    let assimpScene : Loader.Scene =  Loader.Assimp.Load(file, assimpFlags) 
-                    let triangles = createShape trafo assimpScene.root
-                    let bounds = triangles |> Seq.collect (fun t -> [t.P0; t.P1; t.P2]) |> Box3d
+    let toObjects (canMove : bool) (l : list<_>) =
+        l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
+                let assimpScene : Loader.Scene =  Loader.Assimp.Load(file, assimpFlags) 
+                let triangles = createShape trafo assimpScene.root
+                let bounds = triangles |> Seq.collect (fun t -> [t.P0; t.P1; t.P2]) |> Box3d
 
-                    let sg = 
-                        assimpScene 
-                            |> Sg.AdapterNode :> ISg 
-                            |> Sg.transform (trafo)
+                let sg = 
+                    assimpScene 
+                        |> Sg.AdapterNode :> ISg 
+                        |> Sg.transform (trafo)
 
-                    let collShape = 
-                        match shape with
-                            | None ->
-                                Some (triangles |> BulletHelper.TriangleMesh)
-                            | Some s ->
-                                s
+                let collShape = 
+                    match shape with
+                        | None ->
+                            Some (triangles |> BulletHelper.TriangleMesh)
+                        | Some s ->
+                            s
 
-                    { defaultObject with
-                        id = newId()
-                        isManipulable = canMove
-                        model = Some sg 
-                        surface = Some diffuseSurface
-                        mass = mass
-                        collisionShape = collShape
-                        restitution = restitution
-                        collisionGroup = CollisionGroups.Static |> int16
-                        collisionMask = staticCollidesWith
-                    }
-                )
-        let manipulableObjects = toObjects true manipulableModels
+                { defaultObject with
+                    id = newId()
+                    isManipulable = canMove
+                    model = Some sg 
+                    surface = Some diffuseSurface
+                    mass = mass
+                    objectType = ObjectTypes.Kinematic
+                    collisionShape = collShape
+                    restitution = restitution
+                    collisionGroup = CollisionGroups.Static |> int16
+                    collisionMask = staticCollidesWith
+                }
+            )
+    let manipulableObjects = toObjects true manipulableModels
         
+    let staticObjects = toObjects false staticModels 
+    let hoop = staticObjects.[0]
+
+    let objects =
         manipulableObjects @ 
-        ballObjects @ boxObjects @
-        toObjects false staticModels 
+        ballObjects @ boxObjects
         @ [lowerHoopTrigger; upperHoopTrigger; goalRoomGroundTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall3; wall4]
         @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
-        @ [pedestal; cushion]
+        @ [pedestal; cushion; hoop]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
         @ [grabTrigger1; grabTrigger2]
         
@@ -621,6 +624,7 @@ let main argv =
             groundTriggerId     = goalRoomGroundTrigger.id
             grabTrigger1Id      = grabTrigger1.id
             grabTrigger2Id      = grabTrigger2.id
+            hoopObjectId        = hoop.id
         }
         
     let sceneObj =
@@ -642,13 +646,20 @@ let main argv =
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
             interactionInfo2    = DefaultInteractionInfo
-            gameInfo            = DefaultGameInfo(scoreTrafo)
+            gameInfo            = { DefaultGameInfo with 
+                                        scoreTrafo = scoreTrafo
+                                        scoreStartTrafo = scoreTrafo
+                                        hoopStartTrafo = hoop.trafo
+                                        upperTriggerTrafo = upperHoopTrigger.trafo
+                                        lowerTriggerTrafo = lowerHoopTrigger.trafo
+                                        goalAreaSize = goalAreaSize
+                                  }
             physicsInfo         = { DefaultPhysicsInfo with
                                         raycastCollGroup = CollisionGroups.TeleportRaycast |> int16
                                         raycastCollMask  = teleportRaycastCollidesWith
                                   }
 
-            enableExperimental  = false
+            enableExperimental  = true
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin
