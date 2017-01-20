@@ -34,12 +34,21 @@ module LogicalScene =
     let randomNumberGen = System.Random()
     let resetDelay = 1.0
     
-    let seededRandomNumberGen = System.Random(42)
+    let seed = 42
+    let mutable seededRandomNumberGen = System.Random(seed)
             
     let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
     let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
     
     let getGoalAreaSizeFactor(scene : Scene) = (scene.gameInfo.goalAreaSize * 0.5 - 1.2)
+    
+    let setHoopPos(newHoopOffsetTrafo : Trafo3d, scene : Scene, gameInfo : GameInfo, objects : PersistentHashSet<Object>) =
+            let newTrafo = gameInfo.hoopStartTrafo * newHoopOffsetTrafo
+            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, gameInfo.hoopStartTrafo * newHoopOffsetTrafo, objects, scene.physicsInfo.deltaTime)
+            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, gameInfo.upperTriggerTrafo * newHoopOffsetTrafo, newObjects, scene.physicsInfo.deltaTime)
+            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, gameInfo.lowerTriggerTrafo * newHoopOffsetTrafo, newObjects, scene.physicsInfo.deltaTime)
+            let newScoreTrafo = gameInfo.scoreStartTrafo * newHoopOffsetTrafo
+            (newObjects, {gameInfo with scoreTrafo = newScoreTrafo})
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
@@ -305,11 +314,8 @@ module LogicalScene =
                         let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
                         let offset = V3d(0.0, 0.0, cos(newGoalMovementPhase)) * goalAreaSizeFactor
                         let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, newGameInfo.hoopStartTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, newGameInfo.upperTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, newGameInfo.lowerTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newScoreTrafo = newGameInfo.scoreStartTrafo * translationTrafo
-                        (newObjects, {newGameInfo with scoreTrafo = newScoreTrafo; goalMovementPhase = newGoalMovementPhase})
+                        let (newObjects, newGameInfo) = setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
+                        (newObjects, {newGameInfo with goalMovementPhase = newGoalMovementPhase})
                     elif newGameInfo.numRounds >= 3 then
                         let numRoundsSpeedFactor = float (newGameInfo.numRounds - 2)
                         let speedFactor = 0.1 * numRoundsSpeedFactor * numRoundsSpeedFactor * Constant.Pi
@@ -318,12 +324,8 @@ module LogicalScene =
                         let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
                         let offset = V3d(cos(newGoalMovementPhase), 0.0, sin(newGoalMovementPhase)) * goalAreaSizeFactor
                         let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        let newTrafo = newGameInfo.hoopStartTrafo * translationTrafo
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, newGameInfo.hoopStartTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, newGameInfo.upperTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, newGameInfo.lowerTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newScoreTrafo = newGameInfo.scoreStartTrafo * translationTrafo
-                        (newObjects, {newGameInfo with scoreTrafo = newScoreTrafo; goalMovementPhase = newGoalMovementPhase})
+                        let (newObjects, newGameInfo) = setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
+                        (newObjects, {newGameInfo with goalMovementPhase = newGoalMovementPhase})
                     else
                         (newObjects, newGameInfo)
 
@@ -335,44 +337,46 @@ module LogicalScene =
                                         
                         let newRound = newGameInfo.numRounds + 1
                         let lastRound = 5
-                        let newRunning = newRound <> lastRound
-                        let newRound = if newRound = lastRound then 0 else newRound
+
+                        let (newObjects, newGameInfo) =
+                            if newRound = lastRound then
+                                let (newObjects, newGameInfo) = setHoopPos(Trafo3d.Identity, scene, newGameInfo, newObjects)
+                                seededRandomNumberGen <- System.Random(seed)
+                                (newObjects, {newGameInfo with 
+                                                warmupScore = 0
+                                                numRounds = 0
+                                                running = false
+                                                timeSinceStart = 0.0
+                                                goalMovementPhase = 0.0
+                                             }
+                                )
+                            else
+                                (newObjects, {newGameInfo with numRounds = newRound})
                         
                         let (newObjects, newGameInfo) = 
                             if newRound = 1 then 
                                 let offset = (V3d(seededRandomNumberGen.NextDouble(), 0.0, seededRandomNumberGen.NextDouble()) - V3d(0.5, 0.0, 0.5)) * 2.0
-                                let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
-                                let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                                let newTrafo = newGameInfo.hoopStartTrafo * translationTrafo
-                                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, newGameInfo.hoopStartTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, newGameInfo.upperTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, newGameInfo.lowerTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                                let newScoreTrafo = newGameInfo.scoreStartTrafo * translationTrafo
-                                (newObjects, {newGameInfo with scoreTrafo = newScoreTrafo})
+                                let translationTrafo = Trafo3d.Translation(offset * getGoalAreaSizeFactor(scene))
+                                setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
                             else
                                 (newObjects, newGameInfo)
 
                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
-                        (newObjects, { newGameInfo with
-                                        timeSinceStart = 0.0
-                                        lastRoundScore = newGameInfo.score
-                                        running = newRunning
-                                        numRounds = newRound
-                                    })
+                        (newObjects, { newGameInfo with timeSinceStart = 0.0 })
                     else
-                        (newObjects, { newGameInfo with timeSinceStart = scene.gameInfo.timeSinceStart + dt })
+                        (newObjects, { newGameInfo with timeSinceStart = newGameInfo.timeSinceStart + dt })
                             
                 let culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
-                let newText =   if not scene.gameInfo.running then 
+                let newText =   if not newGameInfo.running then 
                                     let pointsUntilStart = 3
-                                    let remainingScoreString = ((pointsUntilStart - scene.gameInfo.score).ToString("0", culture))
-                                    let lastRoundScoreString = (scene.gameInfo.lastRoundScore.ToString("000", culture))
-                                    "Score:    " + lastRoundScoreString + "\r\n" + 
+                                    let remainingScoreString = ((pointsUntilStart - newGameInfo.warmupScore).ToString("0", culture))
+                                    let scoreString = (newGameInfo.score.ToString("000", culture))
+                                    "Score:    " + scoreString + "\r\n" + 
                                     "Start in:    " + remainingScoreString
                                 else
                                     let remainingTimeString = (remainingTime.ToString("000", culture))
-                                    let scoreString = (scene.gameInfo.score.ToString("000", culture))
-//                                    let timeString = (scene.gameInfo.timeSinceStart.ToString("000.00", culture))
+                                    let scoreString = (newGameInfo.score.ToString("000", culture))
+//                                    let timeString = (newGameInfo.timeSinceStart.ToString("000.00", culture))
                                     "Score:    " + scoreString + "\r\n" + 
                                     "Time:    " + remainingTimeString
                                     
@@ -458,12 +462,15 @@ module LogicalScene =
                                 if scored then
                                     hasScored <- true
                                     scene.sireneSoundSource.Play()
-                                    newGameInfo <- {newGameInfo with score = newGameInfo.score + 1}
-                                    Logging.log (scene.gameInfo.timeSinceStart.ToString() + ": Scored " + newGameInfo.score.ToString())
+                                    newGameInfo <-  if newGameInfo.running then 
+                                                        {newGameInfo with score = newGameInfo.score + 1}
+                                                    else
+                                                        {newGameInfo with warmupScore = newGameInfo.warmupScore + 1}
+                                    Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored")
                                     let scoreUntilStart = 3
-                                    if not scene.gameInfo.running && newGameInfo.score = scoreUntilStart then
+                                    if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
                                         newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; score = 0}
-                                        Logging.log (scene.gameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
+                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
@@ -554,23 +561,18 @@ module LogicalScene =
                                     o
                             )
                 
-                let (newObjects, newScoreTrafo) = 
-                    if hasScored && scene.gameInfo.numRounds = 1 then 
+                let (newObjects, newGameInfo) = 
+                    if hasScored && newGameInfo.numRounds = 1 then 
                         let offset = (V3d(seededRandomNumberGen.NextDouble(), 0.0, seededRandomNumberGen.NextDouble()) - V3d(0.5, 0.0, 0.5)) * 2.0
                         let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
                         let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        let newTrafo = scene.gameInfo.hoopStartTrafo * translationTrafo
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, scene.gameInfo.hoopStartTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, scene.gameInfo.upperTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, scene.gameInfo.lowerTriggerTrafo * translationTrafo, newObjects, scene.physicsInfo.deltaTime)
-                        let newScoreTrafo = scene.gameInfo.scoreStartTrafo * translationTrafo
-                        (newObjects, newScoreTrafo)
+                        setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
                     else
-                        (newObjects, scene.gameInfo.scoreTrafo)
+                        (newObjects, newGameInfo)
 
                 { scene with 
                     objects = newObjects
-                    gameInfo = { newGameInfo with scoreTrafo = newScoreTrafo }
+                    gameInfo = newGameInfo
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }

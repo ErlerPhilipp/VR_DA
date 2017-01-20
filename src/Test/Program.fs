@@ -659,7 +659,7 @@ let main argv =
                                         raycastCollMask  = teleportRaycastCollidesWith
                                   }
 
-            enableExperimental  = true
+            enableExperimental  = false
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin

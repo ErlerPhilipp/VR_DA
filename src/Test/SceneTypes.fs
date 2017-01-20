@@ -169,12 +169,12 @@ module LogicalSceneTypes =
     type GameInfo = 
         {
             score               : int
+            warmupScore         : int
             timeSinceStart      : float
             scoreTrafo          : Trafo3d
             scoreStartTrafo     : Trafo3d
             scoreText           : string
             running             : bool
-            lastRoundScore      : int
             numRounds           : int
             hoopStartTrafo      : Trafo3d
             upperTriggerTrafo   : Trafo3d
@@ -186,12 +186,12 @@ module LogicalSceneTypes =
     let DefaultGameInfo = 
         {
             score               = 0
+            warmupScore         = 0
             timeSinceStart      = 0.0
             scoreTrafo          = Trafo3d()
             scoreStartTrafo     = Trafo3d()
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
-            lastRoundScore      = 0
             numRounds           = 0
             hoopStartTrafo      = Trafo3d()
             upperTriggerTrafo   = Trafo3d()
