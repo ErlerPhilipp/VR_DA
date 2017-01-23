@@ -48,8 +48,6 @@ module LogicalSceneTypes =
             hitUpperTrigger   : bool
             hitLowerTrigger   : bool
             hasScored         : bool
-            willReset         : bool
-            timeToReset       : float
             collisionCallback : bool
 
             trafo             : Trafo3d
@@ -84,8 +82,6 @@ module LogicalSceneTypes =
             hitUpperTrigger     = false
             hitLowerTrigger     = false
             hasScored           = false
-            willReset           = false
-            timeToReset         = 0.0
             collisionCallback   = false
 
             trafo               = Trafo3d.Identity
@@ -140,6 +136,7 @@ module LogicalSceneTypes =
 
     type GameInfo = 
         {
+            targetBallIndex     : option<int>
             score               : int
             warmupScore         : int
             timeSinceStart      : float
@@ -151,6 +148,7 @@ module LogicalSceneTypes =
 
     let DefaultGameInfo = 
         {
+            targetBallIndex     = None
             score               = 0
             warmupScore         = 0
             timeSinceStart      = 0.0
@@ -195,6 +193,8 @@ module LogicalSceneTypes =
             bounceSoundSources  : list<Audio.Sound>
             sireneSoundSource   : Audio.Sound
             popSoundSource      : Audio.Sound
+
+            ballSgs             : array<ISg>
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

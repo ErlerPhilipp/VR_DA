@@ -24,6 +24,31 @@ module LogicalScene =
             { scene with interactionInfo1 = newInteractionInfo}
         else
             { scene with interactionInfo2 = newInteractionInfo}
+            
+    let getBallIndex(ballId : int, scene : Scene) = 
+        array.FindIndex (scene.specialObjectIds.ballObjectIds, (fun i -> i = ballId))
+
+    let resetBallObject(ballIndex : int, scene : Scene, ballObject : Object) = 
+            if ballObject.id = scene.specialObjectIds.ballObjectIds.[ballIndex] then
+                scene.popSoundSource.Location <- scene.ballResetPos.[ballIndex]
+                scene.popSoundSource.Play()
+                { ballObject with 
+                    hasScored = false
+                    hitLowerTrigger = false
+                    hitUpperTrigger = false
+                    isGrabbed = GrabbedOptions.NoGrab
+                    trafo = Trafo3d.Translation(scene.ballResetPos.[ballIndex])
+                    linearVelocity = V3d()
+                    angularVelocity = V3d()
+                }
+            else
+                ballObject
+
+    let resetBall(ballIndex : int, scene : Scene, objects : PersistentHashSet<Object>) = 
+        objects 
+            |> PersistentHashSet.map (fun o -> 
+                    resetBallObject(ballIndex, scene, o)
+                )
 
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -147,43 +172,8 @@ module LogicalScene =
             | TimeElapsed(dt) ->
                 let dt = dt.TotalSeconds
 
-                // flying
-                let getAxisValue(deviceId : uint32) = 
-                    let mutable state = VRControllerState_t()
-                    let axisPosition =
-                        if system.GetControllerState(deviceId, &state) then
-                            Some (V2d(state.[1].x, state.[1].y))
-                        else None
-                    let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
-                    axisValue
-                
-//                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt)
-//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
-
-                let newObjects = 
-                    scene.objects 
-                        |> PersistentHashSet.map (fun o -> 
-                                let newTimeToReset = o.timeToReset - dt
-                                let reset = o.willReset && newTimeToReset < 0.0
-                                if reset then
-                                    scene.popSoundSource.Location <- scene.ballResetPos.[1]
-                                    scene.popSoundSource.Play()
-                                    { o with 
-                                        hasScored = false
-                                        hitLowerTrigger = false
-                                        hitUpperTrigger = false
-                                        isGrabbed = GrabbedOptions.NoGrab
-                                        willReset = false
-                                        timeToReset = 0.0
-                                        trafo = Trafo3d.Translation(scene.ballResetPos.[1])
-                                        linearVelocity = V3d()
-                                        angularVelocity = V3d()
-                                    }
-                                else
-                                    { o with timeToReset = newTimeToReset }
-                            )
-
                 let newGameInfo = scene.gameInfo
+                let newObjects = scene.objects
 
                 let timePerRound = 60.0 
                 let remainingTime = timePerRound - newGameInfo.timeSinceStart
@@ -235,7 +225,7 @@ module LogicalScene =
                 }
             
             | EndFrame ->
-                let newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
+                let mutable newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
                         if o.isManipulable then
                             { o with 
                                 wasGrabbed = o.isGrabbed
@@ -243,15 +233,13 @@ module LogicalScene =
                         else o
                     )
                 // reset balls below the ground
-                let newObjects = newObjects |> PersistentHashSet.map (fun o -> 
-                        if o.trafo.Forward.TransformPos(V3d()).Y < -100.0 then
-                            { o with 
-                                willReset = true
-                                timeToReset = resetDelay
-                            } 
-                        else
-                            o
-                    )
+                let mutable ballIndex = 0
+                for id in scene.specialObjectIds.ballObjectIds do
+                    let ballObject = getObjectWithId(id, newObjects)
+                    let ballPos = ballObject.trafo.Forward.TransformPos(V3d())
+                    if ballPos.Y < -10.0 then
+                        newObjects <- resetBall(ballIndex, scene, newObjects)
+                    ballIndex <- ballIndex + 1
 
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
@@ -320,10 +308,9 @@ module LogicalScene =
                                     Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
                                     Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
+                                    
                                     { o with 
                                         hasScored = true
-                                        willReset = true
-                                        timeToReset = resetDelay 
                                     } 
                                 else 
                                     o
@@ -393,6 +380,17 @@ module LogicalScene =
                                     else o
                                 else  o
                             )
+
+                let newObjects = 
+                    if hasScored then
+                        // reset all
+                        let mutable mutableNewObjects = newObjects
+                        for ballIndex in 0..scene.specialObjectIds.ballObjectIds.Length-1 do
+                            mutableNewObjects <- resetBall(ballIndex, scene, mutableNewObjects)
+
+                        mutableNewObjects
+                    else
+                        newObjects
 
                 { scene with 
                     objects = newObjects

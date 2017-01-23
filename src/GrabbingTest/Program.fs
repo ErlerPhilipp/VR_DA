@@ -562,6 +562,8 @@ let main argv =
             bounceSoundSources  = bounceSound
             sireneSoundSource   = sireneSound
             popSoundSource      = popSound
+
+            ballSgs             = [| basketballSg; beachballSg; softballSg; tennisballSg |]
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
