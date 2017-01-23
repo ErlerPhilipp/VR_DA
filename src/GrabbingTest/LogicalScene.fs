@@ -7,24 +7,6 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
-module Logging =
-    open System.IO
-    let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
-    let sessionFileName = startupTimeString + ".txt"
-    let streamWriter = new StreamWriter(sessionFileName, true)
-    streamWriter.AutoFlush <- true
-    streamWriter.WriteLine(startupTimeString + ": Start session")
-
-    let log(text : string) =
-        streamWriter.WriteLine(text)
-        printfn "%A" text
-
-    let endSession() =
-        let endTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
-        streamWriter.WriteLine(endTimeString + ": End session")
-        streamWriter.Flush() // doesn't do anything?
-        streamWriter.Dispose()
-
 module LogicalScene =
     open LogicalSceneTypes
     open VrTypes
@@ -36,19 +18,6 @@ module LogicalScene =
     
     let seed = 42
     let mutable seededRandomNumberGen = System.Random(seed)
-            
-    let controller1OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
-    let controller2OverlayColor = Mod.init (VrInteractions.colorForInteractionTechnique VrInteractionTechnique.VirtualHand)
-    
-    let getGoalAreaSizeFactor(scene : Scene) = (scene.gameInfo.goalAreaSize * 0.5 - 1.2)
-    
-    let setHoopPos(newHoopOffsetTrafo : Trafo3d, scene : Scene, gameInfo : GameInfo, objects : PersistentHashSet<Object>) =
-            let newTrafo = gameInfo.hoopStartTrafo * newHoopOffsetTrafo
-            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.hoopObjectId, gameInfo.hoopStartTrafo * newHoopOffsetTrafo, objects, scene.physicsInfo.deltaTime)
-            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.upperHoopTriggerId, gameInfo.upperTriggerTrafo * newHoopOffsetTrafo, newObjects, scene.physicsInfo.deltaTime)
-            let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.lowerHoopTriggerId, gameInfo.lowerTriggerTrafo * newHoopOffsetTrafo, newObjects, scene.physicsInfo.deltaTime)
-            let newScoreTrafo = gameInfo.scoreStartTrafo * newHoopOffsetTrafo
-            (newObjects, {gameInfo with scoreTrafo = newScoreTrafo})
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
@@ -106,70 +75,12 @@ module LogicalScene =
                                 { a with trafo = a.trafo * deltaTrafo } else a
                         )
 
-
-                match interactionInfo.interactionType with
-                    | VrInteractionTechnique.VirtualHand ->
-                        let newObjects = updateControllerObjects(t, scene.objects)
-                        let newObjects = updateGrabbedObjects(t, newObjects)
-                        let newInteractionInfo = { interactionInfo with armExtensionFactor = 1.0; lastContrTrafo = t }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                        { newScene with objects = newObjects}
-                    | VrInteractionTechnique.GoGo ->
-                        let virtualHandTrafo, extension = VrInteractions.getVirtualHandTrafoAndExtensionFactor(t, scene.viewTrafo, scene.trackingToWorld)
-                        let newObjects = updateControllerObjects(virtualHandTrafo, scene.objects)
-                        let newObjects = updateGrabbedObjects(virtualHandTrafo, newObjects)
-                        let newInteractionInfo = { interactionInfo with armExtensionFactor = extension; lastContrTrafo = virtualHandTrafo }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                        { newScene with objects = newObjects}
-                    | VrInteractionTechnique.Flying ->
-                        let direction = t.Forward.TransformDir(V3d.OOI)
-                        let newObjects = updateControllerObjects(t, scene.objects)
-                        let newInteractionInfo = { interactionInfo with moveDirection = direction }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                        { newScene with objects = newObjects}
-                    | VrInteractionTechnique.TeleportArea
-                    | VrInteractionTechnique.TeleportPos ->     
-                        let direction = t.Forward.TransformDir(V3d.OOI)
-                        let newObjects = updateControllerObjects(t, scene.objects)
-                        let rayCastStart = t.Forward.TransformPos(V3d())
-                        let newInteractionInfo = { interactionInfo with 
-                                                    moveDirection = direction 
-                                                    raycastInfo =   { interactionInfo.raycastInfo with
-                                                                        wantsRayCast = true
-                                                                        rayCastStart = rayCastStart
-                                                                        rayCastEnd = rayCastStart + -100.0 * direction
-                                                                    }
-                                                 }
-                        let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                        { newScene with objects = newObjects}
-                    | _ -> failwith "Not implemented"
+                let newObjects = updateControllerObjects(t, scene.objects)
+                let newObjects = updateGrabbedObjects(t, newObjects)
+                let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
+                let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
+                { newScene with objects = newObjects}
                  
-            // press track pad
-            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
-                if scene.enableExperimental then
-                    let firstController = deviceId = assignedInputs.controller1Id
-                    let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-                        
-                    let newInteractionTechnique = VrInteractions.nextInteractionTechnique interactionInfo.interactionType
-                    let newInteractionInfo = { interactionInfo with 
-                                                interactionType = newInteractionTechnique
-                                                raycastInfo = { interactionInfo.raycastInfo with wantsRayCast = false; rayCastHasHit = false }
-                                             }
-
-                    if firstController then
-                        transact ( fun _ -> Mod.change controller1OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
-                    else
-                        transact ( fun _ -> Mod.change controller2OverlayColor (VrInteractions.colorForInteractionTechnique newInteractionTechnique) )
-
-                    makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                else
-                    scene
-
-            // press menu button     
-//            | DevicePress(deviceId, a, _) when deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id && a = 2 ->
-//                { scene with
-//                    physicsInfo = { scene.physicsInfo with enablePhysics = not scene.physicsInfo.enablePhysics }
-//                }
             // press trigger
             | DeviceTouch(deviceId, a, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
@@ -181,43 +92,22 @@ module LogicalScene =
                                 else
                                     scene
 
-                match interactionInfo.interactionType with
-                    | VrInteractionTechnique.VirtualHand
-                    | VrInteractionTechnique.GoGo ->
-                        let newObjects = 
-                            scene.objects 
-                                |> PersistentHashSet.map (fun o ->
-                                        if o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
-                                           ((o.isGrabbable = GrabbableOptions.Controller1 && firstController) || 
-                                            (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
-                                            o.isGrabbable = GrabbableOptions.BothControllers) then 
-                                            { o with 
-                                                isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
-                                                hitLowerTrigger = false
-                                                hitUpperTrigger = false
-                                                hasScored = false
-        //                                        trafo = controller2Trafo // snap ball to controller
-                                            } 
-                                        else o
-                                    ) 
-//                                |> PersistentHashSet.map (fun a -> if a.hitLowerTrigger then { a with hitLowerTrigger = false } else a) 
-//                                |> PersistentHashSet.map (fun a -> if a.hitUpperTrigger then { a with hitUpperTrigger = false } else a)
-//                                |> PersistentHashSet.map (fun a -> if a.hasScored then { a with hasScored = false } else a)
-                        { scene with objects = newObjects }
-                    | VrInteractionTechnique.Flying -> scene // handled in time elapsed message
-                    | VrInteractionTechnique.TeleportArea
-                    | VrInteractionTechnique.TeleportPos ->
-                        if interactionInfo.raycastInfo.rayCastHasHit then
-                            let hmdTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.headId, scene.objects)
-                            let recenter = interactionInfo.interactionType = VrInteractions.VrInteractionTechnique.TeleportPos
-                            let newTrackingToWorld = VrInteractions.getTeleportTrafo(scene.trackingToWorld, hmdTrafo, interactionInfo.raycastInfo.rayCastHitPoint, interactionInfo.raycastInfo.rayCastHitNormal, recenter)
-                            { scene with 
-                                trackingToWorld = newTrackingToWorld 
-                                physicsInfo = { scene.physicsInfo with gravity = newTrackingToWorld.Forward.TransformDir(V3d(0.0, -9.81, 0.0)) }
-                            }
-                        else
-                            scene
-                    | _ -> failwith "Not implemented"
+                let newObjects = 
+                    scene.objects 
+                        |> PersistentHashSet.map (fun o ->
+                                if o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
+                                   ((o.isGrabbable = GrabbableOptions.Controller1 && firstController) || 
+                                    (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
+                                    o.isGrabbable = GrabbableOptions.BothControllers) then 
+                                    { o with 
+                                        isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
+                                        hitLowerTrigger = false
+                                        hitUpperTrigger = false
+                                        hasScored = false
+                                    } 
+                                else o
+                            ) 
+                { scene with objects = newObjects }
                     
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -266,17 +156,6 @@ module LogicalScene =
                         else None
                     let axisValue = if axisPosition.IsSome then axisPosition.Value.X else 0.0
                     axisValue
-
-                let newTrackingToWorld = 
-                    if scene.interactionInfo1.interactionType = VrInteractions.VrInteractionTechnique.Flying then
-                        VrInteractions.getTrafoAfterFlying(scene.trackingToWorld, scene.interactionInfo1.moveDirection, dt, getAxisValue(uint32 assignedInputs.controller1Id))
-                    else
-                        scene.trackingToWorld
-                let newTrackingToWorld = 
-                    if scene.interactionInfo2.interactionType = VrInteractions.VrInteractionTechnique.Flying then
-                        VrInteractions.getTrafoAfterFlying(newTrackingToWorld, scene.interactionInfo2.moveDirection, dt, getAxisValue(uint32 assignedInputs.controller2Id))
-                    else
-                        newTrackingToWorld
                 
 //                let lightRotation = Trafo3d.RotationYInDegrees(90.0 * dt)
 //                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.lightId, lightRotation, newObjects, scene.physicsInfo.deltaTime)
@@ -287,7 +166,7 @@ module LogicalScene =
                                 let newTimeToReset = o.timeToReset - dt
                                 let reset = o.willReset && newTimeToReset < 0.0
                                 if reset then
-                                    scene.popSoundSource.Location <- scene.ballResetPos
+                                    scene.popSoundSource.Location <- scene.ballResetPos.[1]
                                     scene.popSoundSource.Play()
                                     { o with 
                                         hasScored = false
@@ -296,7 +175,7 @@ module LogicalScene =
                                         isGrabbed = GrabbedOptions.NoGrab
                                         willReset = false
                                         timeToReset = 0.0
-                                        trafo = Trafo3d.Translation(scene.ballResetPos)
+                                        trafo = Trafo3d.Translation(scene.ballResetPos.[1])
                                         linearVelocity = V3d()
                                         angularVelocity = V3d()
                                     }
@@ -305,29 +184,6 @@ module LogicalScene =
                             )
 
                 let newGameInfo = scene.gameInfo
-
-                let (newObjects, newGameInfo) = 
-                    if newGameInfo.numRounds = 2 then
-                        let speedFactor = 0.1 * Constant.Pi
-                        let newGoalMovementPhase = newGameInfo.goalMovementPhase + dt * speedFactor
-                        let newGoalMovementPhase = if newGoalMovementPhase > Constant.PiTimesTwo then newGoalMovementPhase - Constant.PiTimesTwo else newGoalMovementPhase
-                        let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
-                        let offset = V3d(0.0, 0.0, cos(newGoalMovementPhase)) * goalAreaSizeFactor
-                        let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        let (newObjects, newGameInfo) = setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
-                        (newObjects, {newGameInfo with goalMovementPhase = newGoalMovementPhase})
-                    elif newGameInfo.numRounds >= 3 then
-                        let numRoundsSpeedFactor = float (newGameInfo.numRounds - 2)
-                        let speedFactor = 0.1 * numRoundsSpeedFactor * numRoundsSpeedFactor * Constant.Pi
-                        let newGoalMovementPhase = newGameInfo.goalMovementPhase + dt * speedFactor
-                        let newGoalMovementPhase = if newGoalMovementPhase > Constant.PiTimesTwo then newGoalMovementPhase - Constant.PiTimesTwo else newGoalMovementPhase
-                        let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
-                        let offset = V3d(cos(newGoalMovementPhase), 0.0, sin(newGoalMovementPhase)) * goalAreaSizeFactor
-                        let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        let (newObjects, newGameInfo) = setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
-                        (newObjects, {newGameInfo with goalMovementPhase = newGoalMovementPhase})
-                    else
-                        (newObjects, newGameInfo)
 
                 let timePerRound = 60.0 
                 let remainingTime = timePerRound - newGameInfo.timeSinceStart
@@ -340,27 +196,17 @@ module LogicalScene =
 
                         let (newObjects, newGameInfo) =
                             if newRound = lastRound then
-                                let (newObjects, newGameInfo) = setHoopPos(Trafo3d.Identity, scene, newGameInfo, newObjects)
                                 seededRandomNumberGen <- System.Random(seed)
                                 (newObjects, {newGameInfo with 
                                                 warmupScore = 0
                                                 numRounds = 0
                                                 running = false
                                                 timeSinceStart = 0.0
-                                                goalMovementPhase = 0.0
                                              }
                                 )
                             else
                                 (newObjects, {newGameInfo with numRounds = newRound})
                         
-                        let (newObjects, newGameInfo) = 
-                            if newRound = 1 then 
-                                let offset = (V3d(seededRandomNumberGen.NextDouble(), 0.0, seededRandomNumberGen.NextDouble()) - V3d(0.5, 0.0, 0.5)) * 2.0
-                                let translationTrafo = Trafo3d.Translation(offset * getGoalAreaSizeFactor(scene))
-                                setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
-                            else
-                                (newObjects, newGameInfo)
-
                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
                         (newObjects, { newGameInfo with timeSinceStart = 0.0 })
                     else
@@ -384,7 +230,6 @@ module LogicalScene =
 
                 { scene with
                     objects = newObjects
-                    trackingToWorld = newTrackingToWorld
                     gameInfo = newGameInfo
                     physicsInfo = { scene.physicsInfo with deltaTime = dt }
                 }
@@ -494,7 +339,6 @@ module LogicalScene =
                                                                 
                                 let firstController = ghostId = scene.specialObjectIds.grabTrigger1Id
                                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-                                let thisControllerCanGrab = interactionInfo.interactionType = VrInteractionTechnique.VirtualHand || interactionInfo.interactionType = VrInteractionTechnique.GoGo
 
                                 if collidingWithController then
                                     let velToStrength(vel : float) = 
@@ -520,7 +364,7 @@ module LogicalScene =
                                         if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
 
                                     // check grabbable with
-                                    if colliderObject.isManipulable && thisControllerCanGrab then
+                                    if colliderObject.isManipulable then
                                         let newGrabbableState = 
                                             match o.isGrabbable with
                                                 | GrabbableOptions.NoGrab -> if firstController then GrabbableOptions.Controller1 else GrabbableOptions.Controller2
@@ -549,26 +393,6 @@ module LogicalScene =
                                     else o
                                 else  o
                             )
-                        // check reset on ground
-                        |> PersistentHashSet.map (fun o -> 
-                                let collidingWithGround = ghostId = scene.specialObjectIds.groundTriggerId && o.id = colliderId && o.isManipulable && not o.willReset && o.isGrabbed = GrabbedOptions.NoGrab
-                                if collidingWithGround then 
-                                    { o with 
-                                        willReset = true
-                                        timeToReset = resetDelay 
-                                    } 
-                                else 
-                                    o
-                            )
-                
-                let (newObjects, newGameInfo) = 
-                    if hasScored && newGameInfo.numRounds = 1 then 
-                        let offset = (V3d(seededRandomNumberGen.NextDouble(), 0.0, seededRandomNumberGen.NextDouble()) - V3d(0.5, 0.0, 0.5)) * 2.0
-                        let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
-                        let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
-                        setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
-                    else
-                        (newObjects, newGameInfo)
 
                 { scene with 
                     objects = newObjects
@@ -643,15 +467,5 @@ module LogicalScene =
                 }
 //                scene
             | RayCastResult (source, hasHit, hitPoint, hitNormal) ->
-                let firstController = source = 0
-                let oldInteractionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-                let newInteractionInfo = { oldInteractionInfo with
-                                            raycastInfo = { oldInteractionInfo.raycastInfo with 
-                                                                rayCastHasHit = hasHit
-                                                                rayCastHitPoint = hitPoint
-                                                                rayCastHitNormal = hitNormal
-                                                                wantsRayCast = false
-                                                          }
-                                         }
-                makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
+                scene
             | _ -> scene

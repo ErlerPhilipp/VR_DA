@@ -118,37 +118,13 @@ module LogicalSceneTypes =
             lowerHoopTriggerId  : int
             upperHoopTriggerId  : int
             lightId             : int
-            groundTriggerId     : int
             hoopObjectId        : int
-        }
-
-    type RaycastInfo = 
-        {
-            wantsRayCast        : bool
-            rayCastStart        : V3d
-            rayCastEnd          : V3d
-            rayCastHasHit       : bool
-            rayCastHitPoint     : V3d
-            rayCastHitNormal    : V3d
-        }
-
-    let DefaultRaycastInfo = 
-        {
-            wantsRayCast        = false
-            rayCastStart        = V3d()
-            rayCastEnd          = V3d()
-            rayCastHasHit       = false
-            rayCastHitPoint     = V3d()
-            rayCastHitNormal    = V3d()
+            ballObjectIds       : array<int>
         }
 
     type InteractionInfo =
         {
-            interactionType     : VrInteractions.VrInteractionTechnique
-            armExtensionFactor  : float
-            moveDirection       : V3d
             lastContrTrafo      : Trafo3d
-            raycastInfo         : RaycastInfo
             vibrationStrength   : float
             vibStrLastFrame     : float
             triggerPressed      : bool
@@ -156,11 +132,7 @@ module LogicalSceneTypes =
 
     let DefaultInteractionInfo = 
         {
-            interactionType     = VrInteractions.VrInteractionTechnique.VirtualHand
-            armExtensionFactor  = 1.0
-            moveDirection       = V3d.Zero
             lastContrTrafo      = Trafo3d.Identity
-            raycastInfo         = DefaultRaycastInfo
             vibrationStrength   = 0.0
             vibStrLastFrame     = 0.0
             triggerPressed      = false
@@ -172,15 +144,9 @@ module LogicalSceneTypes =
             warmupScore         : int
             timeSinceStart      : float
             scoreTrafo          : Trafo3d
-            scoreStartTrafo     : Trafo3d
             scoreText           : string
             running             : bool
             numRounds           : int
-            hoopStartTrafo      : Trafo3d
-            upperTriggerTrafo   : Trafo3d
-            lowerTriggerTrafo   : Trafo3d
-            goalAreaSize        : float
-            goalMovementPhase   : float
         }
 
     let DefaultGameInfo = 
@@ -189,15 +155,9 @@ module LogicalSceneTypes =
             warmupScore         = 0
             timeSinceStart      = 0.0
             scoreTrafo          = Trafo3d()
-            scoreStartTrafo     = Trafo3d()
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
             numRounds           = 0
-            hoopStartTrafo      = Trafo3d()
-            upperTriggerTrafo   = Trafo3d()
-            lowerTriggerTrafo   = Trafo3d()
-            goalAreaSize        = 0.0
-            goalMovementPhase   = 0.0
         }
 
     type PhysicsInfo = 
@@ -230,24 +190,17 @@ module LogicalSceneTypes =
             objects             : PersistentHashSet<Object>
             viewTrafo           : Trafo3d
             trackingToWorld     : Trafo3d
-            ballResetPos        : V3d
+            ballResetPos        : array<V3d>
             
             bounceSoundSources  : list<Audio.Sound>
             sireneSoundSource   : Audio.Sound
             popSoundSource      : Audio.Sound
-            
-            rayCastDirSg        : ISg
-            rayCastHitPointSg   : ISg
-            rayCastHitAreaSg    : ISg
-            rayCastCamSg        : ISg
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
             interactionInfo2    : InteractionInfo
             gameInfo            : GameInfo
             physicsInfo         : PhysicsInfo
-
-            enableExperimental  : bool
         }
         
     let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : PersistentHashSet<Object>, dt : float) = 
@@ -391,17 +344,6 @@ module GraphicsSceneTypes =
             mtilingFactor       : ModRef<V2d>
         }
 
-    type RaycastMods = 
-        {
-            hasRayCastHit       : ModRef<bool>
-            drawRayCastDir      : ModRef<bool>
-            drawHitPoint        : ModRef<bool>
-            drawHitArea         : ModRef<bool>
-            hasRayCastDir       : ModRef<Trafo3d>
-            rayCastHitTrafo     : ModRef<Trafo3d>
-            rayCastCam          : ModRef<Trafo3d>
-        }
-
     type GraphicsScene =
         {
             mutable original    : Scene
@@ -411,8 +353,5 @@ module GraphicsSceneTypes =
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>
-            
-            raycastMods1        : RaycastMods
-            raycastMods2        : RaycastMods
         }
             

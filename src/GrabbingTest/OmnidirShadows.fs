@@ -52,10 +52,6 @@ module OmnidirShadows =
                             |> Sg.uniform "isHighlighted" t.mhasHighlight
                             |> Sg.uniform "scoredState" t.mscoredState
                             |> Sg.uniform "tilingFactor" t.mtilingFactor
-                            |> if t.original.id = scene.specialObjectIds.controller1ObjectId then
-                                    Sg.uniform "overlayColor" LogicalScene.controller1OverlayColor
-                               else
-                                    Sg.uniform "overlayColor" LogicalScene.controller2OverlayColor
                             |> Sg.trafo t.mtrafo
                             |> Sg.surface (Mod.constant surface)
                     | _ ->

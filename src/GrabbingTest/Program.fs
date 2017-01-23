@@ -46,14 +46,11 @@ let main argv =
     
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9
-    let trackingAreaHeight = 6.2
-    let goalAreaSize = 4.5
-    let goalAreaHeight = 7.5
+    let trackingAreaHeight = 5.2
     let wallThickness = 1.0
-    let goalRoomOffset = Trafo3d.Translation(0.5 * trackingAreaSize + 0.5 * goalAreaSize, (trackingAreaSize - goalAreaSize) * 0.5, 0.0)
 
     let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * goalRoomOffset// * Trafo3d.Translation(0.1, 0.0, 0.0)
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * Trafo3d.Translation(trackingAreaSize * 0.48, -2.0, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
@@ -129,13 +126,6 @@ let main argv =
                                     OmnidirShadowShader.Effect false
                                 ] 
     let diffuseSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, diffuseEffect) :> ISurface
-    let diffuseContrEffect =    [
-                                    defaultTrafoEffect
-                                    defaultDiffuseTextureEffect
-                                    ControllerOverlayColor.Effect
-                                    OmnidirShadowShader.Effect false
-                                ] 
-    let diffuseContrSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, diffuseContrEffect) :> ISurface
     let normalDiffuseEffect =   [
                                     defaultTrafoEffect
                                     TextureTiling.Effect
@@ -179,20 +169,16 @@ let main argv =
     let goalRoomWallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Brown Bricks\TexturesCom_Brown Bricks_albedo_S.jpg", textureParam) :> ITexture))
     let cushionDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Tufted Leather\TexturesCom_TuftedLeather_albedo_S.png", textureParam) :> ITexture))
     let pedestalDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Marble Polished\TexturesCom_MarblePolishedWhite1_diffuse_S.png", textureParam) :> ITexture))
+    
+    let basketballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
+    let beachballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\BeachBallColor.jpg", textureParam) :> ITexture))
+    let softballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
+    let tennisballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\TennisBallColorMap.jpg", textureParam) :> ITexture))
     //#endregion
 
     let staticModels =
         [
-            //@"C:\Aardwork\sponza\sponza.obj", Trafo3d.Scale 0.01, Mass.Infinite, None, 0.5f
             @"..\..\resources\models\basketball\hoop.obj", hoopTrafo, 0.0f, None, 0.5f
-        ]
-
-    let manipulableModels =
-        [
-            //@"C:\Aardwork\Stormtrooper\Stormtrooper.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-0.5, 0.0, 0.0), Mass 100.0f, None, 0.5f
-            //@"C:\Aardwork\witcher\geralt.obj", Trafo3d.Translation(0.0, 4.0, 0.0), Mass 80.0f, None, 0.5
-            //@"C:\Aardwork\ironman\ironman.obj", Trafo3d.Scale 0.5 * Trafo3d.Translation(0.0, 0.0, 0.0), Mass 100.0f, None, 0.5f
-            //@"C:\Aardwork\lara\lara.dae", Trafo3d.Scale 0.5 * Trafo3d.Translation(-2.0, 0.0, 0.0), Mass 60.0f, None, 0.5f
         ]
 
     let assimpFlagsSteamVR = 
@@ -211,7 +197,6 @@ let main argv =
 
     let loadVR f = Loader.Assimp.Load(f,assimpFlagsSteamVR)
    
-
     let handBoxEdgeLength = 0.1
     let handBox = Box3d.FromCenterAndSize(V3d.OOO, handBoxEdgeLength * V3d.III)
     let handSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant handBox)
@@ -235,8 +220,10 @@ let main argv =
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
                     |> Sg.effect beamEffect
     let ballRadius = 0.1213
-    let ballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius)
-                    |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\basketball\balldimpled.png", textureParam) :> ITexture))
+    let basketballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> basketballDiffuseTexture
+    let beachballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> beachballDiffuseTexture
+    let softballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> softballDiffuseTexture
+    let tennisballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> tennisballDiffuseTexture
     let lightSg = Sg.sphere 3 (Mod.constant C4b.White) (Mod.constant 0.1)
     let rayCastAreaSg = BoxSg.box (Mod.constant C4b.Green) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, 0.1, trackingAreaSize))))
     let rayCastPointSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant 0.08)
@@ -248,14 +235,8 @@ let main argv =
                             |> ceilingDiffuseTexture |> ceilingNormalMap
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaHeight, wallThickness))))
                             |> wallDiffuseTexture |> wallNormalMap
-    let goalRoomGroundSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
-                            |> groundDiffuseTexture |> groundNormalMap
-    let goalRoomCeilingSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, wallThickness, goalAreaSize))))
-                            |> ceilingDiffuseTexture |> ceilingNormalMap
-    let goalRoomWallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(goalAreaSize, goalAreaHeight, wallThickness))))
-                            |> goalRoomWallDiffuseTexture |> goalRoomWallNormalMap
     let pedestalHeight = 0.8
-    let pedestalRadius = 0.2
+    let pedestalRadius = 0.005
 //    let pedestalSg = Sg.cylinder 4 (Mod.constant C4b.Gray) (Mod.constant pedestalRadius) (Mod.constant pedestalHeight)
     let pedestalSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(pedestalRadius, pedestalHeight, pedestalRadius))))
                             |> pedestalDiffuseTexture |> pedestalNormalMap
@@ -284,7 +265,7 @@ let main argv =
             objectType = ObjectTypes.Kinematic
             collisionCallback = true
             model = Some controllerSg
-            surface = Some diffuseContrSurface
+            surface = Some diffuseSurface
             collisionShape = Some simpleControllerBodyCollShape
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
@@ -316,7 +297,7 @@ let main argv =
         { defaultObject with
             id = newId()
             castsShadow = false
-            trafo = Trafo3d.Translation(-(0.5 * trackingAreaSize - wallThickness * 3.0), trackingAreaHeight - wallThickness * 2.5, 0.0)
+            trafo = Trafo3d.Translation(0.0, trackingAreaHeight - wallThickness * 2.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
             isColliding = false
@@ -390,77 +371,15 @@ let main argv =
             trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-wallLateralOffset, wallHorizontalOffset, 0.0)
             collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
-
-    let goalRoomGroundObject = 
-        { staticDefaultCollider with
-            id = newId()
-            trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness, 0.0) * goalRoomOffset
-            model = Some goalRoomGroundSg
-            surface = Some normalDiffuseSurface
-            tilingFactor = V2d(groundTilingFactor * goalAreaSize)
-            collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
-        }
-
-    let goalRoomGroundTrigger = 
-        { defaultObject with
-            id = newId()
-            castsShadow = false
-            objectType = ObjectTypes.Ghost
-            trafo = Trafo3d.Translation(0.0, -0.5 * wallThickness + 0.3, 0.0) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
-            isColliding = false
-            collisionGroup = CollisionGroups.HoopTrigger |> int16
-            collisionMask = hoopTriggerCollidesWith
-        }
-
-    let goalRoomCeilingObject = 
-        { staticDefaultCollider with
-            id = newId()
-            trafo = Trafo3d.Translation(0.0, goalAreaHeight - 1.5 * wallThickness, 0.0) * goalRoomOffset
-            model = Some goalRoomCeilingSg
-            surface = Some normalDiffuseSurface
-            tilingFactor = V2d(ceilingTilingFactor * goalAreaSize)
-            collisionShape = Some ( V3d(goalAreaSize, wallThickness, goalAreaSize) |> BulletHelper.Shape.Box )
-        }
-
-    let goalRoomWallBase = 
-        { staticDefaultCollider with
-            model = Some goalRoomWallSg
-            surface = Some normalDiffuseSurface
-            tilingFactor = V2d(0.5 * goalAreaSize)
-        }
-    let goalWallLateralOffset = goalAreaSize * 0.5 + wallThickness * 0.5
-    let goalWallHorizontalOffset = goalAreaHeight * 0.5 - wallThickness
-    let goalRoomWall1 = 
-        { goalRoomWallBase with 
-            id = newId()
-            trafo = Trafo3d.Translation(0.0, goalWallHorizontalOffset, -goalWallLateralOffset) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
-        }
-    let goalRoomWall2 = 
-        { goalRoomWallBase with 
-            id = newId()
-            trafo = Trafo3d.RotationYInDegrees (-90.0) * Trafo3d.Translation(goalWallLateralOffset, goalWallHorizontalOffset, 0.0) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
-        }
-    let goalRoomWall3 = 
-        { goalRoomWallBase with 
-            id = newId()
-            trafo = Trafo3d.RotationYInDegrees (180.0) * Trafo3d.Translation(0.0, goalWallHorizontalOffset, goalWallLateralOffset) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
-        }
-    let goalRoomWall4 = 
-        { goalRoomWallBase with 
-            id = newId()
-            trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-goalWallLateralOffset, goalWallHorizontalOffset, 0.0) * goalRoomOffset
-            collisionShape = Some ( V3d(goalAreaSize + 2.0 * wallThickness, goalAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
-        }
     
-    let pedestalPosition = V3d(trackingAreaSize / 2.0 - 0.5, pedestalHeight / 2.0, trackingAreaSize / 2.0 - 0.5)
-    let pedestal =
+    let pedestalHorizontalOffset = trackingAreaSize / 2.0 - 0.3
+    let pedestalVerticalOffset = pedestalHeight / 2.0
+    let pedestal1Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
+    let pedestal2Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
+    let pedestal3Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
+    let pedestal4Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
+    let pedestalBase = 
         { defaultObject with
-            id = newId()
-            trafo = Trafo3d.Translation(pedestalPosition)
             model = Some pedestalSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(1.0, pedestalRadius / pedestalHeight)
@@ -472,12 +391,17 @@ let main argv =
             collisionGroup = CollisionGroups.Static |> int16
             collisionMask = staticCollidesWith
         }
+    let pedestal1 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal1Position)}
+    let pedestal2 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal2Position)}
+    let pedestal3 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal3Position)}
+    let pedestal4 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal4Position)}
         
-    let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
-    let cushion =
+    let cushion1Position = V3d(pedestal1Position.X, pedestal1Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal1Position.Z)
+    let cushion2Position = V3d(pedestal2Position.X, pedestal2Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal2Position.Z)
+    let cushion3Position = V3d(pedestal3Position.X, pedestal3Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal3Position.Z)
+    let cushion4Position = V3d(pedestal4Position.X, pedestal4Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal4Position.Z)
+    let cushionBase =
         { defaultObject with
-            id = newId()
-            trafo = Trafo3d.Translation(cushionPosition)
             model = Some cushionSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.25)
@@ -488,16 +412,20 @@ let main argv =
             collisionGroup = CollisionGroups.Static |> int16
             collisionMask = staticCollidesWith
         }
+    let cushion1 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion1Position)}
+    let cushion2 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion2Position)}
+    let cushion3 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion3Position)}
+    let cushion4 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion4Position)}
         
-    let ballResetPos = V3d(cushionPosition.X, cushionPosition.Y + ballRadius, cushionPosition.Z)
-    let ball = 
+    let ball1ResetPos = V3d(cushion1Position.X, cushion1Position.Y + ballRadius, cushion1Position.Z)
+    let ball2ResetPos = V3d(cushion2Position.X, cushion2Position.Y + ballRadius, cushion2Position.Z)
+    let ball3ResetPos = V3d(cushion3Position.X, cushion3Position.Y + ballRadius, cushion3Position.Z)
+    let ball4ResetPos = V3d(cushion4Position.X, cushion4Position.Y + ballRadius, cushion4Position.Z)
+    let ballBase = 
         { defaultCollider with
-            id = newId()
             objectType = ObjectTypes.Dynamic
             isManipulable = true
             collisionCallback = true
-            model = Some ballSg
-            trafo = Trafo3d.Translation(ballResetPos)
             surface = Some ballSurface
             mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
@@ -506,6 +434,10 @@ let main argv =
             collisionGroup = CollisionGroups.Ball |> int16
             collisionMask = ballCollidesWith
         }
+    let ball1 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball1ResetPos); model = Some basketballSg}
+    let ball2 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball2ResetPos); model = Some beachballSg}
+    let ball3 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball3ResetPos); model = Some softballSg}
+    let ball4 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball4ResetPos); model = Some tennisballSg}
     let box = 
         { defaultCollider with
             id = newId()
@@ -559,21 +491,7 @@ let main argv =
             collisionMask = hoopTriggerCollidesWith
         }
 
-//    let ObjectListToIdList(objectList : List<Object>) = objectList |> List.map (fun e -> e.id)
-
-    let replicate (objects : Object list, amount : int) = 
-        [
-            for (o) in objects do
-                for i in 1..amount do
-                    let offset = Trafo3d.Translation(0.0, float i*0.01, 0.0)
-                    yield ({o with 
-                                id = newId()
-                                trafo = offset * o.trafo})
-        ]
-
-    let ballObjects = replicate ([ball], 1)
-    let boxObjects = replicate ([box], 0)
-//    let ballObjectIds = ObjectListToIdList(ballObjects)
+    let ballObjects = [ball1; ball2; ball3; ball4]
 
     let toObjects (canMove : bool) (l : list<_>) =
         l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
@@ -606,18 +524,15 @@ let main argv =
                     collisionMask = staticCollidesWith
                 }
             )
-    let manipulableObjects = toObjects true manipulableModels
         
     let staticObjects = toObjects false staticModels 
     let hoop = staticObjects.[0]
 
     let objects =
-        manipulableObjects @ 
-        ballObjects @ boxObjects
-        @ [lowerHoopTrigger; upperHoopTrigger; goalRoomGroundTrigger; lightObject]
-        @ [groundObject; ceilingObject; wall1; wall3; wall4]
-        @ [goalRoomGroundObject; goalRoomCeilingObject; goalRoomWall1; goalRoomWall2; goalRoomWall3;]
-        @ [pedestal; cushion; hoop]
+        ballObjects
+        @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
+        @ [groundObject; ceilingObject; wall1; wall2; wall3; wall4]
+        @ [pedestal1; pedestal2; pedestal3; pedestal4; cushion1; cushion2; cushion3; cushion4; hoop]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
         @ [grabTrigger1; grabTrigger2]
         
@@ -631,10 +546,10 @@ let main argv =
             lightId             = lightObject.id
             lowerHoopTriggerId  = lowerHoopTrigger.id
             upperHoopTriggerId  = upperHoopTrigger.id
-            groundTriggerId     = goalRoomGroundTrigger.id
             grabTrigger1Id      = grabTrigger1.id
             grabTrigger2Id      = grabTrigger2.id
             hoopObjectId        = hoop.id
+            ballObjectIds       = [| ball1.id; ball2.id; ball3.id; ball4.id |]
         }
         
     let sceneObj =
@@ -642,34 +557,22 @@ let main argv =
             objects             = PersistentHashSet.ofList objects
             viewTrafo           = Trafo3d.Identity
             trackingToWorld     = Trafo3d.Identity
-            ballResetPos        = ballResetPos
+            ballResetPos        = [| ball1ResetPos; ball2ResetPos; ball3ResetPos; ball4ResetPos |]
 
             bounceSoundSources  = bounceSound
             sireneSoundSource   = sireneSound
             popSoundSource      = popSound
             
-            rayCastDirSg        = beamSg
-            rayCastHitPointSg   = rayCastHitPointSg
-            rayCastHitAreaSg    = rayCastHitAreaSg
-            rayCastCamSg        = rayCastCamSg
-
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
             interactionInfo2    = DefaultInteractionInfo
             gameInfo            = { DefaultGameInfo with 
                                         scoreTrafo = scoreTrafo
-                                        scoreStartTrafo = scoreTrafo
-                                        hoopStartTrafo = hoop.trafo
-                                        upperTriggerTrafo = upperHoopTrigger.trafo
-                                        lowerTriggerTrafo = lowerHoopTrigger.trafo
-                                        goalAreaSize = goalAreaSize
                                   }
             physicsInfo         = { DefaultPhysicsInfo with
                                         raycastCollGroup = CollisionGroups.TeleportRaycast |> int16
                                         raycastCollMask  = teleportRaycastCollidesWith
                                   }
-
-            enableExperimental  = false
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin

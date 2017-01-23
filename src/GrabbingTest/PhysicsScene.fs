@@ -30,13 +30,7 @@ module PhysicsScene =
         let controllerDevice = if firstController then VrDriver.inputDevices.controller1 else VrDriver.inputDevices.controller2
         let vel = s.trackingToWorld.Forward.TransformDir(controllerDevice.Velocity)
         let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
-        let handVelocity = 
-            match interactionInfo.interactionType with
-                | VrInteractions.VrInteractionTechnique.GoGo -> 
-                    // TODO: make more accurate, function of difference with last step
-                    //printfn "release object vel %A -> vel %A" vel (vel * s.armExtensionFactor)
-                    toVector3(vel * interactionInfo.armExtensionFactor)
-                | _ -> toVector3(vel)
+        let handVelocity = toVector3(vel)
 
 //                            collisionObject.LinearVelocity <- handVelocity
         collisionObject.LinearVelocity <- Vector3()
@@ -439,18 +433,6 @@ module PhysicsScene =
 
                 for message in ghostMessages do
                     newScene <- LogicalScene.update newScene message
-                   
-                let performRayCast(source : int, raycastInfo : LogicalSceneTypes.RaycastInfo) =
-                    if raycastInfo.wantsRayCast then
-                        let rayCastStart = toVector3(raycastInfo.rayCastStart)
-                        let rayCastEnd = toVector3(raycastInfo.rayCastEnd)
-                        let collisionFilterGroup = s.physicsInfo.raycastCollGroup
-                        let collisionFilterMask = s.physicsInfo.raycastCollMask
-                        let (hasHit, hitPoint, hitNormal) = BulletHelper.rayCast(rayCastStart, rayCastEnd, world.dynamicsWorld, collisionFilterGroup, collisionFilterMask)
-                        let rayCastMsg = RayCastResult (source, hasHit, toV3d(hitPoint), toV3d(hitNormal))
-                        newScene <- LogicalScene.update newScene rayCastMsg
-                performRayCast(0, s.interactionInfo1.raycastInfo)
-                performRayCast(1, s.interactionInfo2.raycastInfo)
 
                 newScene
             | None -> 

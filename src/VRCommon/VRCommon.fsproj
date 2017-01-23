@@ -58,6 +58,7 @@
     <Compile Include="Audio.fs" />
     <Compile Include="Shaders.fs" />
     <Compile Include="SGHelper.fs" />
+    <Compile Include="Logging.fs" />
     <Compile Include="VrWindow.fs" />
   </ItemGroup>
   <ItemGroup>
