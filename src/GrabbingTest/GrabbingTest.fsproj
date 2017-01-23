@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>7f8ea77d-af88-4d25-b5ad-3ae316302dca</ProjectGuid>
+    <ProjectGuid>7b1aed75-2c47-4bb9-ab83-65653a1b5306</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>Test</RootNamespace>
-    <AssemblyName>Basketball</AssemblyName>
+    <RootNamespace>GrabbingTest</RootNamespace>
+    <AssemblyName>GrabbingTest</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>Test</Name>
+    <Name>GrabbingTest</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -26,7 +26,6 @@
     <DocumentationFile>
     </DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
-    <EnableUnmanagedDebugging>true</EnableUnmanagedDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -35,10 +34,10 @@
     <OutputPath>..\..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>
     </DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
+    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -51,29 +50,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="HelloWorld.fs" />
     <None Include="App.config" />
-    <None Include="paket.references" />
-    <Compile Include="VrTypes.fs" />
-    <Compile Include="VrConversions.fs" />
-    <Compile Include="VrAxis.fs" />
-    <Compile Include="VrDevice.fs" />
-    <Compile Include="VrDriver.fs" />
-    <Compile Include="VrWindow.fs" />
     <Compile Include="VrInteractions.fs" />
     <Compile Include="BulletHelper.fs" />
-    <Compile Include="Vibration.fs" />
-    <Compile Include="Audio.fs" />
     <Compile Include="SceneTypes.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="PhysicsScene.fs" />
-    <Compile Include="Shaders.fs" />
     <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
-    <Compile Include="SGHelper.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\VRCommon\VRCommon.fsproj">
+      <Name>VRCommon</Name>
+      <Project>{f5129646-75e0-4565-8023-7e39da4a625d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\VR\Aardvark.VR.csproj">
       <Name>Aardvark.VR</Name>
       <Project>{65bc41bd-6844-45eb-aa4d-af07b080f03e}</Project>

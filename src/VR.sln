@@ -4,7 +4,11 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aardvark.VR", "VR\Aardvark.VR.csproj", "{65BC41BD-6844-45EB-AA4D-AF07B080F03E}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Test", "Test\Test.fsproj", "{7F8EA77D-AF88-4D25-B5AD-3AE316302DCA}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Basketball", "Test\Basketball.fsproj", "{7F8EA77D-AF88-4D25-B5AD-3AE316302DCA}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GrabbingTest", "GrabbingTest\GrabbingTest.fsproj", "{7B1AED75-2C47-4BB9-AB83-65653A1B5306}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "VRCommon", "VRCommon\VRCommon.fsproj", "{F5129646-75E0-4565-8023-7E39DA4A625D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +24,14 @@ Global
 		{7F8EA77D-AF88-4D25-B5AD-3AE316302DCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F8EA77D-AF88-4D25-B5AD-3AE316302DCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F8EA77D-AF88-4D25-B5AD-3AE316302DCA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B1AED75-2C47-4BB9-AB83-65653A1B5306}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B1AED75-2C47-4BB9-AB83-65653A1B5306}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B1AED75-2C47-4BB9-AB83-65653A1B5306}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B1AED75-2C47-4BB9-AB83-65653A1B5306}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5129646-75E0-4565-8023-7E39DA4A625D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5129646-75E0-4565-8023-7E39DA4A625D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5129646-75E0-4565-8023-7E39DA4A625D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5129646-75E0-4565-8023-7E39DA4A625D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

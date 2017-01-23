@@ -7,8 +7,6 @@ open Aardvark.SceneGraph.IO
 
 open System
 
-open LogicalScene
-
 module BoxSg = 
     let private calcTangentsFromVertices (indices : int[], texPos : V2f[], normals : V3f[], positions : V3f[]) =
 
@@ -130,7 +128,6 @@ module BoxSg =
             |> Sg.trafo trafo
 
 module SGHelper = 
-    open LogicalSceneTypes
     let rec triangles (trafo : Trafo3d) (m : IndexedGeometry) =
         let positions = m.IndexedAttributes.[DefaultSemantic.Positions] |> unbox<V3f[]>
         let index =
@@ -167,12 +164,3 @@ module SGHelper =
             | Loader.Material(_,c) ->
                 createShape currentTrafo c
             
-    let replicate (objects : Object list, amount : int) = 
-        [
-            for (o) in objects do
-                for i in 1..amount do
-                    let offset = Trafo3d.Translation(0.0, float i*0.01, 0.0)
-                    yield ({o with 
-                                id = newId()
-                                trafo = offset * o.trafo})
-        ]
