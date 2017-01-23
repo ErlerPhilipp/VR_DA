@@ -44,16 +44,17 @@ module OmnidirShadows =
         
         let toSg (t : GraphicsObject) =
             adaptive {
-            let! model = t.mmodel
+            let! model = t.model
             return 
                 match t.original.surface, model with
                     | Some surface, Some model ->
                         model
-                            |> Sg.uniform "isHighlighted" t.mhasHighlight
-                            |> Sg.uniform "scoredState" t.mscoredState
-                            |> Sg.uniform "tilingFactor" t.mtilingFactor
-                            |> Sg.trafo t.mtrafo
+                            |> Sg.uniform "isHighlighted" t.hasHighlight
+                            |> Sg.uniform "scoredState" t.scoredState
+                            |> Sg.uniform "tilingFactor" t.tilingFactor
+                            |> Sg.trafo t.trafo
                             |> Sg.surface (Mod.constant surface)
+                            |> Sg.onOff t.visible
                     | _ ->
                         Sg.ofList []
             } 
@@ -62,13 +63,14 @@ module OmnidirShadows =
         let depthOnlySurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, ([DefaultSurfaces.trafo |> toEffect; DefaultSurfaces.constantColor C4f.White |> toEffect])) :> ISurface
         let toShadowCasterSg (t : GraphicsObject) =
             adaptive {
-                let! model = t.mmodel
+                let! model = t.model
                 return 
                     match t.original.surface, model with
                         | Some surface, Some model when t.original.castsShadow ->
                             model
-                                |> Sg.trafo t.mtrafo
+                                |> Sg.trafo t.trafo
                                 |> Sg.surface (Mod.constant depthOnlySurface)
+                                |> Sg.onOff t.visible
                         | _ ->
                             Sg.ofList []
             }

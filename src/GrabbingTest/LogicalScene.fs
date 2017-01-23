@@ -175,7 +175,7 @@ module LogicalScene =
                 let newGameInfo = scene.gameInfo
                 let newObjects = scene.objects
 
-                let timePerRound = 60.0 
+                let timePerRound = 30.0 
                 let remainingTime = timePerRound - newGameInfo.timeSinceStart
                 let (newObjects, newGameInfo) =   
                     if remainingTime < 0.0 && newGameInfo.running then
@@ -274,8 +274,8 @@ module LogicalScene =
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithUpperHoop = ghostId = scene.specialObjectIds.upperHoopTriggerId && o.id = colliderId
                                 let hitUpperTrigger = collidingWithUpperHoop && not o.hitUpperTrigger && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab && o.linearVelocity.Y < 0.0
-                                if hitUpperTrigger then
-                                    { o with hitUpperTrigger = true } 
+                                if hitUpperTrigger && o.isManipulable then
+                                    { o with hitUpperTrigger = true }
                                 else 
                                     o
                             )
@@ -283,7 +283,7 @@ module LogicalScene =
                         |> PersistentHashSet.map (fun o -> 
                                 let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
                                 let hitLowerTrigger = collidingWithLowerHoop && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab
-                                if hitLowerTrigger then
+                                if hitLowerTrigger && o.isManipulable then
                                     { o with hitLowerTrigger = true } 
                                 else 
                                     o
@@ -293,25 +293,32 @@ module LogicalScene =
                                 let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
                                 let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
                                 if scored then
-                                    hasScored <- true
-                                    scene.sireneSoundSource.Play()
-                                    newGameInfo <-  if newGameInfo.running then 
-                                                        {newGameInfo with score = newGameInfo.score + 1}
-                                                    else
-                                                        {newGameInfo with warmupScore = newGameInfo.warmupScore + 1}
-                                    Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored")
-                                    let scoreUntilStart = 3
-                                    if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
-                                        newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; score = 0}
-                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
-                                    Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
-                                    Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
-                                    Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
-                                    Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
+                                    let isTargetBall = o.isManipulable && getBallIndex(o.id, scene) = scene.gameInfo.targetBallIndex
+                                    if isTargetBall then 
+                                        hasScored <- true
+                                        scene.sireneSoundSource.Play()
+                                        newGameInfo <-  if newGameInfo.running then 
+                                                            {newGameInfo with score = newGameInfo.score + 1}
+                                                        else
+                                                            {newGameInfo with warmupScore = newGameInfo.warmupScore + 1}
+                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored")
+                                        let scoreUntilStart = 3
+                                        if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
+                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; score = 0}
+                                            Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
+                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
+                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
+                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
+                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     
-                                    { o with 
-                                        hasScored = true
-                                    } 
+                                        { o with 
+                                            hasScored = true
+                                        } 
+                                    else
+                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Wrong ball scored!")
+                                        { o with 
+                                            hasScored = true
+                                        } 
                                 else 
                                     o
                             )
@@ -392,9 +399,33 @@ module LogicalScene =
                     else
                         newObjects
 
+                // new target ball
+                let newTargetBallIndex = 
+                    if hasScored then
+                        seededRandomNumberGen.Next(scene.specialObjectIds.ballObjectIds.Length - 1)
+                    else
+                        scene.gameInfo.targetBallIndex
+
+                // update visibility of target balls
+                let newObjects =
+                    if hasScored then
+                        newObjects
+                            |> PersistentHashSet.map (fun o -> 
+                                                            let isStaticBall = array.Exists (scene.specialObjectIds.staticBallObjectIds, (fun id -> o.id = id ))
+                                                            let isTargetBall = o.id = scene.specialObjectIds.staticBallObjectIds.[newTargetBallIndex]
+                                                            if isStaticBall then
+                                                                { o with visible = isTargetBall }
+                                                            else
+                                                                o
+                                                        )
+
+                    else
+                        newObjects
+
+
                 { scene with 
                     objects = newObjects
-                    gameInfo = newGameInfo
+                    gameInfo = { newGameInfo with targetBallIndex = newTargetBallIndex }
                     interactionInfo1 = { scene.interactionInfo1 with vibrationStrength = newCtr1VibStrength }
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = newCtr2VibStrength }
                 }

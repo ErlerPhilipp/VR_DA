@@ -38,6 +38,7 @@ module LogicalSceneTypes =
         {
             id                : int
             
+            visible           : bool
             castsShadow       : bool
             objectType        : ObjectTypes
             isColliding       : bool
@@ -71,7 +72,8 @@ module LogicalSceneTypes =
     let defaultObject = 
         {
             id = newId()
-
+            
+            visible             = true
             castsShadow         = true
             objectType          = ObjectTypes.Static
             isColliding         = true
@@ -116,6 +118,7 @@ module LogicalSceneTypes =
             lightId             : int
             hoopObjectId        : int
             ballObjectIds       : array<int>
+            staticBallObjectIds : array<int>
         }
 
     type InteractionInfo =
@@ -136,7 +139,7 @@ module LogicalSceneTypes =
 
     type GameInfo = 
         {
-            targetBallIndex     : option<int>
+            targetBallIndex     : int
             score               : int
             warmupScore         : int
             timeSinceStart      : float
@@ -148,7 +151,7 @@ module LogicalSceneTypes =
 
     let DefaultGameInfo = 
         {
-            targetBallIndex     = None
+            targetBallIndex     = 0
             score               = 0
             warmupScore         = 0
             timeSinceStart      = 0.0
@@ -195,6 +198,7 @@ module LogicalSceneTypes =
             popSoundSource      : Audio.Sound
 
             ballSgs             : array<ISg>
+            targetBallTrafo     : Trafo3d
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
@@ -337,11 +341,12 @@ module GraphicsSceneTypes =
     type GraphicsObject =
         {
             mutable original    : Object
-            mtrafo              : ModRef<Trafo3d>
-            mmodel              : ModRef<Option<ISg>>
-            mhasHighlight       : ModRef<bool>
-            mscoredState        : ModRef<int>
-            mtilingFactor       : ModRef<V2d>
+            trafo               : ModRef<Trafo3d>
+            model               : ModRef<Option<ISg>>
+            hasHighlight        : ModRef<bool>
+            scoredState         : ModRef<int>
+            tilingFactor        : ModRef<V2d>
+            visible             : ModRef<bool>
         }
 
     type GraphicsScene =
@@ -353,5 +358,6 @@ module GraphicsSceneTypes =
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>
+            ballSgIsTarget      : array<ModRef<bool>>
         }
             

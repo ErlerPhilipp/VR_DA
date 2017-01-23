@@ -43,7 +43,6 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
-    
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9
     let trackingAreaHeight = 5.2
@@ -57,6 +56,32 @@ let main argv =
                         Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
     let lowerHoopTriggerTrafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
     let upperHoopTriggerTrafo = lowerHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
+    let targetBallTrafo = upperHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.3, 0.0)
+    
+    let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
+    let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
+    
+    let pedestalHeight = 0.8
+    let pedestalRadius = 0.005
+    let pedestalHorizontalOffset = trackingAreaSize / 2.0 - 0.3
+    let pedestalVerticalOffset = pedestalHeight / 2.0
+    let pedestal1Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
+    let pedestal2Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
+    let pedestal3Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
+    let pedestal4Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
+        
+    let cushionHeight = pedestalRadius * 0.75
+    let cushionSize = pedestalRadius * 1.5
+    let cushion1Position = V3d(pedestal1Position.X, pedestal1Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal1Position.Z)
+    let cushion2Position = V3d(pedestal2Position.X, pedestal2Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal2Position.Z)
+    let cushion3Position = V3d(pedestal3Position.X, pedestal3Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal3Position.Z)
+    let cushion4Position = V3d(pedestal4Position.X, pedestal4Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal4Position.Z)
+        
+    let ballRadius = 0.1213
+    let ball1ResetPos = V3d(cushion1Position.X, cushion1Position.Y + ballRadius, cushion1Position.Z)
+    let ball2ResetPos = V3d(cushion2Position.X, cushion2Position.Y + ballRadius, cushion2Position.Z)
+    let ball3ResetPos = V3d(cushion3Position.X, cushion3Position.Y + ballRadius, cushion3Position.Z)
+    let ball4ResetPos = V3d(cushion4Position.X, cushion4Position.Y + ballRadius, cushion4Position.Z)
     //#endregion
         
     //#region Audio   
@@ -219,7 +244,6 @@ let main argv =
             
     let beamSg = Sg.lines (Mod.constant C4b.Red) (Mod.constant ( [| Line3d(V3d.OOO, -V3d.OOI * 100.0) |]) ) 
                     |> Sg.effect beamEffect
-    let ballRadius = 0.1213
     let basketballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> basketballDiffuseTexture
     let beachballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> beachballDiffuseTexture
     let softballSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant ballRadius) |> softballDiffuseTexture
@@ -235,13 +259,10 @@ let main argv =
                             |> ceilingDiffuseTexture |> ceilingNormalMap
     let wallSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(trackingAreaSize, trackingAreaHeight, wallThickness))))
                             |> wallDiffuseTexture |> wallNormalMap
-    let pedestalHeight = 0.8
-    let pedestalRadius = 0.005
+
 //    let pedestalSg = Sg.cylinder 4 (Mod.constant C4b.Gray) (Mod.constant pedestalRadius) (Mod.constant pedestalHeight)
     let pedestalSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(pedestalRadius, pedestalHeight, pedestalRadius))))
                             |> pedestalDiffuseTexture |> pedestalNormalMap
-    let cushionHeight = pedestalRadius * 0.75
-    let cushionSize = pedestalRadius * 1.5
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
 
@@ -345,8 +366,7 @@ let main argv =
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.25 * trackingAreaSize)
         }
-    let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
-    let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
+
     let wall1 = 
         { wallBase with 
             id = newId()
@@ -372,12 +392,6 @@ let main argv =
             collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
         }
     
-    let pedestalHorizontalOffset = trackingAreaSize / 2.0 - 0.3
-    let pedestalVerticalOffset = pedestalHeight / 2.0
-    let pedestal1Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
-    let pedestal2Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
-    let pedestal3Position = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
-    let pedestal4Position = V3d(-pedestalHorizontalOffset, pedestalVerticalOffset, -pedestalHorizontalOffset)
     let pedestalBase = 
         { defaultObject with
             model = Some pedestalSg
@@ -395,11 +409,7 @@ let main argv =
     let pedestal2 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal2Position)}
     let pedestal3 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal3Position)}
     let pedestal4 = { pedestalBase with id = newId(); trafo = Trafo3d.Translation(pedestal4Position)}
-        
-    let cushion1Position = V3d(pedestal1Position.X, pedestal1Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal1Position.Z)
-    let cushion2Position = V3d(pedestal2Position.X, pedestal2Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal2Position.Z)
-    let cushion3Position = V3d(pedestal3Position.X, pedestal3Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal3Position.Z)
-    let cushion4Position = V3d(pedestal4Position.X, pedestal4Position.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestal4Position.Z)
+
     let cushionBase =
         { defaultObject with
             model = Some cushionSg
@@ -416,11 +426,7 @@ let main argv =
     let cushion2 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion2Position)}
     let cushion3 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion3Position)}
     let cushion4 = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushion4Position)}
-        
-    let ball1ResetPos = V3d(cushion1Position.X, cushion1Position.Y + ballRadius, cushion1Position.Z)
-    let ball2ResetPos = V3d(cushion2Position.X, cushion2Position.Y + ballRadius, cushion2Position.Z)
-    let ball3ResetPos = V3d(cushion3Position.X, cushion3Position.Y + ballRadius, cushion3Position.Z)
-    let ball4ResetPos = V3d(cushion4Position.X, cushion4Position.Y + ballRadius, cushion4Position.Z)
+
     let ballBase = 
         { defaultCollider with
             objectType = ObjectTypes.Dynamic
@@ -438,6 +444,23 @@ let main argv =
     let ball2 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball2ResetPos); model = Some beachballSg}
     let ball3 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball3ResetPos); model = Some softballSg}
     let ball4 = { ballBase with id = newId(); trafo = Trafo3d.Translation(ball4ResetPos); model = Some tennisballSg}
+    let ballObjects = [ball1; ball2; ball3; ball4]
+    
+    let staticBallBase = 
+        { defaultCollider with
+            objectType = ObjectTypes.Static
+            surface = Some ballSurface
+            mass = 0.625f
+            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
+            collisionGroup = CollisionGroups.Static |> int16
+            collisionMask = staticCollidesWith
+        }
+    let staticBall1 = { staticBallBase with id = newId(); trafo = targetBallTrafo; model = Some basketballSg}
+    let staticBall2 = { staticBallBase with id = newId(); trafo = targetBallTrafo; model = Some beachballSg; visible = false}
+    let staticBall3 = { staticBallBase with id = newId(); trafo = targetBallTrafo; model = Some softballSg; visible = false}
+    let staticBall4 = { staticBallBase with id = newId(); trafo = targetBallTrafo; model = Some tennisballSg; visible = false}
+    let staticBallObjects = [staticBall1; staticBall2; staticBall3; staticBall4]
+
     let box = 
         { defaultCollider with
             id = newId()
@@ -491,7 +514,6 @@ let main argv =
             collisionMask = hoopTriggerCollidesWith
         }
 
-    let ballObjects = [ball1; ball2; ball3; ball4]
 
     let toObjects (canMove : bool) (l : list<_>) =
         l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
@@ -529,7 +551,7 @@ let main argv =
     let hoop = staticObjects.[0]
 
     let objects =
-        ballObjects
+        ballObjects @ staticBallObjects
         @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall2; wall3; wall4]
         @ [pedestal1; pedestal2; pedestal3; pedestal4; cushion1; cushion2; cushion3; cushion4; hoop]
@@ -550,6 +572,7 @@ let main argv =
             grabTrigger2Id      = grabTrigger2.id
             hoopObjectId        = hoop.id
             ballObjectIds       = [| ball1.id; ball2.id; ball3.id; ball4.id |]
+            staticBallObjectIds = [| staticBall1.id; staticBall2.id; staticBall3.id; staticBall4.id |]
         }
         
     let sceneObj =
@@ -564,6 +587,7 @@ let main argv =
             popSoundSource      = popSound
 
             ballSgs             = [| basketballSg; beachballSg; softballSg; tennisballSg |]
+            targetBallTrafo     = targetBallTrafo
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

@@ -28,15 +28,17 @@ module GraphicsScene =
         static member Create(o : Object) =
             {
                 original = o
-                mtrafo = Mod.init o.trafo
-                mmodel = Mod.init o.model
-                mhasHighlight = Mod.init (o.isGrabbable <> GrabbableOptions.NoGrab)
-                mscoredState = Mod.init (getScoredState(o))
-                mtilingFactor = Mod.init o.tilingFactor
+                trafo = Mod.init o.trafo
+                model = Mod.init o.model
+                hasHighlight = Mod.init (o.isGrabbable <> GrabbableOptions.NoGrab)
+                scoredState = Mod.init (getScoredState(o))
+                tilingFactor = Mod.init o.tilingFactor
+                visible = Mod.init o.visible
             }
 
         static member Create(s : Scene) =
             let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
+            let ballSgIsTarget = [| for i in 0 .. s.specialObjectIds.ballObjectIds.Length-1 -> Mod.init (i = s.gameInfo.targetBallIndex) |]
             {
                 original           = s
                 graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
@@ -45,15 +47,17 @@ module GraphicsScene =
 
                 scoreTrafo         = Mod.init s.gameInfo.scoreTrafo
                 scoreText          = Mod.init s.gameInfo.scoreText
+                ballSgIsTarget     = ballSgIsTarget
             }
 
         static member Update(mo : GraphicsObject, o : Object) =
             if not (System.Object.ReferenceEquals(mo.original, o)) then
                 mo.original <- o
-                mo.mtrafo.Value <- o.trafo
-                mo.mhasHighlight.Value <- (o.isGrabbable <> GrabbableOptions.NoGrab)
-                mo.mscoredState.Value <- (getScoredState(o))
-                mo.mtilingFactor.Value <- o.tilingFactor
+                mo.trafo.Value <- o.trafo
+                mo.hasHighlight.Value <- (o.isGrabbable <> GrabbableOptions.NoGrab)
+                mo.scoredState.Value <- (getScoredState(o))
+                mo.tilingFactor.Value <- o.tilingFactor
+                mo.visible.Value <- o.visible
 
         static member Update(ms : GraphicsScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
@@ -79,6 +83,9 @@ module GraphicsScene =
                             ms.graphicsObjects.Add mo |> ignore
                 
                 ms.graphicsObjects.ExceptWith table.Values
+                
+                for i in 0 .. s.specialObjectIds.ballObjectIds.Length-1 do
+                    ms.ballSgIsTarget.[i].Value <- (i = s.gameInfo.targetBallIndex)
          
     let createScene (initialScene : Scene) (win : VrWindow) =
         let mutable scene = initialScene
