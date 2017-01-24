@@ -587,7 +587,26 @@ let main argv =
             ballObjectIds       = [| ball1.id; ball2.id; ball3.id; ball4.id |]
             staticBallObjectIds = [| staticBall1.id; staticBall2.id; staticBall3.id; staticBall4.id |]
         }
-        
+
+    let firstArgAsInt = 
+        if argv.Length > 0 then
+            let firstArg = argv.[0]
+            let mutable asInt = 0
+            let success = System.Int32.TryParse(firstArg, &asInt)
+            if success then asInt else 0
+        else 0
+
+
+    if firstArgAsInt = 0 then printfn "No argument given. Using both feedback types"
+    let argToFeedbackType(a : int) =
+        match a with
+            | 0 -> FeedbackTypes.Both
+            | 1 -> FeedbackTypes.OpticalFeedback
+            | 2 -> FeedbackTypes.HapticFeedback
+            | 3 -> FeedbackTypes.NoFeedback
+            | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
+    let feedback = argToFeedbackType(firstArgAsInt)
+
     let sceneObj =
         {
             objects             = PersistentHashSet.ofList objects
@@ -600,6 +619,7 @@ let main argv =
             popSoundSource      = popSound
             physicsMessages     = []
             lightColor          = V3d(1.0, 1.0, 0.5)
+            feedbackTypes       = feedback
 
             ballSgs             = [| basketballSg; beachballSg; softballSg; tennisballSg |]
             targetBallTrafo     = targetBallTrafo

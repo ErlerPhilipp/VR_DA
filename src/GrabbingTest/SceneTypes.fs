@@ -53,6 +53,12 @@ module LogicalSceneTypes =
         | Controller2
         | BothControllers
     
+    type FeedbackTypes = 
+        | NoFeedback
+        | OpticalFeedback
+        | HapticFeedback
+        | Both
+
     [<ReferenceEquality;NoComparison>]
     type Object =
         {
@@ -66,6 +72,7 @@ module LogicalSceneTypes =
             isGrabbable         : GrabbableOptions
             isGrabbed           : GrabbedOptions
             wasGrabbed          : GrabbedOptions
+            hasHighlight        : bool
             hitUpperTrigger     : bool
             hitLowerTrigger     : bool
             hasScored           : bool
@@ -101,6 +108,7 @@ module LogicalSceneTypes =
             isGrabbable         = GrabbableOptions.NoGrab
             isGrabbed           = GrabbedOptions.NoGrab
             wasGrabbed          = GrabbedOptions.NoGrab
+            hasHighlight        = false
             hitUpperTrigger     = false
             hitLowerTrigger     = false
             hasScored           = false
@@ -224,6 +232,7 @@ module LogicalSceneTypes =
             popSoundSource      : Audio.Sound
             physicsMessages     : list<PhysicsMessage>
             lightColor          : V3d
+            feedbackTypes       : FeedbackTypes
 
             ballSgs             : array<ISg>
             targetBallTrafo     : Trafo3d

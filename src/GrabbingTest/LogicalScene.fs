@@ -181,7 +181,7 @@ module LogicalScene =
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o -> 
-                                if o.isGrabbable <> GrabbableOptions.NoGrab then { o with isGrabbable = GrabbableOptions.NoGrab } else o
+                                { o with isGrabbable = GrabbableOptions.NoGrab; hasHighlight = false }
                             )
                 { scene with 
                     objects = newObjects
@@ -280,15 +280,16 @@ module LogicalScene =
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
 
-                // hit object
-                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
-                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
+                if scene.feedbackTypes = FeedbackTypes.HapticFeedback || scene.feedbackTypes = FeedbackTypes.Both then
+                    // hit object
+                    if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
+                        Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
+                    if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
+                        Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
                 
-                // overlap
-                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
-                Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.interactionInfo2.vibrationStrength)
+                    // overlap
+                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
+                    Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.interactionInfo2.vibrationStrength)
                 
                 Vibration.updateVibration(uint32 assignedInputs.controller1Id, scene.physicsInfo.deltaTime)
                 Vibration.updateVibration(uint32 assignedInputs.controller2Id, scene.physicsInfo.deltaTime)
@@ -393,7 +394,6 @@ module LogicalScene =
                                     else
                                         if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
 
-//                                    o
                                     // check grabbable with
                                     if colliderObject.isManipulable then
                                         let newGrabbableState = 
@@ -403,6 +403,8 @@ module LogicalScene =
                                                 | GrabbableOptions.Controller2 -> if firstController then GrabbableOptions.BothControllers else GrabbableOptions.Controller2
                                                 | GrabbableOptions.BothControllers -> GrabbableOptions.BothControllers
                                                 
+                                        let setHighlight = scene.feedbackTypes = FeedbackTypes.OpticalFeedback || scene.feedbackTypes = FeedbackTypes.Both
+                                        let newHasHighlight = setHighlight && newGrabbableState <> GrabbableOptions.NoGrab
 //                                        let grabNow = interactionInfo.triggerPressed && o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
 //                                                       ((newGrabbableState = GrabbableOptions.Controller1 && firstController) || 
 //                                                        (newGrabbableState = GrabbableOptions.Controller2 && not firstController) || 
@@ -420,6 +422,7 @@ module LogicalScene =
 //                                        else
                                         { o with 
                                             isGrabbable = newGrabbableState 
+                                            hasHighlight = newHasHighlight
                                         }
                                     else o
                                 else  o

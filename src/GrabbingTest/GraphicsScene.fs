@@ -30,7 +30,7 @@ module GraphicsScene =
                 original = o
                 trafo = Mod.init o.trafo
                 model = Mod.init o.model
-                hasHighlight = Mod.init (o.isGrabbable <> GrabbableOptions.NoGrab)
+                hasHighlight = Mod.init (o.hasHighlight)
                 scoredState = Mod.init (getScoredState(o))
                 tilingFactor = Mod.init o.tilingFactor
                 visible = Mod.init o.visible
@@ -55,7 +55,7 @@ module GraphicsScene =
             if not (System.Object.ReferenceEquals(mo.original, o)) then
                 mo.original <- o
                 mo.trafo.Value <- o.trafo
-                mo.hasHighlight.Value <- (o.isGrabbable <> GrabbableOptions.NoGrab)
+                mo.hasHighlight.Value <- (o.hasHighlight)
                 mo.scoredState.Value <- (getScoredState(o))
                 mo.tilingFactor.Value <- o.tilingFactor
                 mo.visible.Value <- o.visible
