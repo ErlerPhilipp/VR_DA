@@ -231,6 +231,7 @@ module LogicalSceneTypes =
             viewTrafo           : Trafo3d
             trackingToWorld     : Trafo3d
             ballResetPos        : V3d
+            lightColor          : V3d
             
             bounceSoundSources  : list<Audio.Sound>
             sireneSoundSource   : Audio.Sound
@@ -408,6 +409,7 @@ module GraphicsSceneTypes =
             graphicsObjects     : cset<GraphicsObject>
             viewTrafo           : ModRef<Trafo3d>
             lightPos            : ModRef<V3d>
+            lightColor          : ModRef<V3d>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

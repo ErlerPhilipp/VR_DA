@@ -42,6 +42,7 @@ module GraphicsScene =
                 graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 viewTrafo          = Mod.init s.viewTrafo
                 lightPos           = Mod.init lightPos
+                lightColor         = Mod.init s.lightColor
 
                 scoreTrafo         = Mod.init s.gameInfo.scoreTrafo
                 scoreText          = Mod.init s.gameInfo.scoreText
@@ -81,7 +82,7 @@ module GraphicsScene =
                 ms.original <- s
                 ms.viewTrafo.Value <- s.viewTrafo
                 ms.lightPos.Value <- lightPos
-
+                ms.lightColor.Value <- s.lightColor
                 
                 ms.scoreTrafo.Value <- s.gameInfo.scoreTrafo
                 ms.scoreText.Value <- s.gameInfo.scoreText

@@ -22,6 +22,7 @@ module OmnidirShadowShader =
         member x.AmbientFactor : float = x?AmbientFactor
         member x.LinearAttenuation : float = x?LinearAttenuation
         member x.LightPos : V3d = uniform?LightPos
+        member x.LightColor : V3d = uniform?LightColor
         member x.ShadowMapSize : float = uniform?ShadowMapSize
         
     let shadowSamplerPosX =
@@ -213,8 +214,9 @@ module OmnidirShadowShader =
 //                numSamples <- 20.0
 
             let shadowFactor = shadowSampleSum / numSamples
-
-            return V4d(v.c.XYZ * (ambientPart + (diffusePart + specularPart) * shadowFactor), v.c.W)
+            
+            let lightColor = uniform.LightColor
+            return V4d(v.c.XYZ * lightColor * (ambientPart + (diffusePart + specularPart) * shadowFactor), v.c.W)
         }
 
     let Effect (twoSided : bool)= 
@@ -357,3 +359,16 @@ module SphereTexture =
 
             return { v with tc = V2d(s,t) }
         }
+
+module LightRepresentation =
+    type UniformScope with
+        member x.LightColor : V3d = uniform?LightColor
+
+    let lightRepresentation (v : Vertex) =
+        fragment {
+            return V4d(uniform.LightColor, 1.0)
+        }
+    
+    let Effect = 
+        toEffect lightRepresentation
+        

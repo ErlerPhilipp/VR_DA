@@ -643,6 +643,7 @@ let main argv =
             viewTrafo           = Trafo3d.Identity
             trackingToWorld     = Trafo3d.Identity
             ballResetPos        = ballResetPos
+            lightColor          = V3d.III
 
             bounceSoundSources  = bounceSound
             sireneSoundSource   = sireneSound

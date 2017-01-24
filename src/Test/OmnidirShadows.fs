@@ -127,6 +127,7 @@ module OmnidirShadows =
                 |> Sg.uniform "LinearAttenuation" (Mod.constant 0.05)
                 |> Sg.uniform "ShadowMapSize" (Mod.constant shadowMapEdgeSize)
                 |> Sg.uniform "LightPos" graphicsScene.lightPos
+                |> Sg.uniform "LightColor" graphicsScene.lightColor
                 |> Sg.uniform "LightSpaceViewProjTrafoPosX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosX |> int]))
                 |> Sg.uniform "LightSpaceViewProjTrafoNegX" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FaceNegX |> int]))
                 |> Sg.uniform "LightSpaceViewProjTrafoPosY" (lightViewProjTrafo(CubeFaceMatrices.[CubeFaces.FacePosY |> int]))

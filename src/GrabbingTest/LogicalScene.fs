@@ -50,6 +50,17 @@ module LogicalScene =
                     resetBallObject(ballIndex, scene, o)
                 )
 
+    let getLightColor(gameInfo : GameInfo) =
+        let blinkDuration = 0.5
+        if gameInfo.running then
+            if gameInfo.timeSinceRoundStart < blinkDuration then
+                V3d(0.5, 1.0, 0.5)
+            else
+                V3d.III
+        else
+            V3d(1.0, 1.0, 0.5)
+            
+
     let update (scene : Scene) (message : Message) : Scene =
 
         match message with
@@ -218,9 +229,11 @@ module LogicalScene =
                                 (newObjects, {newGameInfo with numRounds = newRound})
                         
                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
-                        (newObjects, { newGameInfo with timeSinceStart = 0.0 })
+                        (newObjects, { newGameInfo with timeSinceStart = 0.0; timeSinceRoundStart = 0.0 })
                     else
-                        (newObjects, { newGameInfo with timeSinceStart = newGameInfo.timeSinceStart + dt })
+                        let newTimeSinceStart = newGameInfo.timeSinceStart + dt
+                        let newTimeSinceRoundStart = newGameInfo.timeSinceRoundStart + dt
+                        (newObjects, { newGameInfo with timeSinceStart = newTimeSinceStart; timeSinceRoundStart = newTimeSinceRoundStart })
                             
                 let culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
                 let newText =   if not newGameInfo.running then 
@@ -237,9 +250,11 @@ module LogicalScene =
                                     "Time:    " + remainingTimeString
                                     
                 let newGameInfo = {newGameInfo with scoreText = newText}
-
+                
+                let newLightColor = getLightColor(newGameInfo)
                 { scene with
                     objects = newObjects
+                    lightColor = newLightColor
                     gameInfo = newGameInfo
                     physicsInfo = { scene.physicsInfo with deltaTime = dt }
                 }
@@ -317,10 +332,10 @@ module LogicalScene =
                                                             {newGameInfo with score = newGameInfo.score + 1}
                                                         else
                                                             {newGameInfo with warmupScore = newGameInfo.warmupScore + 1}
-                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored")
+                                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored " + newGameInfo.score.ToString())
                                         let scoreUntilStart = 3
                                         if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
-                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; score = 0}
+                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0}
                                             Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
@@ -419,7 +434,10 @@ module LogicalScene =
                 // new target ball
                 let newTargetBallIndex = 
                     if hasScored then
-                        seededRandomNumberGen.Next(scene.specialObjectIds.ballObjectIds.Length)
+                        // prevent same target ball
+                        let possibleTargetIndieces = [ for i in 0..scene.specialObjectIds.ballObjectIds.Length-1 -> i ]
+                        let possibleTargetIndieces = List.filter (fun i -> i <> scene.gameInfo.targetBallIndex) possibleTargetIndieces
+                        possibleTargetIndieces.[seededRandomNumberGen.Next(possibleTargetIndieces.Length)]
                     else
                         scene.gameInfo.targetBallIndex
 

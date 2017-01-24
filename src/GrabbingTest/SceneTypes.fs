@@ -163,6 +163,7 @@ module LogicalSceneTypes =
             score               : int
             warmupScore         : int
             timeSinceStart      : float
+            timeSinceRoundStart : float
             scoreTrafo          : Trafo3d
             scoreText           : string
             running             : bool
@@ -175,6 +176,7 @@ module LogicalSceneTypes =
             score               = 0
             warmupScore         = 0
             timeSinceStart      = 0.0
+            timeSinceRoundStart = 0.0
             scoreTrafo          = Trafo3d()
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
@@ -217,6 +219,7 @@ module LogicalSceneTypes =
             sireneSoundSource   : Audio.Sound
             popSoundSource      : Audio.Sound
             physicsMessages     : list<PhysicsMessage>
+            lightColor          : V3d
 
             ballSgs             : array<ISg>
             targetBallTrafo     : Trafo3d
@@ -362,6 +365,7 @@ module GraphicsSceneTypes =
             graphicsObjects     : cset<GraphicsObject>
             viewTrafo           : ModRef<Trafo3d>
             lightPos            : ModRef<V3d>
+            lightColor          : ModRef<V3d>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

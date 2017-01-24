@@ -24,6 +24,7 @@ open NormalMap
 open TextureTiling
 open Lighting
 open Highlight
+open LightRepresentation
 open Audio
 
 type CollisionGroups =
@@ -50,7 +51,7 @@ let main argv =
     let wallThickness = 1.0
 
     let hoopScale = 2.0
-    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * Trafo3d.Translation(trackingAreaSize * 0.48, -2.0, 0.0)
+    let hoopTrafoWithoutScale = Trafo3d.RotationYInDegrees(90.0) * Trafo3d.Translation(trackingAreaSize * 0.48, -1.8, 0.0)
     let hoopTrafo = Trafo3d.Scale hoopScale * hoopTrafoWithoutScale
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
@@ -62,7 +63,7 @@ let main argv =
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
     let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
     
-    let pedestalHeight = 0.8
+    let pedestalHeight = 1.0
     let pedestalRadius = 0.005
     let pedestalHorizontalOffset = trackingAreaSize / 2.0 - 0.3
     let pedestalVerticalOffset = pedestalHeight / 2.0
@@ -130,7 +131,7 @@ let main argv =
 
     let constColorEffect =      [
                                     defaultTrafoEffect
-                                    DefaultSurfaces.constantColor C4f.White |> toEffect
+                                    LightRepresentation.Effect
                                     defaultSimpleLightingEffect
                                 ]
     let constColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constColorEffect) :> ISurface
@@ -598,6 +599,7 @@ let main argv =
             sireneSoundSource   = sireneSound
             popSoundSource      = popSound
             physicsMessages     = []
+            lightColor          = V3d(1.0, 1.0, 0.5)
 
             ballSgs             = [| basketballSg; beachballSg; softballSg; tennisballSg |]
             targetBallTrafo     = targetBallTrafo
