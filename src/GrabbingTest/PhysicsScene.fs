@@ -30,19 +30,19 @@ module PhysicsScene =
         let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
         let handVelocity = toVector3(vel)
 
-//      collisionObject.LinearVelocity <- handVelocity
-        collisionObject.LinearVelocity <- Vector3()
-        let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
-        let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
-        let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
-        let relativePos = (colliderPos - controllerPos) |> toVector3
-        collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
+        collisionObject.LinearVelocity <- handVelocity
+//        collisionObject.LinearVelocity <- Vector3()
+//        let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
+//        let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
+//        let colliderPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(o.id, s.objects).Forward.TransformPos(V3d())
+//        let relativePos = (colliderPos - controllerPos) |> toVector3
+//        collisionObject.ApplyImpulse(Vector3.Multiply(handVelocity, o.mass), relativePos)
 
         let angVel = controllerDevice.AngularVelocity
         let handAngVelocity = toVector3(angVel)
-//      collisionObject.AngularVelocity <- handAngVelocity
-        collisionObject.AngularVelocity <- Vector3()
-        collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
+        collisionObject.AngularVelocity <- handAngVelocity
+//        collisionObject.AngularVelocity <- Vector3()
+//        collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
                             
         // reset to normal state
         collisionObject.Activate()

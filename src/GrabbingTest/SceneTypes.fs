@@ -73,8 +73,6 @@ module LogicalSceneTypes =
             isGrabbed           : GrabbedOptions
             wasGrabbed          : GrabbedOptions
             hasHighlight        : bool
-            hitUpperTrigger     : bool
-            hitLowerTrigger     : bool
             hasScored           : bool
             collisionCallback   : bool
                                 
@@ -109,8 +107,6 @@ module LogicalSceneTypes =
             isGrabbed           = GrabbedOptions.NoGrab
             wasGrabbed          = GrabbedOptions.NoGrab
             hasHighlight        = false
-            hitUpperTrigger     = false
-            hitLowerTrigger     = false
             hasScored           = false
             collisionCallback   = false
 
@@ -141,8 +137,7 @@ module LogicalSceneTypes =
             grabTrigger1Id      : int
             grabTrigger2Id      : int
             headId              : int
-            lowerHoopTriggerId  : int
-            upperHoopTriggerId  : int
+            hoopTriggerId       : int
             lightId             : int
             hoopObjectId        : int
             ballObjectIds       : array<int>

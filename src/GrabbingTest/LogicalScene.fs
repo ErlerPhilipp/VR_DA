@@ -34,8 +34,6 @@ module LogicalScene =
                 scene.popSoundSource.Play()
                 { ballObject with 
                     hasScored = false
-                    hitLowerTrigger = false
-                    hitUpperTrigger = false
                     isGrabbed = GrabbedOptions.NoGrab
                     trafo = Trafo3d.Translation(scene.ballResetPos.[ballIndex])
                     linearVelocity = V3d()
@@ -142,8 +140,6 @@ module LogicalScene =
                                     newGrabs <- newGrabs + 1
                                     { o with 
                                         isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
-                                        hitLowerTrigger = false
-                                        hitUpperTrigger = false
                                         hasScored = false
                                     } 
                                 else o
@@ -307,30 +303,12 @@ module LogicalScene =
                 let mutable newCtr2VibStrength = scene.interactionInfo2.vibrationStrength
                 let newObjects = 
                     scene.objects 
-                        // hit upper hoop trigger
-                        |> PersistentHashSet.map (fun o -> 
-                                let collidingWithUpperHoop = ghostId = scene.specialObjectIds.upperHoopTriggerId && o.id = colliderId
-                                let hitUpperTrigger = collidingWithUpperHoop && not o.hitUpperTrigger && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab && o.linearVelocity.Y < 0.0
-                                if hitUpperTrigger && o.isManipulable then
-                                    { o with hitUpperTrigger = true }
-                                else 
-                                    o
-                            )
-                        // hit lower hoop trigger
-                        |> PersistentHashSet.map (fun o -> 
-                                let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
-                                let hitLowerTrigger = collidingWithLowerHoop && not o.hitLowerTrigger && o.isGrabbed = GrabbedOptions.NoGrab
-                                if hitLowerTrigger && o.isManipulable then
-                                    { o with hitLowerTrigger = true } 
-                                else 
-                                    o
-                            )
                         // check score
                         |> PersistentHashSet.map (fun o -> 
-                                let collidingWithLowerHoop = ghostId = scene.specialObjectIds.lowerHoopTriggerId && o.id = colliderId
-                                let scored = collidingWithLowerHoop && o.hitLowerTrigger && o.hitUpperTrigger && not o.hasScored && o.linearVelocity.Y < 0.0
+                                let collidingWithHoop = ghostId = scene.specialObjectIds.hoopTriggerId && o.isManipulable && o.id = colliderId
+                                let scored = collidingWithHoop && not o.hasScored && o.isGrabbed = GrabbedOptions.NoGrab
                                 if scored then
-                                    let isTargetBall = o.isManipulable && getBallIndex(o.id, scene) = scene.gameInfo.targetBallIndex
+                                    let isTargetBall = getBallIndex(o.id, scene) = scene.gameInfo.targetBallIndex
                                     if isTargetBall then 
                                         hasScored <- true
                                         scene.sireneSoundSource.Play()

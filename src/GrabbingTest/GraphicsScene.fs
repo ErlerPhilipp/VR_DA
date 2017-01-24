@@ -17,12 +17,12 @@ module GraphicsScene =
     open VrInteractions
     open VrWindow
 
-    let getScoredState (o : Object) =
-        if o.hasScored then 3
-//        elif o.willReset then 1
-        //elif o.hitLowerTrigger then 2
-        //elif o.hitUpperTrigger then 1
-        else 0
+    let getScoredState (o : Object) = 0
+//        if o.hasScored then 3
+////        elif o.willReset then 1
+//        //elif o.hitLowerTrigger then 2
+//        //elif o.hitUpperTrigger then 1
+//        else 0
 
     type Conversion private() =
         static member Create(o : Object) =

@@ -56,9 +56,8 @@ let main argv =
     let scoreScale = 0.1
     let scoreTrafo = Trafo3d.Scale(scoreScale * hoopScale) * Trafo3d.RotationYInDegrees(180.0) * hoopTrafoWithoutScale * 
                         Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
-    let lowerHoopTriggerTrafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
-    let upperHoopTriggerTrafo = lowerHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
-    let targetBallTrafo = upperHoopTriggerTrafo * Trafo3d.Translation(0.35, -0.055, 0.0)
+    let hoopTriggerTrafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.44 * hoopScale, 0.0)
+    let targetBallTrafo = hoopTriggerTrafo * Trafo3d.Translation(0.35, 0.0, 0.0)
     
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
     let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
@@ -94,7 +93,7 @@ let main argv =
     let sireneSound = Audio.Sound.sourceFromBuffer(sireneBuffer)
     sireneSound.Volume <- 2.5
     sireneSound.RolloffFactor <- 0.25
-    sireneSound.Location <- upperHoopTriggerTrafo.Forward.TransformPos(V3d())
+    sireneSound.Location <- hoopTriggerTrafo.Forward.TransformPos(V3d())
 
     let popBuffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\222373__qubodup__balloon-pop.wav")
     let popSound = Audio.Sound.sourceFromBuffer(popBuffer)
@@ -502,29 +501,17 @@ let main argv =
             collisionGroup = CollisionGroups.Avatar |> int16
             collisionMask = avatarCollidesWith
         }
-    let lowerHoopTrigger = 
+    let hoopTrigger = 
         { defaultObject with
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
-            trafo = lowerHoopTriggerTrafo
+            trafo = hoopTriggerTrafo
             collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale) |> toCollisionShape)
             isColliding = false
             collisionGroup = CollisionGroups.HoopTrigger |> int16
             collisionMask = hoopTriggerCollidesWith
         }
-    let upperHoopTrigger = 
-        { lowerHoopTrigger with
-            id = newId()
-            castsShadow = false
-            objectType = ObjectTypes.Ghost
-            trafo = upperHoopTriggerTrafo
-            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale) |> toCollisionShape)
-            isColliding = false
-            collisionGroup = CollisionGroups.HoopTrigger |> int16
-            collisionMask = hoopTriggerCollidesWith
-        }
-
 
     let toObjects (canMove : bool) (l : list<_>) =
         l |> List.mapi (fun i (file, (trafo : Trafo3d), mass, shape, restitution) ->
@@ -563,7 +550,7 @@ let main argv =
 
     let objects =
         ballObjects @ staticBallObjects
-        @ [lowerHoopTrigger; upperHoopTrigger; lightObject]
+        @ [hoopTrigger; lightObject]
         @ [groundObject; ceilingObject; wall1; wall2; wall3; wall4]
         @ [pedestal1; pedestal2; pedestal3; pedestal4; cushion1; cushion2; cushion3; cushion4; hoop]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
@@ -579,8 +566,7 @@ let main argv =
             controller2ObjectId = controller2Object.id
             headId              = headCollider.id
             lightId             = lightObject.id
-            lowerHoopTriggerId  = lowerHoopTrigger.id
-            upperHoopTriggerId  = upperHoopTrigger.id
+            hoopTriggerId       = hoopTrigger.id
             grabTrigger1Id      = grabTrigger1.id
             grabTrigger2Id      = grabTrigger2.id
             hoopObjectId        = hoop.id
