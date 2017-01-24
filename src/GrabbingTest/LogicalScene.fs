@@ -104,7 +104,7 @@ module LogicalScene =
                 let newObjects = updateGrabbedObjects(t, newObjects)
                 let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with objects = newObjects}
+                { newScene with objects = newObjects }
                  
             // press trigger
             | DeviceTouch(deviceId, a, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -117,6 +117,7 @@ module LogicalScene =
                                 else
                                     scene
 
+                let mutable newPhysicsMessages = scene.physicsMessages
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o ->
@@ -124,6 +125,7 @@ module LogicalScene =
                                    ((o.isGrabbable = GrabbableOptions.Controller1 && firstController) || 
                                     (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
                                     o.isGrabbable = GrabbableOptions.BothControllers) then 
+                                    newPhysicsMessages <- newPhysicsMessages @ [PhysicsMessage.Grab (o.id, firstController)]
                                     { o with 
                                         isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
                                         hitLowerTrigger = false
@@ -132,30 +134,34 @@ module LogicalScene =
                                     } 
                                 else o
                             ) 
-                { scene with objects = newObjects }
+                { scene with objects = newObjects; physicsMessages = newPhysicsMessages }
                     
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
+                let mutable newPhysicsMessages = scene.physicsMessages
                 let newObjects = 
                     scene.objects 
-                        |> PersistentHashSet.map (fun a ->
-                                if a.isManipulable then
-                                    let newGrabbedState = match a.isGrabbed with
+                        |> PersistentHashSet.map (fun o ->
+                                if o.isManipulable then
+                                    let newGrabbedState = match o.isGrabbed with
                                                             | GrabbedOptions.NoGrab -> GrabbedOptions.NoGrab
                                                             | GrabbedOptions.Controller1 when firstController -> GrabbedOptions.NoGrab
                                                             | GrabbedOptions.Controller1 when not firstController -> GrabbedOptions.Controller1
                                                             | GrabbedOptions.Controller2 when firstController -> GrabbedOptions.Controller2
                                                             | GrabbedOptions.Controller2 when not firstController -> GrabbedOptions.NoGrab
-                                                            | _ -> GrabbedOptions.NoGrab // should never happen
-                                    if a.isGrabbed = newGrabbedState then a else { a with isGrabbed = newGrabbedState }
-                                else a
+                                                            | _ -> failwith "should never happen"
+                                    if o.isGrabbed = newGrabbedState then o
+                                    else 
+                                        newPhysicsMessages <- newPhysicsMessages @ [PhysicsMessage.Release (o.id, firstController)]
+                                        { o with isGrabbed = newGrabbedState }
+                                else o
                             ) 
                 let newInteractionInfo = {interactionInfo with lastContrTrafo = Trafo3d.Identity; triggerPressed = false }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with objects = newObjects}
+                { newScene with objects = newObjects; physicsMessages = newPhysicsMessages }
 
             | StartFrame ->
                 let newObjects = 
@@ -169,6 +175,9 @@ module LogicalScene =
                     interactionInfo2 = { scene.interactionInfo2 with vibrationStrength = 0.0 }
                 }
 
+            | AfterPhysics ->
+                { scene with physicsMessages = []}
+                
             | TimeElapsed(dt) ->
                 let dt = dt.TotalSeconds
 
@@ -182,19 +191,30 @@ module LogicalScene =
                         Logging.log (newGameInfo.timeSinceStart.ToString() + ": Time's up!")
                                         
                         let newRound = newGameInfo.numRounds + 1
-                        let lastRound = 5
-
+                        let lastRound = scene.grabbingVolShape.Length
+                        let newGame = newRound = lastRound
+                        let newRound = if newGame then 0 else newRound
+                        
+                        let newObjects = newObjects 
+                                            |> PersistentHashSet.map (fun o -> 
+                                                if o.id = scene.specialObjectIds.grabTrigger1Id || o.id = scene.specialObjectIds.grabTrigger2Id then
+                                                    { o with collisionShape = Some scene.grabbingVolShape.[newRound] }
+                                                else
+                                                    o
+                                                )
+                                                
                         let (newObjects, newGameInfo) =
-                            if newRound = lastRound then
+                            if newGame then    // finish game
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Starting new game")
                                 seededRandomNumberGen <- System.Random(seed)
                                 (newObjects, {newGameInfo with 
                                                 warmupScore = 0
                                                 numRounds = 0
                                                 running = false
                                                 timeSinceStart = 0.0
-                                             }
-                                )
-                            else
+                                             })
+                            else    // finish round
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Starting round " + newRound.ToString())
                                 (newObjects, {newGameInfo with numRounds = newRound})
                         
                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
@@ -226,11 +246,7 @@ module LogicalScene =
             
             | EndFrame ->
                 let mutable newObjects = scene.objects |> PersistentHashSet.map (fun o -> 
-                        if o.isManipulable then
-                            { o with 
-                                wasGrabbed = o.isGrabbed
-                            }
-                        else o
+                        if o.isManipulable then { o with wasGrabbed = o.isGrabbed } else o
                     )
                 // reset balls below the ground
                 let mutable ballIndex = 0
@@ -357,6 +373,7 @@ module LogicalScene =
                                     else
                                         if strength > newCtr2VibStrength then newCtr2VibStrength <- strength
 
+//                                    o
                                     // check grabbable with
                                     if colliderObject.isManipulable then
                                         let newGrabbableState = 
@@ -366,24 +383,24 @@ module LogicalScene =
                                                 | GrabbableOptions.Controller2 -> if firstController then GrabbableOptions.BothControllers else GrabbableOptions.Controller2
                                                 | GrabbableOptions.BothControllers -> GrabbableOptions.BothControllers
                                                 
-                                        let grabNow = interactionInfo.triggerPressed && o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
-                                                       ((newGrabbableState = GrabbableOptions.Controller1 && firstController) || 
-                                                        (newGrabbableState = GrabbableOptions.Controller2 && not firstController) || 
-                                                        newGrabbableState = GrabbableOptions.BothControllers)
-
-                                        if grabNow then 
-                                            { o with 
-                                                isGrabbable = newGrabbableState 
-                                                isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
-                                                hitLowerTrigger = false
-                                                hitUpperTrigger = false
-                                                hasScored = false
-        //                                        trafo = controller2Trafo // snap ball to controller
-                                            } 
-                                        else
-                                            { o with 
-                                                isGrabbable = newGrabbableState 
-                                            }
+//                                        let grabNow = interactionInfo.triggerPressed && o.isManipulable && o.isGrabbed = GrabbedOptions.NoGrab &&
+//                                                       ((newGrabbableState = GrabbableOptions.Controller1 && firstController) || 
+//                                                        (newGrabbableState = GrabbableOptions.Controller2 && not firstController) || 
+//                                                        newGrabbableState = GrabbableOptions.BothControllers)
+//
+//                                        if grabNow then 
+//                                            { o with 
+//                                                isGrabbable = newGrabbableState 
+//                                                isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
+//                                                hitLowerTrigger = false
+//                                                hitUpperTrigger = false
+//                                                hasScored = false
+//        //                                        trafo = controller2Trafo // snap ball to controller
+//                                            } 
+//                                        else
+                                        { o with 
+                                            isGrabbable = newGrabbableState 
+                                        }
                                     else o
                                 else  o
                             )
@@ -402,7 +419,7 @@ module LogicalScene =
                 // new target ball
                 let newTargetBallIndex = 
                     if hasScored then
-                        seededRandomNumberGen.Next(scene.specialObjectIds.ballObjectIds.Length - 1)
+                        seededRandomNumberGen.Next(scene.specialObjectIds.ballObjectIds.Length)
                     else
                         scene.gameInfo.targetBallIndex
 

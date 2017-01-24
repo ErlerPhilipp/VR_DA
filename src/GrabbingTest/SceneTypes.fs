@@ -8,6 +8,26 @@ module LogicalSceneTypes =
     open Aardvark.Base.Rendering
 
     open FShade
+            
+    type Message =
+        | DevicePress of int * int * Trafo3d
+        | DeviceRelease of int * int * Trafo3d
+        | DeviceTouch of int * int * Trafo3d
+        | DeviceUntouch of int * int * Trafo3d
+        | DeviceMove of int * Trafo3d
+        | StartFrame
+        | AfterPhysics
+        | TimeElapsed of System.TimeSpan
+        | EndFrame
+        | UpdateViewTrafo of Trafo3d
+        | Collision of int * int
+        | CollisionAdded of int * int * V3d * V3d
+//        | CollisionProcessed of int * int * float * V3d
+        | RayCastResult of int * bool * V3d * V3d
+
+    type PhysicsMessage =
+        | Grab of int * bool
+        | Release of int * bool
 
     let mutable currentId = 0
     let newId() = 
@@ -36,37 +56,37 @@ module LogicalSceneTypes =
     [<ReferenceEquality;NoComparison>]
     type Object =
         {
-            id                : int
-            
-            visible           : bool
-            castsShadow       : bool
-            objectType        : ObjectTypes
-            isColliding       : bool
-            isManipulable     : bool
-            isGrabbable       : GrabbableOptions
-            isGrabbed         : GrabbedOptions
-            wasGrabbed        : GrabbedOptions
-            hitUpperTrigger   : bool
-            hitLowerTrigger   : bool
-            hasScored         : bool
-            collisionCallback : bool
-
-            trafo             : Trafo3d
-            model             : Option<ISg>
-            surface           : Option<ISurface>
-            tilingFactor      : V2d
-
-            linearVelocity    : V3d
-            angularVelocity   : V3d
-            mass              : float32
-            restitution       : float32
-            friction          : float32
-            ccdSpeedThreshold : float32
-            ccdSphereRadius   : float32
-            rollingFriction   : float32
-            collisionShape    : Option<BulletHelper.Shape> 
-            collisionGroup    : int16
-            collisionMask     : int16
+            id                  : int
+                                
+            visible             : bool
+            castsShadow         : bool
+            objectType          : ObjectTypes
+            isColliding         : bool
+            isManipulable       : bool
+            isGrabbable         : GrabbableOptions
+            isGrabbed           : GrabbedOptions
+            wasGrabbed          : GrabbedOptions
+            hitUpperTrigger     : bool
+            hitLowerTrigger     : bool
+            hasScored           : bool
+            collisionCallback   : bool
+                                
+            trafo               : Trafo3d
+            model               : Option<ISg>
+            surface             : Option<ISurface>
+            tilingFactor        : V2d
+                                
+            linearVelocity      : V3d
+            angularVelocity     : V3d
+            mass                : float32
+            restitution         : float32
+            friction            : float32
+            ccdSpeedThreshold   : float32
+            ccdSphereRadius     : float32
+            rollingFriction     : float32
+            collisionShape      : Option<BulletSharp.CollisionShape> 
+            collisionGroup      : int16
+            collisionMask       : int16
         }
 
     let defaultObject = 
@@ -196,9 +216,11 @@ module LogicalSceneTypes =
             bounceSoundSources  : list<Audio.Sound>
             sireneSoundSource   : Audio.Sound
             popSoundSource      : Audio.Sound
+            physicsMessages     : list<PhysicsMessage>
 
             ballSgs             : array<ISg>
             targetBallTrafo     : Trafo3d
+            grabbingVolShape    : array<BulletSharp.CollisionShape>
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
@@ -257,21 +279,6 @@ module LogicalSceneTypes =
         match objectWithId with
             | Some foundObject -> foundObject
             | None -> failwith(sprintf "Object with id %A not found!" id) 
-            
-    type Message =
-        | DevicePress of int * int * Trafo3d
-        | DeviceRelease of int * int * Trafo3d
-        | DeviceTouch of int * int * Trafo3d
-        | DeviceUntouch of int * int * Trafo3d
-        | DeviceMove of int * Trafo3d
-        | StartFrame
-        | TimeElapsed of System.TimeSpan
-        | EndFrame
-        | UpdateViewTrafo of Trafo3d
-        | Collision of int * int
-        | CollisionAdded of int * int * V3d * V3d
-//        | CollisionProcessed of int * int * float * V3d
-        | RayCastResult of int * bool * V3d * V3d
         
 module PhysicsSceneTypes = 
     open LogicalSceneTypes

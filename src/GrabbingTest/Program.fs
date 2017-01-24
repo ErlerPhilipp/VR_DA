@@ -16,6 +16,7 @@ open Aardvark.VR
 
 open LogicalSceneTypes
 
+open BulletHelper
 open Primitives
 open Sphere
 open SGHelper
@@ -200,7 +201,8 @@ let main argv =
     let softballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
     let tennisballDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\TennisBallColorMap.jpg", textureParam) :> ITexture))
     //#endregion
-
+    
+    //#region SceneGraph   
     let staticModels =
         [
             @"..\..\resources\models\basketball\hoop.obj", hoopTrafo, 0.0f, None, 0.5f
@@ -276,10 +278,19 @@ let main argv =
     let rayCastHitPointSg = rayCastPointSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastHitAreaSg = rayCastAreaSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
     let rayCastCamSg = rayCastCamSg |> Sg.effect rayCastHitEffect |> Sg.blendMode(Mod.constant (BlendMode(true)))
+    //#endregion
 
+    //#region Objects   
     let simpleControllerBodyAssimpScene = Loader.Assimp.Load(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj", assimpFlagsSteamVR) 
-    let simpleControllerBodyTriangles = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root
-    let simpleControllerBodyCollShape = simpleControllerBodyTriangles |> BulletHelper.TriangleMesh
+    let simpleControllerBodyCollShape = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape
+    let numScales = 5
+    let simpleControllerBodyCollShapeScaled = [| for i in 0..numScales -> 
+                                                    let minScaling = 1.01
+                                                    let maxBonusScaling = 1.0
+                                                    let reductionPerRound = maxBonusScaling / float numScales
+                                                    let scale = minScaling + maxBonusScaling - (float i) * reductionPerRound
+                                                    createShape (Trafo3d.Scale(scale)) simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape |]
+
     let controller1Object = 
         { defaultObject with
             id = newId()
@@ -288,6 +299,7 @@ let main argv =
             model = Some controllerSg
             surface = Some diffuseSurface
             collisionShape = Some simpleControllerBodyCollShape
+            restitution = 1.5f
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
             collisionGroup = CollisionGroups.Avatar |> int16
@@ -299,8 +311,7 @@ let main argv =
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
-//            collisionShape = Some (BulletHelper.Shape.Sphere 0.15)
-            collisionShape = Some (BulletHelper.Shape.CylinderZ (0.09, 0.25))
+            collisionShape = Some simpleControllerBodyCollShapeScaled.[0]
             isColliding = false
             collisionGroup = CollisionGroups.HandTrigger |> int16
             collisionMask = handTriggerCollidesWith
@@ -347,7 +358,7 @@ let main argv =
             model = Some groundSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(groundTilingFactor * trackingAreaSize)
-            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
 
     let ceilingObject = 
@@ -357,7 +368,7 @@ let main argv =
             model = Some ceilingSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(ceilingTilingFactor * trackingAreaSize)
-            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, wallThickness, trackingAreaSize) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
 
     let wallBase = 
@@ -371,25 +382,25 @@ let main argv =
         { wallBase with 
             id = newId()
             trafo = Trafo3d.Translation(0.0, wallHorizontalOffset, -wallLateralOffset)
-            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
     let wall2 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (-90.0) * Trafo3d.Translation(wallLateralOffset, wallHorizontalOffset, 0.0)
-            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
     let wall3 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (180.0) * Trafo3d.Translation(0.0, wallHorizontalOffset, wallLateralOffset)
-            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
     let wall4 = 
         { wallBase with 
             id = newId()
             trafo = Trafo3d.RotationYInDegrees (90.0) * Trafo3d.Translation(-wallLateralOffset, wallHorizontalOffset, 0.0)
-            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(trackingAreaSize + 2.0 * wallThickness, trackingAreaHeight, wallThickness) |> BulletHelper.Shape.Box |> toCollisionShape )
         }
     
     let pedestalBase = 
@@ -398,7 +409,7 @@ let main argv =
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(1.0, pedestalRadius / pedestalHeight)
 //            collisionShape = Some (BulletHelper.Shape.CylinderY (pedestalRadius, pedestalHeight))
-            collisionShape = Some ( V3d(pedestalRadius, pedestalHeight, pedestalRadius) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(pedestalRadius, pedestalHeight, pedestalRadius) |> BulletHelper.Shape.Box |> toCollisionShape )
             rollingFriction = 0.01f
             restitution = 0.95f
             friction = 0.75f
@@ -415,7 +426,7 @@ let main argv =
             model = Some cushionSg
             surface = Some normalDiffuseSurface
             tilingFactor = V2d(0.25)
-            collisionShape = Some ( V3d(cushionSize, cushionHeight, cushionSize) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(cushionSize, cushionHeight, cushionSize) |> BulletHelper.Shape.Box |> toCollisionShape )
             rollingFriction = 0.1f
             restitution = 0.15f
             friction = 0.95f
@@ -434,7 +445,7 @@ let main argv =
             collisionCallback = true
             surface = Some ballSurface
             mass = 0.625f
-            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
+            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius |> toCollisionShape)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
             collisionGroup = CollisionGroups.Ball |> int16
@@ -450,7 +461,7 @@ let main argv =
         { defaultCollider with
             objectType = ObjectTypes.Static
             surface = Some ballSurface
-            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
+            collisionShape = Some (BulletHelper.Shape.Sphere ballRadius |> toCollisionShape)
             collisionGroup = CollisionGroups.Static |> int16
             collisionMask = staticCollidesWith
         }
@@ -470,7 +481,7 @@ let main argv =
             model = Some boxSg
             surface = Some boxSurface
             mass = 0.625f
-            collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box )
+            collisionShape = Some ( V3d(objectBoxEdgeLength) |> BulletHelper.Shape.Box |> toCollisionShape )
             restitution = 0.1f
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
@@ -484,7 +495,7 @@ let main argv =
             objectType = ObjectTypes.Kinematic
             isManipulable = false
             trafo = Trafo3d.Translation(-0.1, 0.0, 0.0)
-            collisionShape = Some (BulletHelper.Shape.Sphere 0.12)
+            collisionShape = Some (BulletHelper.Shape.Sphere 0.12 |> toCollisionShape)
             ccdSpeedThreshold = 0.1f
             ccdSphereRadius = 0.5f
             collisionGroup = CollisionGroups.Avatar |> int16
@@ -496,7 +507,7 @@ let main argv =
             castsShadow = false
             objectType = ObjectTypes.Ghost
             trafo = lowerHoopTriggerTrafo
-            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
+            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale) |> toCollisionShape)
             isColliding = false
             collisionGroup = CollisionGroups.HoopTrigger |> int16
             collisionMask = hoopTriggerCollidesWith
@@ -507,7 +518,7 @@ let main argv =
             castsShadow = false
             objectType = ObjectTypes.Ghost
             trafo = upperHoopTriggerTrafo
-            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale))
+            collisionShape = Some (BulletHelper.Shape.CylinderY (0.16 * hoopScale, 0.02 * hoopScale) |> toCollisionShape)
             isColliding = false
             collisionGroup = CollisionGroups.HoopTrigger |> int16
             collisionMask = hoopTriggerCollidesWith
@@ -539,7 +550,7 @@ let main argv =
                     surface = Some diffuseSurface
                     mass = mass
                     objectType = ObjectTypes.Kinematic
-                    collisionShape = collShape
+                    collisionShape = match collShape with | Some shape -> Some (shape |> toCollisionShape) | None -> None
                     restitution = restitution
                     collisionGroup = CollisionGroups.Static |> int16
                     collisionMask = staticCollidesWith
@@ -556,7 +567,9 @@ let main argv =
         @ [pedestal1; pedestal2; pedestal3; pedestal4; cushion1; cushion2; cushion3; cushion4; hoop]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
         @ [grabTrigger1; grabTrigger2]
+    //#endregion
         
+    //#region Scene   
     let specialObjectIds =
         {
             cam1ObjectId        = camObject1.id
@@ -584,9 +597,11 @@ let main argv =
             bounceSoundSources  = bounceSound
             sireneSoundSource   = sireneSound
             popSoundSource      = popSound
+            physicsMessages     = []
 
             ballSgs             = [| basketballSg; beachballSg; softballSg; tennisballSg |]
             targetBallTrafo     = targetBallTrafo
+            grabbingVolShape    = simpleControllerBodyCollShapeScaled
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
@@ -597,8 +612,10 @@ let main argv =
             physicsInfo         = { DefaultPhysicsInfo with
                                         raycastCollGroup = CollisionGroups.TeleportRaycast |> int16
                                         raycastCollMask  = teleportRaycastCollidesWith
+//                                        physicsDebugDraw = true
                                   }
         }
+    //#endregion
 
     let scene = GraphicsScene.createScene sceneObj vrWin
 

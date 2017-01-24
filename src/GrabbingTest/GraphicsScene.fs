@@ -98,6 +98,13 @@ module GraphicsScene =
             
             scene <- LogicalScene.update scene StartFrame
 
+            let timeStepThreshold = 0.5
+            if dt.TotalSeconds < timeStepThreshold && scene.physicsInfo.enablePhysics then
+                scene <- PhysicsScene.stepSimulation dt scene 
+                PhysicsScene.debugDrawer.flush()
+
+            scene <- LogicalScene.update scene AfterPhysics
+
             let trackingToWorldHasChanged = oldTrackingToWorld <> scene.trackingToWorld
             oldTrackingToWorld <- scene.trackingToWorld
 
@@ -121,11 +128,6 @@ module GraphicsScene =
                     | _ -> () //printfn "%A" (e.eventType)
                     
             scene <- LogicalScene.update scene (TimeElapsed dt)
-
-            let timeStepThreshold = 0.5
-            if dt.TotalSeconds < timeStepThreshold && scene.physicsInfo.enablePhysics then
-                scene <- PhysicsScene.stepSimulation dt scene 
-                PhysicsScene.debugDrawer.flush()
   
             scene <- LogicalScene.update scene EndFrame
 

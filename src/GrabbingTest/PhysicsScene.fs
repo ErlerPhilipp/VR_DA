@@ -18,9 +18,7 @@ module PhysicsScene =
 
     let maxPenetrationDepth = -0.001f
     
-    let releaseGrab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
-//        printfn "release"
-        let firstController = o.wasGrabbed = GrabbedOptions.Controller1
+    let release(firstController : bool, s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
         collisionObject.ClearForces()
         // activate by setting normal mass
         collisionObject.SetMassProps(o.mass, pb.inertia)
@@ -32,7 +30,7 @@ module PhysicsScene =
         let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
         let handVelocity = toVector3(vel)
 
-//                            collisionObject.LinearVelocity <- handVelocity
+//      collisionObject.LinearVelocity <- handVelocity
         collisionObject.LinearVelocity <- Vector3()
         let controllerId = if firstController then s.specialObjectIds.controller1ObjectId else s.specialObjectIds.controller2ObjectId
         let controllerPos = LogicalSceneTypes.getTrafoOfFirstObjectWithId(controllerId, s.objects).Forward.TransformPos(V3d())
@@ -42,7 +40,7 @@ module PhysicsScene =
 
         let angVel = controllerDevice.AngularVelocity
         let handAngVelocity = toVector3(angVel)
-//                            collisionObject.AngularVelocity <- handAngVelocity
+//      collisionObject.AngularVelocity <- handAngVelocity
         collisionObject.AngularVelocity <- Vector3()
         collisionObject.ApplyTorqueImpulse(handAngVelocity * collisionObject.LocalInertia)
                             
@@ -50,8 +48,7 @@ module PhysicsScene =
         collisionObject.Activate()
         collisionObject.ForceActivationState(ActivationState.ActiveTag)
 
-    let grab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody, o : Object) = 
-//        printfn "grab"
+    let grab(s : Scene, collisionObject : RigidBody, pb : PhysicsBody) = 
         collisionObject.ClearForces()
         // deactivate by setting infinite mass
         collisionObject.SetMassProps(0.0f, Vector3(0.0f,0.0f,0.0f))
@@ -127,15 +124,13 @@ module PhysicsScene =
 
             match o.collisionShape with
                 | Some (collisionShape) -> 
-                    let cshape = toCollisionShape collisionShape
-                
                     let setProperties(collObj : BulletSharp.CollisionObject, o : Object) =
                         if not o.isColliding then collObj.CollisionFlags <- collObj.CollisionFlags ||| CollisionFlags.NoContactResponse
                         if o.collisionCallback then collObj.CollisionFlags <- collObj.CollisionFlags ||| CollisionFlags.CustomMaterialCallback
                         collObj.UserIndex <- o.id
                         collObj.Friction <- float32 o.friction
                         collObj.RollingFriction <- float32 o.rollingFriction
-                        collObj.CollisionShape <- cshape
+                        collObj.CollisionShape <- collisionShape
                         collObj.WorldTransform <- toMatrix o.trafo
                         collObj.Restitution <- float32 o.restitution
                         // continuous collision detection
@@ -154,9 +149,9 @@ module PhysicsScene =
                                 trafo = initialTrafo
                             }
                         | ObjectTypes.Dynamic -> 
-                            let inertia = cshape.CalculateLocalInertia(o.mass)
+                            let inertia = collisionShape.CalculateLocalInertia(o.mass)
                             let state = new MyMotionState()
-                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
+                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, collisionShape, inertia)
                             
                             let rigidBody = new BulletSharp.RigidBody(info)
                             rigidBody.SetDamping(0.1f, 0.1f)
@@ -185,9 +180,9 @@ module PhysicsScene =
                                 trafo = initialTrafo
                             }
                         | ObjectTypes.Kinematic ->
-                            let inertia = cshape.CalculateLocalInertia(o.mass)
+                            let inertia = collisionShape.CalculateLocalInertia(o.mass)
                             let state = new MyMotionState()
-                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, cshape, inertia)
+                            let info = new BulletSharp.RigidBodyConstructionInfo(o.mass, state, collisionShape, inertia)
                             
                             let rigidBody = new BulletSharp.RigidBody(info)
                             rigidBody.SetDamping(0.1f, 0.1f)
@@ -241,10 +236,13 @@ module PhysicsScene =
 
                 let updateCollisionObjectSettings(co : BulletSharp.CollisionObject, o : Object) =
                     if co.Friction <> o.friction then co.Friction <- o.friction
+                    if co.RollingFriction <> o.rollingFriction then co.RollingFriction <- o.rollingFriction
+                    match o.collisionShape with
+                        | Some shape -> if co.CollisionShape <> shape then co.CollisionShape <- shape
+                        | None -> ()
                     if co.Restitution <> o.restitution then co.Restitution <- o.restitution
                     if co.CcdMotionThreshold <> o.ccdSpeedThreshold then co.CcdMotionThreshold <- o.ccdSpeedThreshold
                     if co.CcdSweptSphereRadius <> o.ccdSphereRadius then co.CcdSweptSphereRadius <- o.ccdSphereRadius
-                    if co.RollingFriction <> o.rollingFriction then co.RollingFriction <- o.rollingFriction
                     
                     let newWorldTransform = toMatrix o.trafo
                     if co.WorldTransform <> newWorldTransform then
@@ -262,12 +260,6 @@ module PhysicsScene =
                         if collisionObject.AngularVelocity <> newAngularVelocity then 
                             collisionObject.AngularVelocity <- newAngularVelocity
                             collisionObject.Activate()
-
-                        if (o.wasGrabbed <> GrabbedOptions.NoGrab && o.isGrabbed = GrabbedOptions.NoGrab) then
-                            releaseGrab(s, collisionObject, pb, o)
-                        else if (o.wasGrabbed = GrabbedOptions.NoGrab && o.isGrabbed <> GrabbedOptions.NoGrab) then
-                            grab(s, collisionObject, pb, o)
-
                     | CollisionObject.StaticBody collisionObject -> 
                         updateCollisionObjectSettings(collisionObject, o)
                         // TODO: make static objects grabbable?
@@ -318,7 +310,27 @@ module PhysicsScene =
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.DrawWireframe
                 else if not s.physicsInfo.physicsDebugDraw && debugDrawer.DebugMode <> BulletSharp.DebugDrawModes.None then 
                     debugDrawer.DebugMode <- BulletSharp.DebugDrawModes.None
-
+                    
+                for message in s.physicsMessages do
+                    match message with
+                        | PhysicsMessage.Grab (objectId, firstController) -> 
+                            for pb in pw.bodies do
+                                if pb.original.id = objectId then
+                                   match pb.collisionObject with
+                                    | CollisionObject.RigidBody collisionObject -> 
+                                        grab(s, collisionObject, pb)
+                                    | CollisionObject.StaticBody collisionObject -> ()
+                                    | CollisionObject.Ghost collisionObject -> ()
+                                    | CollisionObject.NoObject -> ()
+                        | PhysicsMessage.Release (objectId, firstController) -> 
+                            for pb in pw.bodies do
+                                if pb.original.id = objectId then
+                                   match pb.collisionObject with
+                                    | CollisionObject.RigidBody collisionObject -> 
+                                        release(firstController, s, collisionObject, pb, pb.original)
+                                    | CollisionObject.StaticBody collisionObject -> ()
+                                    | CollisionObject.Ghost collisionObject -> ()
+                                    | CollisionObject.NoObject -> ()
 
     let simulationSw = System.Diagnostics.Stopwatch()
     let stepSimulation (dt : System.TimeSpan) (s : Scene) : Scene =
@@ -390,17 +402,17 @@ module PhysicsScene =
                                             if hasContact then
                                                 ghostMessages.Add (Collision(ghostObjectId, collidingObjectId))
 
-                                                let o = LogicalSceneTypes.getObjectWithId(collidingObjectId, s.objects)
-                                                let firstController = ghostObjectId = s.specialObjectIds.grabTrigger1Id
-                                                let secondController = ghostObjectId = s.specialObjectIds.grabTrigger2Id
-                                                if firstController || secondController then
-                                                    let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
-                                                    if interactionInfo.triggerPressed && o.isGrabbed = GrabbedOptions.NoGrab then
-                                                        let pb = getBodyWithId(o.id, world.bodies)
-                                                        match pb.collisionObject with
-                                                            | CollisionObject.RigidBody collisionObject -> 
-                                                                grab(s, collisionObject, pb, o)
-                                                            | _ -> ()
+//                                                let o = LogicalSceneTypes.getObjectWithId(collidingObjectId, s.objects)
+//                                                let firstController = ghostObjectId = s.specialObjectIds.grabTrigger1Id
+//                                                let secondController = ghostObjectId = s.specialObjectIds.grabTrigger2Id
+//                                                if firstController || secondController then
+//                                                    let interactionInfo = if firstController then s.interactionInfo1 else s.interactionInfo2
+//                                                    if interactionInfo.triggerPressed && o.isGrabbed = GrabbedOptions.NoGrab then
+//                                                        let pb = getBodyWithId(o.id, world.bodies)
+//                                                        match pb.collisionObject with
+//                                                            | CollisionObject.RigidBody collisionObject -> 
+//                                                                grab(s, collisionObject, pb, o)
+//                                                            | _ -> ()
                                     
 //                                    // from BulletSharp.GhostObject
 //                                    let numOverlappingObjects = ghostObject.NumOverlappingObjects
