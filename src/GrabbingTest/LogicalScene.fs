@@ -129,6 +129,8 @@ module LogicalScene =
                                     scene
 
                 let mutable newPhysicsMessages = scene.physicsMessages
+                let mutable newGrabs = scene.gameInfo.grabs
+                let newGrabAttemps = scene.gameInfo.grabAttempts + 1
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o ->
@@ -137,6 +139,7 @@ module LogicalScene =
                                     (o.isGrabbable = GrabbableOptions.Controller2 && not firstController) || 
                                     o.isGrabbable = GrabbableOptions.BothControllers) then 
                                     newPhysicsMessages <- newPhysicsMessages @ [PhysicsMessage.Grab (o.id, firstController)]
+                                    newGrabs <- newGrabs + 1
                                     { o with 
                                         isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
                                         hitLowerTrigger = false
@@ -145,7 +148,7 @@ module LogicalScene =
                                     } 
                                 else o
                             ) 
-                { scene with objects = newObjects; physicsMessages = newPhysicsMessages }
+                { scene with objects = newObjects; physicsMessages = newPhysicsMessages; gameInfo = {scene.gameInfo with grabs = newGrabs; grabAttempts = newGrabAttemps} }
                     
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -216,7 +219,9 @@ module LogicalScene =
                                                 
                         let (newObjects, newGameInfo) =
                             if newGame then    // finish game
-                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Starting new game")
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Game finished")
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grab attempts " + newGameInfo.grabAttempts.ToString())
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grabs " + newGameInfo.grabs.ToString())
                                 seededRandomNumberGen <- System.Random(seed)
                                 (newObjects, {newGameInfo with 
                                                 warmupScore = 0
@@ -335,7 +340,7 @@ module LogicalScene =
                                         Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored " + newGameInfo.score.ToString())
                                         let scoreUntilStart = 3
                                         if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
-                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0}
+                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0; grabs = 0; grabAttempts = 0}
                                             Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)

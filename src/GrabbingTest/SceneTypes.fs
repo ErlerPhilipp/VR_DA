@@ -168,6 +168,8 @@ module LogicalSceneTypes =
             scoreText           : string
             running             : bool
             numRounds           : int
+            grabAttempts        : int
+            grabs               : int
         }
 
     let DefaultGameInfo = 
@@ -181,6 +183,8 @@ module LogicalSceneTypes =
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
             numRounds           = 0
+            grabAttempts        = 0
+            grabs               = 0
         }
 
     type PhysicsInfo = 

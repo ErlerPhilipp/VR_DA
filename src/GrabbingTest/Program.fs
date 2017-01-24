@@ -286,10 +286,10 @@ let main argv =
     let simpleControllerBodyCollShape = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape
     let numScales = 5
     let simpleControllerBodyCollShapeScaled = [| for i in 0..numScales -> 
-                                                    let minScaling = 1.01
-                                                    let maxBonusScaling = 1.0
-                                                    let reductionPerRound = maxBonusScaling / float numScales
-                                                    let scale = minScaling + maxBonusScaling - (float i) * reductionPerRound
+                                                    let minScaling = 1.05
+                                                    let maxScaling = 1.5
+                                                    let reductionPerRound = (maxScaling - minScaling) / float numScales
+                                                    let scale = maxScaling - (float i) * reductionPerRound
                                                     createShape (Trafo3d.Scale(scale)) simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape |]
 
     let controller1Object = 
