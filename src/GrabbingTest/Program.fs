@@ -56,7 +56,7 @@ let main argv =
                         Trafo3d.Translation(V3d(-0.03, 1.71, -3.3 * scoreScale) * hoopScale)
     let lowerHoopTriggerTrafo = hoopTrafoWithoutScale * Trafo3d.Translation(-0.23 * hoopScale, 1.38 * hoopScale, 0.0)
     let upperHoopTriggerTrafo = lowerHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.12 * hoopScale, 0.0)
-    let targetBallTrafo = upperHoopTriggerTrafo * Trafo3d.Translation(0.0, 0.3, 0.0)
+    let targetBallTrafo = upperHoopTriggerTrafo * Trafo3d.Translation(0.35, -0.055, 0.0)
     
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
     let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
@@ -450,7 +450,6 @@ let main argv =
         { defaultCollider with
             objectType = ObjectTypes.Static
             surface = Some ballSurface
-            mass = 0.625f
             collisionShape = Some (BulletHelper.Shape.Sphere ballRadius)
             collisionGroup = CollisionGroups.Static |> int16
             collisionMask = staticCollidesWith
