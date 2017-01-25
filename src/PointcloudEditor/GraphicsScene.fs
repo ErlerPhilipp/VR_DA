@@ -123,7 +123,8 @@ module GraphicsScene =
             Sg.markdown MarkdownConfig.light graphicsScene.scoreText
                 |> Sg.trafo graphicsScene.scoreTrafo
                 
-        Sg.ofList ([sg; textSg])
+//        Sg.ofList ([sg; textSg; initialScene.pointCloudSg])
+        Sg.ofList ([initialScene.pointCloudSg])
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)

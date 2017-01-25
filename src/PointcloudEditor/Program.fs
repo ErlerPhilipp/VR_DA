@@ -13,6 +13,10 @@ open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.SceneGraph.IO
 open Aardvark.VR
+open Aardvark.Git
+open Aardvark.Database
+open Aardvark.Base.Native
+
 
 open LogicalSceneTypes
 
@@ -27,6 +31,203 @@ open Highlight
 open LightRepresentation
 open Audio
 
+
+
+
+
+open System
+open Aardvark.Base
+open Aardvark.Base.Native
+open Aardvark.Base.Rendering
+open Aardvark.Base.Incremental
+open Aardvark.Base.Ag
+open Aardvark.SceneGraph
+open Aardvark.Application
+open Aardvark.Application.WinForms
+open Aardvark.SceneGraph.Semantics
+open System.IO
+open System.Threading
+open Aardvark.Git
+open Aardvark.Database
+
+
+
+
+open InteractiveSegmentation
+
+
+module PointSetStorage =
+    
+    module Lazy =
+        let force ( x : Lazy<'a> ) : 'a =
+            x.Value
+
+
+module Rendering =
+
+    open PointSetStorage
+
+     module LodData =
+        open System.Collections.Concurrent
+
+        type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
+            //let bounds = (root |> Mod.force).cell.BoundingBox
+            let bounds = tree.GetValue().bounds
+
+            let mutable cells = []
+
+            member x.Traverse (f : LodDataNode -> bool) = 
+             
+                let rec traverse (level : int) (cell : GridCell) (n : OctreeNode)  =
+                    let bb = cell.BoundingBox
+                    match n with
+                        | Empty -> ()
+                        | Node (points,children)  ->
+                            let nn = { id = (n :> obj); level = level; bounds = bb; 
+                                       inner = true; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
+                                       render = true}
+
+                            if f nn then
+                                children |> Array.iteri (fun i child -> traverse (level + 1) (cell.GetChild i) child.Value) 
+                        | Leaf points ->                             
+                            let nn = { id = (n :> obj); level = level; bounds = bb; 
+                                       inner = true; granularity = 1.0; render = true }
+                            f nn |> ignore
+                            
+               
+                let tree = Mod.force tree
+                traverse 0 tree.cell tree.root.Value
+
+
+            member x.BoundingBox = bounds
+
+            member x.GetData (n : LodDataNode) : Async<Option<IndexedGeometry>> =
+                async {
+                    let node = n.id |> unbox<OctreeNode>
+
+                    let points =
+                        match node with
+                            | Node (points,_) | Leaf points  -> points.Value
+                            | Empty -> [||]
+                    
+
+                    let (p,n,c) = points    |> Array.map ( fun p -> V3f p.Position, V3f p.Normal, p.Color)
+                                            |> Array.unzip3
+
+
+                    //let real = Box3d(pos |> Seq.map V3d)
+                    //Log.warn "bounds: %A" real
+
+                    let r = 
+                        IndexedGeometry(
+                            IndexedAttributes =
+                                SymDict.ofList [
+                                    DefaultSemantic.Positions,  p :> Array
+                                    DefaultSemantic.Normals,    n :> Array
+                                    DefaultSemantic.Colors,     c :> Array
+                                ]
+                        )
+
+                    return Some r
+                }
+            
+
+
+            interface ILodData with
+            
+                member x.BoundingBox = bounds
+                member x.Traverse f = x.Traverse f
+                member x.GetData n = x.GetData n
+                member x.Dependencies = [ tree :> IMod ]
+
+            
+                
+    module Logic =
+        type LodUserSettings =
+            {
+                NodeCount           : IModRef<float>
+                PointSize           : IModRef<float>
+            }
+
+
+    open Logic
+
+
+    let lodSettings =
+        {   
+            NodeCount = Mod.init 150.0
+            PointSize = Mod.init 10.0
+        }
+
+
+    let pointCloudInfoSettings =
+        {
+            targetPointDistance     = Mod.init 50.0
+            maxReuseRatio           = 0.5
+            minReuseCount           = 1L <<< 20
+            pruneInterval           = 500
+            customView              = None
+            customProjection        = None
+            attributeTypes =
+                Map.ofList [
+                    DefaultSemantic.Positions, typeof<V3f>
+                    DefaultSemantic.Colors, typeof<C4b>
+                    DefaultSemantic.Normals, typeof<V3f>
+                ]
+            boundingBoxSurface      = Some BoundingBox.effectRed
+        }
+
+    open LodData
+    open FShade
+    open Aardvark.Base.Rendering.Effects
+
+    let internal debugNormal (v : Vertex) =
+        fragment {
+            return V3d(abs v.n.X, abs v.n.Y, abs v.n.Z)
+        }
+
+    let mkSg (pointSet : IMod<Octree>) = 
+        
+        Sg.pointCloud' ( PointSetLodData(pointSet, lodSettings.NodeCount) ) pointCloudInfoSettings (LodProgress.Progress.empty)
+        |> Sg.effect 
+            [
+                DefaultSurfaces.trafo       |> toEffect
+                DefaultSurfaces.pointSprite |> toEffect
+                DefaultSurfaces.vertexColor                 |> toEffect
+            ]
+        |> Sg.uniform "PointSize" lodSettings.PointSize 
+
+open Rendering
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 type CollisionGroups =
     | Static =          0b0000000000000001s
     | Ball =            0b0000000000000010s
@@ -39,12 +240,120 @@ type CollisionGroups =
 let main _ =
     Ag.initialize()
     Aardvark.Init()
+    
+    
+    let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
+    let storagePath = @"C:\bla\vgmCache"
+
+//        let psp = @"C:\bla\JBs_Haus.pts"
+//        let storagePath = @"C:\bla\vgmCache2"
+
+    //let psp         = @"Technologiezentrum_Teil1.pts"
+    //let storagePath = @"cache"
+    //use db = Database.NpgSql.remote "localhost" 5432 
+    //use db = Database.ofMemory (Memory.hglobal ) //(Memory.newfile @"C:\Aardwork\test.bin")
+    //use db = Database.Redis.local @"C:\octree.rdb"
+    //use db = Database.Vhd.local  @"C:\Aardwork\octree.vhd"
+
+    let s       = Directory.CreateDirectory(storagePath)
+    let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"]) //Memory.hglobal 0L //Memory.mapped (Path.combine [storagePath;"memory.mapped"])
+    let get i   = NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i]) //Memory.hglobal 0L //NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i])
+    let store   = new BlobStore(mem,get)
+    use db      = new Database(store)
+        
+    let r = db.Get(Guid("6f3fd114-f345-4e2d-b82c-2e7172ea6086"))
+
+    let pointset =
+
+        if r.HasValue then
+            Log.startTimed "read"
+            let t : Octree = !r
+            Log.stop()
+
+            printfn "tree : %A" t
+
+            match t.root.Value with
+                | null -> ()
+                | node -> printfn "node: %A" node.Count
+
+            t
+
+        else
+            let file = psp
+
+            let cnt = Pts.approximatePointCount file
+            let chunkSize = 1 <<< 20//1 <<< 16
+            let points = Pts.readChunked chunkSize file
+
+            Log.start "complete build"
+
+            let off = V3d.Zero
+            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
+            printfn "tree : %A" tree
+
+            r := tree
+            //db.Dispose()
+
+            Log.stop()
+
+            tree
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     Aardvark.SceneGraph.IO.Loader.Assimp.initialize()
     Aardvark.Rendering.GL.RuntimeConfig.SupressSparseBuffers <- true
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
+
+    let flipYZ = Trafo3d.FromOrthoNormalBasis(V3d.IOO, V3d.OOI, V3d.OIO)
+
+    let pointcloudSg = 
+        Rendering.mkSg (pointset |> Mod.constant)
+            |> Sg.effect [
+                DefaultSurfaces.trafo |> toEffect
+                DefaultSurfaces.vertexColor |> toEffect
+                ]
+            |> Sg.uniform "ViewportSize" vrWin.Sizes
+            |> Sg.trafo (Mod.constant(flipYZ * Trafo3d.Scale(0.01) * Trafo3d.Translation(V3d(0.0, 0.0, 2.0))))
+
+
+
+
+
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9
     let trackingAreaHeight = 5.2
@@ -274,6 +583,7 @@ let main _ =
             deltaTime           = 0.0
             scoreTrafo          = scoreTrafo
             scoreText           = "test"
+            pointCloudSg        = pointcloudSg
 
             selectionVolume     = Shape.Sphere(0.25)
             

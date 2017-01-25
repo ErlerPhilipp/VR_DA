@@ -4,7 +4,7 @@ open Valve.VR
 
 open Aardvark.Base
 
-open BulletSharp.Math
+//open BulletSharp.Math
 
 module VrInteractions =
     open VrTypes

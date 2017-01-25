@@ -88,6 +88,7 @@ module LogicalSceneTypes =
             selectionVolume     : Shapes.Shape
             scoreTrafo          : Trafo3d
             scoreText           : string
+            pointCloudSg        : ISg
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
