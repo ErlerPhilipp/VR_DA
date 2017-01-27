@@ -54,13 +54,13 @@
     <Compile Include="Shapes.fs" />
     <Compile Include="VrInteractions.fs" />
     <Compile Include="SceneTypes.fs" />
-    <Compile Include="Helper.fs" />
+    <Compile Include="OctreeHelper.fs" />
     <Compile Include="Octree.fs" />
-    <Compile Include="Global.fs" />
     <Compile Include="BoundingBox.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
+    <Compile Include="PointCloudHelper.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

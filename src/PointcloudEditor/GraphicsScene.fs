@@ -30,14 +30,15 @@ module GraphicsScene =
         static member Create(s : Scene) =
             let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
             {
-                original           = s
-                graphicsObjects    = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
-                viewTrafo          = Mod.init s.viewTrafo
-                lightPos           = Mod.init lightPos
-                lightColor         = Mod.init s.lightColor
+                original            = s
+                graphicsObjects     = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
+                viewTrafo           = Mod.init s.viewTrafo
+                lightPos            = Mod.init lightPos
+                lightColor          = Mod.init s.lightColor
 
-                scoreTrafo         = Mod.init s.scoreTrafo
-                scoreText          = Mod.init s.scoreText
+                scoreTrafo          = Mod.init s.scoreTrafo
+                scoreText           = Mod.init s.scoreText
+                pointCloudTrafo     = Mod.init s.pointCloudTrafo
             }
 
         static member Update(mo : GraphicsObject, o : Object) =
@@ -58,6 +59,7 @@ module GraphicsScene =
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo
                 ms.scoreText.Value <- s.scoreText
+                ms.pointCloudTrafo.Value <- s.pointCloudTrafo
 
                 let table = 
                     ms.graphicsObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
@@ -123,8 +125,8 @@ module GraphicsScene =
             Sg.markdown MarkdownConfig.light graphicsScene.scoreText
                 |> Sg.trafo graphicsScene.scoreTrafo
                 
-//        Sg.ofList ([sg; textSg; initialScene.pointCloudSg])
-        Sg.ofList ([initialScene.pointCloudSg])
+        Sg.ofList ([sg; textSg; initialScene.pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
+//        Sg.ofList ([initialScene.pointCloudSg])
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)

@@ -1,4 +1,5 @@
 ﻿namespace InteractiveSegmentation
+
 open System
 open Aardvark.Base
 open Aardvark.Base.Rendering
@@ -16,10 +17,8 @@ open Aardvark.Git
 open Aardvark.Database
 open Aardvark.Base.Native
 
-
-module Helper = 
+module OctreeHelper = 
     
-
     let frustum (f : IMod<CameraView>) (proj : IMod<Frustum>) =
         let invViewProj = Mod.map2 (fun v p -> (CameraView.viewTrafo v * Frustum.projTrafo p).Inverse) f proj
 
@@ -136,9 +135,6 @@ module Helper =
         let m44Trafos = trafos |> Mod.map (fun a -> a |> Array.map (fun (t : Trafo3d) -> (M44f.op_Explicit t.Forward)) :> Array)
         let m44View = BufferView(m44Trafos |> Mod.map (fun a -> ArrayBuffer a :> IBuffer), typeof<M44f>)
 
-
-
-
         let sg = Sg.InstanceAttributeApplicator([DefaultSemantic.InstanceTrafo, m44View] |> Map.ofList, sg) :> ISg
 
         //let colors = colors |> Mod.map (fun a -> a |> Array.map (fun (v : V4d) -> (V4f.op_Explicit v)) :> Array)
@@ -177,7 +173,7 @@ module Helper =
         let det_Z = xx * yy - xy * xy
 
         let det_max = max (max det_X det_Y) det_Z
-        let x = (det_max > 0.0) //"The points don't span a plane"
+//        let x = (det_max > 0.0) //"The points don't span a plane"
 
         let normal = 
             if (det_max = det_X) then

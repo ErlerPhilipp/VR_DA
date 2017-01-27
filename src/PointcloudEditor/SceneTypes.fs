@@ -89,6 +89,7 @@ module LogicalSceneTypes =
             scoreTrafo          : Trafo3d
             scoreText           : string
             pointCloudSg        : ISg
+            pointCloudTrafo     : Trafo3d
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
@@ -154,6 +155,7 @@ module GraphicsSceneTypes =
             viewTrafo           : ModRef<Trafo3d>
             lightPos            : ModRef<V3d>
             lightColor          : ModRef<V3d>
+            pointCloudTrafo     : ModRef<Trafo3d>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

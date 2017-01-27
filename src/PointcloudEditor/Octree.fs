@@ -7,13 +7,9 @@ open Aardvark.Git.Operators
 open Aardvark.Base.Incremental
 open Aardvark.Base
 open Aardvark.Base.Rendering
-open System.IO
-open Aardvark.Base
-//open Aardvark.VRVis
-
-
-
 open Aardvark.Base.Native
+
+open System.IO
 
 type Point =
     struct
