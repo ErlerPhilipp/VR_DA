@@ -2,24 +2,29 @@
 // See the 'F# Tutorial' project for more help.
 module VRGrabbingTest
 
+open System
+open System.IO
+
 open Valve.VR
 
 open OpenTK
 
+open Aardvark.Application
 open Aardvark.Application.WinForms
 open Aardvark.Base
+open Aardvark.Base.Ag
+open Aardvark.Base.Native
 open Aardvark.Base.Rendering
 open Aardvark.Base.Incremental
 open Aardvark.SceneGraph
 open Aardvark.SceneGraph.IO
+open Aardvark.SceneGraph.Semantics
 open Aardvark.VR
 open Aardvark.Git
 open Aardvark.Database
 open Aardvark.Base.Native
 
-
 open LogicalSceneTypes
-
 open Shapes
 open Primitives
 open Sphere
@@ -32,29 +37,9 @@ open LightRepresentation
 open Audio
 
 
-
-
-
-open System
-open Aardvark.Base
-open Aardvark.Base.Native
-open Aardvark.Base.Rendering
-open Aardvark.Base.Incremental
-open Aardvark.Base.Ag
-open Aardvark.SceneGraph
-open Aardvark.Application
-open Aardvark.Application.WinForms
-open Aardvark.SceneGraph.Semantics
-open System.IO
-open System.Threading
-open Aardvark.Git
-open Aardvark.Database
-
-
-
-
 open InteractiveSegmentation
 
+let flipYZ = Trafo3d.FromOrthoNormalBasis(V3d.IOO, V3d.OOI, V3d.OIO)
 
 module PointSetStorage =
     
@@ -70,11 +55,9 @@ module Rendering =
      module LodData =
         open System.Collections.Concurrent
 
-        type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
-            //let bounds = (root |> Mod.force).cell.BoundingBox
-            let bounds = tree.GetValue().bounds
-
-            let mutable cells = []
+        type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>, modelTrafo : Trafo3d) =
+            
+            let bounds = Box3d( modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Min), modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Max))
 
             member x.Traverse (f : LodDataNode -> bool) = 
              
@@ -113,10 +96,6 @@ module Rendering =
 
                     let (p,n,c) = points    |> Array.map ( fun p -> V3f p.Position, V3f p.Normal, p.Color)
                                             |> Array.unzip3
-
-
-                    //let real = Box3d(pos |> Seq.map V3d)
-                    //Log.warn "bounds: %A" real
 
                     let r = 
                         IndexedGeometry(
@@ -186,9 +165,9 @@ module Rendering =
             return V3d(abs v.n.X, abs v.n.Y, abs v.n.Z)
         }
 
-    let mkSg (pointSet : IMod<Octree>) = 
+    let mkSg (lodData : PointSetLodData) = 
         
-        Sg.pointCloud' ( PointSetLodData(pointSet, lodSettings.NodeCount) ) pointCloudInfoSettings (LodProgress.Progress.empty)
+        Sg.pointCloud' lodData pointCloudInfoSettings (LodProgress.Progress.empty)
         |> Sg.effect 
             [
                 DefaultSurfaces.trafo       |> toEffect
@@ -199,72 +178,26 @@ module Rendering =
 
 open Rendering
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-type CollisionGroups =
-    | Static =          0b0000000000000001s
-    | Ball =            0b0000000000000010s
-    | HandTrigger =     0b0000000000000100s
-    | HoopTrigger =     0b0000000000001000s
-    | Avatar =          0b0000000000010000s
-    | TeleportRaycast = 0b0000000000100000s
-
 [<EntryPoint>]
 let main _ =
     Ag.initialize()
     Aardvark.Init()
     
-    
+//    let psp = @"..\..\resources\pointclouds\Laserscan-MS60_Beiglboeck-2015.pts"
     let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
     let storagePath = @"C:\bla\vgmCache"
 
-//        let psp = @"C:\bla\JBs_Haus.pts"
-//        let storagePath = @"C:\bla\vgmCache2"
-
-    //let psp         = @"Technologiezentrum_Teil1.pts"
-    //let storagePath = @"cache"
-    //use db = Database.NpgSql.remote "localhost" 5432 
-    //use db = Database.ofMemory (Memory.hglobal ) //(Memory.newfile @"C:\Aardwork\test.bin")
-    //use db = Database.Redis.local @"C:\octree.rdb"
-    //use db = Database.Vhd.local  @"C:\Aardwork\octree.vhd"
-
-    let s       = Directory.CreateDirectory(storagePath)
+    Directory.CreateDirectory(storagePath) |> ignore
     let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"]) //Memory.hglobal 0L //Memory.mapped (Path.combine [storagePath;"memory.mapped"])
     let get i   = NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i]) //Memory.hglobal 0L //NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i])
     let store   = new BlobStore(mem,get)
     use db      = new Database(store)
         
-    let r = db.Get(Guid("6f3fd114-f345-4e2d-b82c-2e7172ea6086"))
+    let lastSixteenChars = psp.Substring(psp.Length-20, 16)
+    let hash = System.Text.Encoding.ASCII.GetBytes(lastSixteenChars)
+    let r = db.Get(System.Guid(hash))
 
-    let pointset =
-
+    let pointSet =
         if r.HasValue then
             Log.startTimed "read"
             let t : Octree = !r
@@ -277,7 +210,6 @@ let main _ =
                 | node -> printfn "node: %A" node.Count
 
             t
-
         else
             let file = psp
 
@@ -288,7 +220,8 @@ let main _ =
             Log.start "complete build"
 
             let off = V3d.Zero
-            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
+//            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
+            let tree = Octree.build db 50000000 off (1 + cnt / chunkSize) points
             printfn "tree : %A" tree
 
             r := tree
@@ -298,61 +231,11 @@ let main _ =
 
             tree
     
-    
-    
-    
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     Aardvark.SceneGraph.IO.Loader.Assimp.initialize()
     Aardvark.Rendering.GL.RuntimeConfig.SupressSparseBuffers <- true
 
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
-    
-
-    let flipYZ = Trafo3d.FromOrthoNormalBasis(V3d.IOO, V3d.OOI, V3d.OIO)
-
-    let pointcloudSg = 
-        Rendering.mkSg (pointset |> Mod.constant)
-            |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
-                DefaultSurfaces.vertexColor |> toEffect
-                ]
-            |> Sg.uniform "ViewportSize" vrWin.Sizes
-            |> Sg.trafo (Mod.constant(flipYZ * Trafo3d.Scale(0.01) * Trafo3d.Translation(V3d(0.0, 0.0, 2.0))))
-
-
-
-
 
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9
@@ -370,16 +253,46 @@ let main _ =
     
     let pedestalHeight = 1.0
     let pedestalRadius = 0.005
-    let pedestalHorizontalOffset = trackingAreaSize / 2.0 - 0.3
     let pedestalVerticalOffset = pedestalHeight / 2.0
-    let pedestalPosition = V3d(+pedestalHorizontalOffset, pedestalVerticalOffset, +pedestalHorizontalOffset)
+    let pedestalPosition = V3d(0.0, pedestalVerticalOffset, 0.0)
         
     let cushionHeight = pedestalRadius * 0.75
     let cushionSize = pedestalRadius * 1.5
     let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
         
-//    let pointCloudRadius = 0.1213
-//    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + pointCloudRadius, cushionPosition.Z)
+    let rec getPoints (n : OctreeNode) =
+        match n with
+            | Empty -> [||]
+            | Node (points,children)  -> 
+                children 
+                    |> Array.map (fun c -> c.GetValue()) 
+                    |> Array.map getPoints
+                    |> Array.concat
+            | Leaf points -> 
+                points.GetValue() |> Array.map (fun p -> p.Position)
+
+    let centroid (n : OctreeNode) = 
+        let pos = getPoints (n) 
+        let posSum = (pos |> Array.fold (+) V3d.OOO)
+        let count = pos |> Array.length |> float
+        let avgPos = posSum / count
+        let variances = pos |> Array.map (fun p -> (avgPos - p).Length )
+        let varSum = (variances |> Array.fold (+) V3d.OOO)
+        let variance = varSum / count
+        (avgPos, variance)
+        
+//    let pointCloudBBCenter = lodData.BoundingBox.Center
+    let (pointCloudBBCenter, variance) = centroid(pointSet.root.GetValue())
+//    let (pointCloudBBCenter, variance) = (flipYZ.Forward.TransformPos(pointCloudBBCenter), flipYZ.Forward.TransformPos(variance))
+    printfn "centroid = %A, variance = %A" pointCloudBBCenter variance
+    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.5, cushionPosition.Z)
+    let pointCloudOffset = pointCloudResetPos - pointCloudBBCenter
+    let pointCloudCenterTrafo = Trafo3d.Translation(pointCloudOffset)
+        
+//    let pointCloudBBSize = lodData.BoundingBox.Size
+    let pointCloudBBSize = variance
+    let pointCloudScaleCorrection = Trafo3d.Scale(1.0 / pointCloudBBSize.Length)
+
     //#endregion
        
     //#region Effects and Surfaces   
@@ -460,6 +373,17 @@ let main _ =
                             |> pedestalDiffuseTexture |> pedestalNormalMap
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
+                            
+    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ
+    let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, lodSettings.NodeCount, pointCloudModelTrafo)
+    let pointcloudSg = 
+        Rendering.mkSg (lodData)
+            |> Sg.effect [
+                DefaultSurfaces.trafo |> toEffect
+                DefaultSurfaces.vertexColor |> toEffect
+                ]
+            |> Sg.uniform "ViewportSize" vrWin.Sizes
+            |> Sg.trafo (Mod.constant(pointCloudModelTrafo))
     //#endregion
 
     //#region Objects   
