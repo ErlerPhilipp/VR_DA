@@ -112,7 +112,7 @@ let main _ =
     let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
     
     let pedestalHeight = 1.0
-    let pedestalRadius = 0.005
+    let pedestalRadius = 0.5
     let pedestalVerticalOffset = pedestalHeight / 2.0
     let pedestalPosition = V3d(0.0, pedestalVerticalOffset, 0.0)
         
@@ -143,15 +143,15 @@ let main _ =
         
 //    let pointCloudBBCenter = lodData.BoundingBox.Center
     let (pointCloudBBCenter, variance) = centroid(pointSet.root.GetValue())
-//    let (pointCloudBBCenter, variance) = (flipYZ.Forward.TransformPos(pointCloudBBCenter), flipYZ.Forward.TransformPos(variance))
+//    let pointCloudBBCenter = V3d(pointCloudBBCenter.X, pointCloudBBCenter.Z, pointCloudBBCenter.Y)
     printfn "centroid = %A, variance = %A" pointCloudBBCenter variance
-    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.5, cushionPosition.Z)
-    let pointCloudOffset = pointCloudResetPos - pointCloudBBCenter
+    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.1, cushionPosition.Z)
+    let pointCloudOffset = -pointCloudBBCenter
     let pointCloudCenterTrafo = Trafo3d.Translation(pointCloudOffset)
         
 //    let pointCloudBBSize = lodData.BoundingBox.Size
     let pointCloudBBSize = variance
-    let pointCloudScaleCorrection = Trafo3d.Scale(1.0 / pointCloudBBSize.Length)
+    let pointCloudScaleCorrection = Trafo3d.Scale(1.0 / pointCloudBBSize.Length * 0.5)
 
     //#endregion
        
@@ -180,6 +180,14 @@ let main _ =
                                     OmnidirShadowShader.Effect false
                                 ]
     let normalDiffuseSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, normalDiffuseEffect) :> ISurface
+    let centroidEffect =            [
+                                    SphereTexture.vertex |> toEffect
+                                    defaultTrafoEffect
+                                    SphereTexture.fragment |> toEffect
+                                    defaultDiffuseTextureEffect
+                                    OmnidirShadowShader.Effect false
+                                ]
+    let centroidSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, centroidEffect) :> ISurface
     //#endregion
     
     //#region Textures   
@@ -234,7 +242,7 @@ let main _ =
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
                             
-    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ
+    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ * Trafo3d.Translation(pointCloudResetPos)
     let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, Rendering.lodSettings.NodeCount, pointCloudModelTrafo)
     let pointcloudSg = 
         Rendering.mkSg (lodData)
@@ -243,6 +251,9 @@ let main _ =
                 DefaultSurfaces.vertexColor |> toEffect
                 ]
             |> Sg.uniform "ViewportSize" vrWin.Sizes
+            
+    let centroidSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1)
+                    |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
     //#endregion
 
     //#region Objects   
@@ -273,6 +284,13 @@ let main _ =
             trafo = Trafo3d.Translation(0.0, trackingAreaHeight - wallThickness * 2.5, 0.0)
             model = Some lightSg
             surface = Some constColorSurface
+        }
+    let centroidObject = 
+        { defaultObject with
+            id = newId()
+            model = Some centroidSg
+            trafo = Trafo3d.Translation(pointCloudResetPos)
+            surface = Some centroidSurface
         }
 
     let groundTilingFactor = 0.3
@@ -340,8 +358,9 @@ let main _ =
     let cushion = { cushionBase with id = newId(); trafo = Trafo3d.Translation(cushionPosition)}
 
     let objects =
-        [lightObject]
-        @ [groundObject; ceilingObject; wall1; wall2; wall3; wall4]
+        [lightObject; centroidObject]
+        @ [groundObject; ceilingObject]
+        @ [wall1; wall2; wall3; wall4]
         @ [pedestal; cushion]
         @ [controller1Object; controller2Object; camObject1; camObject2]
     //#endregion
@@ -354,6 +373,7 @@ let main _ =
             controller1ObjectId = controller1Object.id
             controller2ObjectId = controller2Object.id
             lightId             = lightObject.id
+            centroidId          = centroidObject.id
         }
 
     let sceneObj =

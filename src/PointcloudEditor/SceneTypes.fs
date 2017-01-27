@@ -59,6 +59,7 @@ module LogicalSceneTypes =
             controller1ObjectId : int
             controller2ObjectId : int
             lightId             : int
+            centroidId          : int
         }
 
     type InteractionInfo =

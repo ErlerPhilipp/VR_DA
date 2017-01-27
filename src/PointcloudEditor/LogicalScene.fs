@@ -49,36 +49,24 @@ module LogicalScene =
                     else
                         (scene.specialObjectIds.controller2ObjectId, scene.interactionInfo2)
                         
-                let updateControllerObjects(virtualHandTrafo : Trafo3d, objects : PersistentHashSet<Object>) = 
-                    let newObjects = setTrafoOfObjectsWithId(controllerObjectId, virtualHandTrafo, objects)
-                    newObjects
-
-//                let updateGrabbedObjects(virtualHandTrafo : Trafo3d, objects : PersistentHashSet<Object>) = 
-//                    objects
-//                        |> PersistentHashSet.map (fun a ->
-//                            if (a.isGrabbed = GrabbedOptions.Controller1 && firstController) || 
-//                                (a.isGrabbed = GrabbedOptions.Controller2 && not firstController) then 
-//                                { a with trafo = a.trafo * deltaTrafo } else a
-////                        )
-
-                let newObjects = updateControllerObjects(t, scene.objects)
-//                let newObjects = updateGrabbedObjects(t, newObjects)
+                let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * t
+                let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects)
+                let newScene = if interactionInfo.triggerPressed then 
+                                    let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, deltaTrafo, newObjects)
+                                    {scene with pointCloudTrafo = scene.pointCloudTrafo * deltaTrafo; objects = newObjects} 
+                                else 
+                                    {scene with objects = newObjects}
                 let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
-                let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with objects = newObjects }
+                let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, newScene)
+                newScene
                  
             // press trigger
             | DeviceTouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
-                let scene = if not interactionInfo.triggerPressed then
-                                    let newInteractionInfo = { interactionInfo with triggerPressed = true}
-                                    makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                                else
-                                    scene
-
-                scene
+                let newInteractionInfo = { interactionInfo with triggerPressed = true}
+                makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -96,6 +84,7 @@ module LogicalScene =
                 }
                 
             | TimeElapsed(dt) ->
+                
                 { scene with deltaTime = dt.TotalSeconds }
             
             | EndFrame ->
