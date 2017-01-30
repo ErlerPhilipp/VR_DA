@@ -68,6 +68,7 @@ module LogicalSceneTypes =
             vibrationStrength   : float
             vibStrLastFrame     : float
             triggerPressed      : bool
+            trackpadPressed     : bool
         }
 
     let DefaultInteractionInfo = 
@@ -76,6 +77,7 @@ module LogicalSceneTypes =
             vibrationStrength   = 0.0
             vibStrLastFrame     = 0.0
             triggerPressed      = false
+            trackpadPressed     = false
         }
 
     type Scene =

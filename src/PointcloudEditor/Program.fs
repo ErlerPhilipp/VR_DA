@@ -145,7 +145,7 @@ let main _ =
     let (pointCloudBBCenter, variance) = centroid(pointSet.root.GetValue())
 //    let pointCloudBBCenter = V3d(pointCloudBBCenter.X, pointCloudBBCenter.Z, pointCloudBBCenter.Y)
     printfn "centroid = %A, variance = %A" pointCloudBBCenter variance
-    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.1, cushionPosition.Z)
+    let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.3, cushionPosition.Z)
     let pointCloudOffset = -pointCloudBBCenter
     let pointCloudCenterTrafo = Trafo3d.Translation(pointCloudOffset)
         
@@ -242,7 +242,7 @@ let main _ =
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
                             
-    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ * Trafo3d.Translation(pointCloudResetPos)
+    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ// * Trafo3d.Translation(pointCloudResetPos)
     let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, Rendering.lodSettings.NodeCount, pointCloudModelTrafo)
     let pointcloudSg = 
         Rendering.mkSg (lodData)

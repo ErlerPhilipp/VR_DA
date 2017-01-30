@@ -746,8 +746,6 @@ module Pts =
                 
         member x.ReadInt(res : byref<int>) =
             if tryFillBuffer() then
-                let mutable pos = true
-
                 let off = stream.Position + int64 offset
                 let rec read (pos : bool) (value : int) =
                     if tryFillBuffer() then
@@ -780,7 +778,6 @@ module Pts =
             if tryFillBuffer() then
                 let mutable cnt = 0
                 let mutable pos = isPositive
-                let off = offset
                 let rec read (value : int) =
                     if tryFillBuffer() then
                         let c = int buffer.[offset]  - int zero
@@ -809,7 +806,6 @@ module Pts =
         member x.ReadDouble(res : byref<float>) =
             if tryFillBuffer() then
                 
-                let off = offset
                 let mutable lpos = true
                 let mutable hpos = true
                 let mutable h = 0

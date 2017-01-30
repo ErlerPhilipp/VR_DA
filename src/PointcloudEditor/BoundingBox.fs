@@ -60,7 +60,7 @@ module BoundingBox =
 
 
     let effectRed  = 
-        let e   = FShade.SequentialComposition.compose [ instancedTrafo |> toEffect; DefaultSurfaces.constantColor C4f.Red |> toEffect ]
+        let e   = FShade.SequentialComposition.compose [ instancedTrafo |> toEffect; DefaultSurfaces.trafo |> toEffect; DefaultSurfaces.constantColor C4f.Red |> toEffect ]
         let s   = FShadeSurface(e) :> ISurface 
         s |> Mod.constant
     

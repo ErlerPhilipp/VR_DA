@@ -108,7 +108,7 @@ module PointCloudHelper =
         let lodSettings =
             {   
                 NodeCount = Mod.init 150.0
-                PointSize = Mod.init 10.0
+                PointSize = Mod.init 0.01
             }
 
 
@@ -138,13 +138,86 @@ module PointCloudHelper =
                 return V3d(abs v.n.X, abs v.n.Y, abs v.n.Z)
             }
 
+
+        let viewSizedPointSprites (p : Point<Effects.Vertex>) =
+            triangle {
+                let s = uniform.PointSize * 0.5
+                let vp = uniform.ViewTrafo * p.Value.wp
+                let p00 = V3d(vp.XYZ + V3d( -s, -s, 0.0 ))
+                let p01 = V3d(vp.XYZ + V3d( -s,  s, 0.0 ))
+                let p10 = V3d(vp.XYZ + V3d(  s, -s, 0.0 ))
+                let p11 = V3d(vp.XYZ + V3d(  s,  s, 0.0 ))
+
+                yield { p.Value with pos = uniform.ProjTrafo * V4d(p00, vp.W); tc = V2d.OO }
+                yield { p.Value with pos = uniform.ProjTrafo * V4d(p10, vp.W); tc = V2d.IO }
+                yield { p.Value with pos = uniform.ProjTrafo * V4d(p01, vp.W); tc = V2d.OI }
+                yield { p.Value with pos = uniform.ProjTrafo * V4d(p11, vp.W); tc = V2d.II }
+
+            }
+
+        type Frag =
+            {
+                [<Color>]
+                color : V4d
+                [<Depth>]
+                depth : float
+                [<Normal>]
+                n : V3d
+            }
+
+        let pointSpriteFragment (v : Effects.Vertex) =
+            fragment {
+                let c = 2.0 * v.tc - V2d.II
+                if c.Length > 1.0 then
+                    discard()
+
+                let z = sqrt (1.0 - c.LengthSquared)
+
+                let n = V3d(c.XY, z) * uniform.PointSize * 0.5
+                let worldNormal = (uniform.ViewTrafoInv * V4d(n, 0.0)).XYZ
+
+                let pp = uniform.ViewProjTrafo * (v.wp + V4d(worldNormal.X, worldNormal.Y, worldNormal.Z, 0.0))
+                let z = pp.Z / pp.W
+
+
+
+
+                // v.wp + V4d(0.0, 0.0, z, 0.0)
+
+
+                return { color = v.c; n = Vec.normalize worldNormal; depth = z } 
+            }
+
+        let alphaColor (v : Effects.Vertex) =
+            fragment {
+                let c = 2.0 * v.tc - V2d.II
+                let z = sqrt (1.0 - c.LengthSquared)
+                return V4d(0.2 * z * v.c.XYZ, 0.2)
+            }
+
         let mkSg (lodData : PointSetLodData) = 
         
+//            let add =
+//                BlendMode(
+//                    Enabled = true,
+//                    SourceAlphaFactor = BlendFactor.One,
+//                    DestinationAlphaFactor = BlendFactor.One,
+//                    SourceFactor = BlendFactor.One,
+//                    DestinationFactor = BlendFactor.One,
+//                    Operation = BlendOperation.Add,
+//                    AlphaOperation = BlendOperation.Add
+//                )
+
             Sg.pointCloud' lodData pointCloudInfoSettings (LodProgress.Progress.empty)
             |> Sg.effect 
                 [
                     DefaultSurfaces.trafo       |> toEffect
-                    DefaultSurfaces.pointSprite |> toEffect
-                    DefaultSurfaces.vertexColor                 |> toEffect
+//                    DefaultSurfaces.pointSprite |> toEffect
+                    viewSizedPointSprites |> toEffect
+                    DefaultSurfaces.pointSpriteFragment |> toEffect
+                    DefaultSurfaces.vertexColor |> toEffect
+//                    alphaColor |> toEffect
                 ]
-            |> Sg.uniform "PointSize" lodSettings.PointSize 
+//            |> Sg.blendMode (Mod.constant add)
+//            |> Sg.depthTest (Mod.constant DepthTestMode.None)
+            |> Sg.uniform "PointSize" lodSettings.PointSize  

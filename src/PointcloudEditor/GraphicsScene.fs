@@ -29,6 +29,7 @@ module GraphicsScene =
 
         static member Create(s : Scene) =
             let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
+            let centroidTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.centroidId, s.objects)
             {
                 original            = s
                 graphicsObjects     = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
@@ -38,7 +39,7 @@ module GraphicsScene =
 
                 scoreTrafo          = Mod.init s.scoreTrafo
                 scoreText           = Mod.init s.scoreText
-                pointCloudTrafo     = Mod.init s.pointCloudTrafo
+                pointCloudTrafo     = Mod.init (s.pointCloudTrafo * centroidTrafo)
             }
 
         static member Update(mo : GraphicsObject, o : Object) =
@@ -51,6 +52,7 @@ module GraphicsScene =
         static member Update(ms : GraphicsScene, s : Scene) =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
                 let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
+                let centroidTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.centroidId, s.objects)
 
                 ms.original <- s
                 ms.viewTrafo.Value <- s.viewTrafo
@@ -59,7 +61,7 @@ module GraphicsScene =
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo
                 ms.scoreText.Value <- s.scoreText
-                ms.pointCloudTrafo.Value <- s.pointCloudTrafo
+                ms.pointCloudTrafo.Value <- (s.pointCloudTrafo * centroidTrafo)
 
                 let table = 
                     ms.graphicsObjects |> Seq.map (fun mm -> mm.original.id, mm) |> Dict.ofSeq
