@@ -111,7 +111,7 @@ let main _ =
     let wallLateralOffset = trackingAreaSize * 0.5 + wallThickness * 0.5
     let wallHorizontalOffset = trackingAreaHeight * 0.5 - wallThickness
     
-    let pedestalHeight = 1.0
+    let pedestalHeight = 0.8
     let pedestalRadius = 0.5
     let pedestalVerticalOffset = pedestalHeight / 2.0
     let pedestalPosition = V3d(0.0, pedestalVerticalOffset, 0.0)
@@ -252,7 +252,7 @@ let main _ =
                 ]
             |> Sg.uniform "ViewportSize" vrWin.Sizes
             
-    let centroidSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.1)
+    let centroidSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.05)
                     |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
     //#endregion
 

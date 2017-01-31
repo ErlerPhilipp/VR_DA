@@ -105,7 +105,7 @@ module LogicalScene =
             | TimeElapsed(dt) ->
                 let newObjects = scene.objects
                 
-                let scalePointCloud(firstController : bool, currTrafo : Trafo3d) =
+                let getScaleFactorForController(firstController : bool) =
                     let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
 
                     if interactionInfo.trackpadPressed then 
@@ -120,29 +120,29 @@ module LogicalScene =
 
                         let axisValue = if firstController then getAxisValue(uint32 assignedInputs.controller1Id) else getAxisValue(uint32 assignedInputs.controller2Id)
                         let scalingFactor = axisValue.Y
+                        scalingFactor
+                    else
+                        0.0
+
+                let scalePointCloud(scalingFactor : float, currTrafo : Trafo3d, pivot : V3d) =
                         let scalingSpeed = 1.1
                         let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
+//                        printfn "axisValue = %A, scalingFactorForFrame %A" axisValue.Y scalingFactorForFrame
+
                         let deltaTrafo = Trafo3d.Scale(scalingFactorForFrame)
-                        printfn "axisValue = %A, scalingFactorForFrame %A" axisValue.Y scalingFactorForFrame
-
-                        let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()))
+                        let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()) - pivot)
                         translation.Inverse * deltaTrafo * translation
-                    else
-                        Trafo3d.Identity
 
-
+                let pivot = V3d()
                 let currCentroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, newObjects)
-                let deltaTrafo1 = scalePointCloud(true, currCentroidTrafo)
-                let deltaTrafo2 = scalePointCloud(false, deltaTrafo1)
-                let newCentroidTrafo = currCentroidTrafo * deltaTrafo1 * deltaTrafo2
+                let scaleFactor1 = getScaleFactorForController(true)
+                let scaleFactor2 = getScaleFactorForController(false)
+                let scaleFactor = scaleFactor1 + scaleFactor2
+                let deltaTrafo = scalePointCloud(scaleFactor, currCentroidTrafo, pivot)
+                let newCentroidTrafo = currCentroidTrafo * deltaTrafo
                 let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, newCentroidTrafo, newObjects)
 
-//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, scalePointCloud(true), newObjects)
-//                let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, scalePointCloud(false), newObjects)
-//                let newPointCloudTrafo = scene.pointCloudTrafo * scalePointCloud(true)
-//                let newPointCloudTrafo = newPointCloudTrafo * scalePointCloud(false)
-
-                { scene with deltaTime = dt.TotalSeconds; objects = newObjects }//pointCloudTrafo = newPointCloudTrafo }
+                { scene with deltaTime = dt.TotalSeconds; objects = newObjects }
             
             | EndFrame ->
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
