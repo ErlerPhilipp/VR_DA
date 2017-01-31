@@ -68,22 +68,44 @@ module VrInteractions =
         let getControllerMiddleTrafo(controller1Trafo : Trafo3d, controller2Trafo : Trafo3d) =
             let controller1Pos = controller1Trafo.Forward.TransformPos(V3d())
             let controller2Pos = controller2Trafo.Forward.TransformPos(V3d())
+//            let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.OOI)
+//            let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.OOI)
+//            let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.OIO)
+//            let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.OIO)
+            let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.IOO)
+            let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.IOO)
+
             let translation = (controller1Pos + controller2Pos) / 2.0
             let scale = (controller1Pos - controller2Pos).Length
             let ctr1To2 = controller2Pos - controller1Pos
-            (translation, scale, ctr1To2)
 
-        let (currMiddleTrans, currMiddleScale, currCtr1To2) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
-        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
+            let rotateAxisToX = Trafo3d.RotateInto(ctr1To2, V3d.IOO)
+            let forward1OnYZ = rotateAxisToX.Forward.TransformDir(controller1Forward)
+            let forward1OnYZ = forward1OnYZ.OYZ.Normalized
+            let forward2OnYZ = rotateAxisToX.Forward.TransformDir(controller2Forward)
+            let forward2OnYZ = forward2OnYZ.OYZ.Normalized
+            let angle1 = acos(V3d.Dot(V3d.OIO, forward1OnYZ))
+            let angle2 = acos(V3d.Dot(V3d.OIO, forward2OnYZ))
+
+            (translation, scale, ctr1To2, angle1, angle2)
+
+        let (currMiddleTrans, currMiddleScale, currCtr1To2, currAngle1, currAngle2) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
+        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2, oldAngle1, oldAngle2) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
         
-        let deltaTrans = currMiddleTrans - oldMiddleTrans
-        let deltaScale = currMiddleScale / oldMiddleScale
-        let deltaRot = Trafo3d.RotateInto(oldCtr1To2, currCtr1To2)
+        let deltaTrans = Trafo3d.Translation(currMiddleTrans - oldMiddleTrans)
+        let deltaScale = Trafo3d.Scale(currMiddleScale / oldMiddleScale)
+        let deltaRot =   Trafo3d.RotateInto(oldCtr1To2, currCtr1To2)
+        
+//        let deltaAngle1 = (currAngle1 - oldAngle1) % Constant.PiTimesTwo
+//        let deltaAngle2 = (currAngle2 - oldAngle2) % Constant.PiTimesTwo
+//        let avgDeltaAngle = ((deltaAngle1 + deltaAngle2) % Constant.PiTimesTwo) / 2.0
+        let controllerDeltaRot = Trafo3d.Identity// Trafo3d.Rotation(currCtr1To2.Normalized, avgDeltaAngle)
+//        printfn "avgDeltaAngle = %A, currCtr1To2 = %A" avgDeltaAngle currCtr1To2
 //        printfn "deltaTrans = %A, deltaScale = %A" deltaTrans deltaScale
 
         let pivot = currMiddleTrans
         let currCentroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
-        let deltaTrafo = Trafo3d.Scale(deltaScale) * deltaRot * Trafo3d.Translation(deltaTrans)
+        let deltaTrafo = deltaScale * deltaRot * controllerDeltaRot * deltaTrans
         let deltaTrafo = transformForPointCloud(deltaTrafo, currCentroidTrafo, pivot)
         let newCentroidTrafo = currCentroidTrafo * deltaTrafo
         let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, newCentroidTrafo, scene.objects)

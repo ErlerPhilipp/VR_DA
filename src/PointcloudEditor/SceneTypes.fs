@@ -91,7 +91,7 @@ module LogicalSceneTypes =
             selectionVolume     : Shapes.Shape
             scoreTrafo          : Trafo3d
             scoreText           : string
-            pointCloudSg        : ISg
+            pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
             
             specialObjectIds    : SpecialObjectIds

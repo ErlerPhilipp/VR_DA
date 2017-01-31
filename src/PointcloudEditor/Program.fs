@@ -81,7 +81,7 @@ let main _ =
 
             let off = V3d.Zero
 //            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
-            let tree = Octree.build db 50000000 off (1 + cnt / chunkSize) points
+            let tree = Octree.build db 10000 off (1 + cnt / chunkSize) points
             printfn "tree : %A" tree
 
             r := tree
@@ -243,9 +243,9 @@ let main _ =
                             |> cushionDiffuseTexture |> cushionNormalMap
                             
     let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ// * Trafo3d.Translation(pointCloudResetPos)
-    let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, Rendering.lodSettings.NodeCount, pointCloudModelTrafo)
-    let pointcloudSg = 
-        Rendering.mkSg (lodData)
+    let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, Rendering.lodSettings.NodeCount)
+    let pointcloudSg (view : IMod<Trafo3d>) = 
+        Rendering.mkSg view (lodData)
             |> Sg.effect [
                 DefaultSurfaces.trafo |> toEffect
                 DefaultSurfaces.vertexColor |> toEffect

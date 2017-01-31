@@ -59,8 +59,8 @@
     <Compile Include="BoundingBox.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="OmnidirShadows.fs" />
-    <Compile Include="GraphicsScene.fs" />
     <Compile Include="PointCloudHelper.fs" />
+    <Compile Include="GraphicsScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

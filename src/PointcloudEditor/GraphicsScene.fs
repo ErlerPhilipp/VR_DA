@@ -126,8 +126,11 @@ module GraphicsScene =
 //            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
             Sg.markdown MarkdownConfig.light graphicsScene.scoreText
                 |> Sg.trafo graphicsScene.scoreTrafo
-                
-        Sg.ofList ([sg; textSg; initialScene.pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
+           
+        let fakeView = Mod.map2 (fun (m : Trafo3d) v -> m * v) graphicsScene.pointCloudTrafo graphicsScene.viewTrafo 
+        let pointCloudSg = initialScene.pointCloudSg fakeView
+
+        Sg.ofList ([sg; textSg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
 //        Sg.ofList ([initialScene.pointCloudSg])
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection

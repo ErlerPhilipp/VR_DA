@@ -28,9 +28,9 @@ module PointCloudHelper =
          module LodData =
             open System.Collections.Concurrent
 
-            type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>, modelTrafo : Trafo3d) =
+            type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
             
-                let bounds = Box3d( modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Min), modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Max))
+                let bounds = tree.GetValue().bounds //Box3d( modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Min), modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Max))
 
                 member x.Traverse (f : LodDataNode -> bool) = 
              
@@ -112,22 +112,22 @@ module PointCloudHelper =
             }
 
 
-        let pointCloudInfoSettings =
-            {
-                targetPointDistance     = Mod.init 50.0
-                maxReuseRatio           = 0.5
-                minReuseCount           = 1L <<< 20
-                pruneInterval           = 500
-                customView              = None
-                customProjection        = None
-                attributeTypes =
-                    Map.ofList [
-                        DefaultSemantic.Positions, typeof<V3f>
-                        DefaultSemantic.Colors, typeof<C4b>
-                        DefaultSemantic.Normals, typeof<V3f>
-                    ]
-                boundingBoxSurface      = Some BoundingBox.effectRed
-            }
+//        let pointCloudInfoSettings =
+//            {
+//                targetPointDistance     = Mod.init 50.0
+//                maxReuseRatio           = 0.5
+//                minReuseCount           = 1L <<< 20
+//                pruneInterval           = 500
+//                customView              = None
+//                customProjection        = None
+//                attributeTypes =
+//                    Map.ofList [
+//                        DefaultSemantic.Positions, typeof<V3f>
+//                        DefaultSemantic.Colors, typeof<C4b>
+//                        DefaultSemantic.Normals, typeof<V3f>
+//                    ]
+//                boundingBoxSurface      = Some BoundingBox.effectRed
+//            }
 
         open LodData
         open FShade
@@ -161,63 +161,90 @@ module PointCloudHelper =
                 color : V4d
                 [<Depth>]
                 depth : float
-                [<Normal>]
-                n : V3d
             }
+            
+        let sphereImposterGeometry (p : Point<Vertex>) =
+            triangle {
+                let s   = uniform.PointSize * 0.5
+                let wp  = p.Value.wp
+                let vp  = uniform.ViewTrafo * wp
+            
+                let vp00 = vp + V4d( -s, -s, 0.0, 0.0 )
+                let vp01 = vp + V4d( -s,  s, 0.0, 0.0 )
+                let vp10 = vp + V4d(  s, -s, 0.0, 0.0 )
+                let vp11 = vp + V4d(  s,  s, 0.0, 0.0 )
 
-        let pointSpriteFragment (v : Effects.Vertex) =
-            fragment {
+                let wp00 = uniform.ViewTrafoInv * vp00 
+                let wp01 = uniform.ViewTrafoInv * vp01 
+                let wp10 = uniform.ViewTrafoInv * vp10 
+                let wp11 = uniform.ViewTrafoInv * vp11 
+
+
+                let p00 = uniform.ProjTrafo * vp00
+                let p01 = uniform.ProjTrafo * vp01
+                let p10 = uniform.ProjTrafo * vp10
+                let p11 = uniform.ProjTrafo * vp11
+
+
+                yield { p.Value with c = p.Value.c; wp = wp00; pos = p00 / p00.W; tc = V2d.OO }
+                yield { p.Value with c = p.Value.c; wp = wp01; pos = p01 / p01.W; tc = V2d.IO }
+                yield { p.Value with c = p.Value.c; wp = wp10; pos = p10 / p10.W; tc = V2d.OI }
+                yield { p.Value with c = p.Value.c; wp = wp11; pos = p11 / p11.W; tc = V2d.II }
+            }       
+
+
+        let sphereImposterFragment (v : Vertex) =
+           fragment {
                 let c = 2.0 * v.tc - V2d.II
                 if c.Length > 1.0 then
                     discard()
 
                 let z = sqrt (1.0 - c.LengthSquared)
+                
+                //let n = V3d(c.XY,z)
+                let d = z * uniform.PointSize * 0.5
+                
+                let vp = uniform.ViewTrafo * v.wp
+                let vp = vp / vp.W
+                let vp = V4d(vp.X, vp.Y, vp.Z + d, 1.0)
 
-                let n = V3d(c.XY, z) * uniform.PointSize * 0.5
-                let worldNormal = (uniform.ViewTrafoInv * V4d(n, 0.0)).XYZ
+                let sp = uniform.ProjTrafo *vp
+                let sp = sp / sp.W
 
-                let pp = uniform.ViewProjTrafo * (v.wp + V4d(worldNormal.X, worldNormal.Y, worldNormal.Z, 0.0))
-                let z = pp.Z / pp.W
-
-
-
-
-                // v.wp + V4d(0.0, 0.0, z, 0.0)
-
-
-                return { color = v.c; n = Vec.normalize worldNormal; depth = z } 
+                return {color = v.c; depth = sp.Z * 0.5 + 0.5} 
             }
-
-        let alphaColor (v : Effects.Vertex) =
+    
+    
+        let vertexColor (f : Frag) =
             fragment {
-                let c = 2.0 * v.tc - V2d.II
-                let z = sqrt (1.0 - c.LengthSquared)
-                return V4d(0.2 * z * v.c.XYZ, 0.2)
+                return f.color
             }
 
-        let mkSg (lodData : PointSetLodData) = 
+        let mkSg (customView : IMod<Trafo3d>) (lodData : PointSetLodData) = 
         
-//            let add =
-//                BlendMode(
-//                    Enabled = true,
-//                    SourceAlphaFactor = BlendFactor.One,
-//                    DestinationAlphaFactor = BlendFactor.One,
-//                    SourceFactor = BlendFactor.One,
-//                    DestinationFactor = BlendFactor.One,
-//                    Operation = BlendOperation.Add,
-//                    AlphaOperation = BlendOperation.Add
-//                )
+            let pointCloudInfoSettings =
+                {
+                    targetPointDistance     = Mod.init 1500.0
+                    maxReuseRatio           = 0.5
+                    minReuseCount           = 1L <<< 20
+                    pruneInterval           = 500
+                    customView              = Some customView
+                    customProjection        = None
+                    attributeTypes =
+                        Map.ofList [
+                            DefaultSemantic.Positions, typeof<V3f>
+                            DefaultSemantic.Colors, typeof<C4b>
+                            DefaultSemantic.Normals, typeof<V3f>
+                        ]
+                    boundingBoxSurface      = Some BoundingBox.effectRed
+                }
 
             Sg.pointCloud' lodData pointCloudInfoSettings (LodProgress.Progress.empty)
             |> Sg.effect 
                 [
                     DefaultSurfaces.trafo       |> toEffect
-//                    DefaultSurfaces.pointSprite |> toEffect
-                    viewSizedPointSprites |> toEffect
-                    DefaultSurfaces.pointSpriteFragment |> toEffect
+                    sphereImposterGeometry      |> toEffect
+                    sphereImposterFragment      |> toEffect
                     DefaultSurfaces.vertexColor |> toEffect
-//                    alphaColor |> toEffect
                 ]
-//            |> Sg.blendMode (Mod.constant add)
-//            |> Sg.depthTest (Mod.constant DepthTestMode.None)
             |> Sg.uniform "PointSize" lodSettings.PointSize  
