@@ -19,8 +19,10 @@ module VrInteractions =
             1.0 + scalingFactor * scalingSpeed * (dt)
 
     let transformForPointCloud(deltaTrafo : Trafo3d, currTrafo : Trafo3d, pivot : V3d) =
-            let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()) - pivot)
-            translation.Inverse * deltaTrafo * translation
+            let pointcloudOffset = currTrafo.Forward.TransformPos(V3d())
+            let toPointcloudOrigin = Trafo3d.Translation(-pointcloudOffset)
+            let centroidToPivot = Trafo3d.Translation(pointcloudOffset-pivot)
+            toPointcloudOrigin * centroidToPivot * deltaTrafo * centroidToPivot.Inverse * toPointcloudOrigin.Inverse
 
     let scaleForPointCloud(scalingFactor : float, currTrafo : Trafo3d, pivot : V3d) =
             let deltaTrafo = Trafo3d.Scale(scalingFactor)
@@ -79,7 +81,7 @@ module VrInteractions =
         let deltaRot = oldMiddleRot.Inverse * currMiddleRot
 //        printfn "deltaTrans = %A, deltaScale = %A" deltaTrans deltaScale
 
-        let pivot = V3d()//currMiddleTrans
+        let pivot = currMiddleTrans
         let currCentroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
         let deltaTrafo = Trafo3d.Scale(deltaScale) * deltaRot * Trafo3d.Translation(deltaTrans)
         let deltaTrafo = transformForPointCloud(deltaTrafo, currCentroidTrafo, pivot)
