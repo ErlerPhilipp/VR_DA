@@ -51,19 +51,17 @@ module LogicalScene =
                         
                         
 
-//                let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * t
                 let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects)
                 let newScene = {scene with objects = newObjects}
+
                 let newObjects =    if scene.interactionInfo1.triggerPressed && scene.interactionInfo2.triggerPressed then 
                                         transformPointCloudWithPinch(newScene)
+                                    elif interactionInfo.triggerPressed then 
+                                        let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * t
+                                        transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, deltaTrafo, newObjects)
                                     else
                                         newObjects
                 let newScene = {scene with objects = newObjects}
-//                let newScene = if interactionInfo.triggerPressed then 
-//                                    let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, deltaTrafo, newObjects)
-//                                    {scene with objects = newObjects} 
-//                                else 
-//                                    {scene with objects = newObjects}
                 let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, newScene)
                 newScene

@@ -70,15 +70,15 @@ module VrInteractions =
             let controller2Pos = controller2Trafo.Forward.TransformPos(V3d())
             let translation = (controller1Pos + controller2Pos) / 2.0
             let scale = (controller1Pos - controller2Pos).Length
-            let rotation = Trafo3d.RotateInto(V3d.IOO, (controller1Pos - controller2Pos))
-            (translation, scale, rotation)
+            let ctr1To2 = controller2Pos - controller1Pos
+            (translation, scale, ctr1To2)
 
-        let (currMiddleTrans, currMiddleScale, currMiddleRot) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
-        let (oldMiddleTrans, oldMiddleScale, oldMiddleRot) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
+        let (currMiddleTrans, currMiddleScale, currCtr1To2) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
+        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
         
         let deltaTrans = currMiddleTrans - oldMiddleTrans
         let deltaScale = currMiddleScale / oldMiddleScale
-        let deltaRot = oldMiddleRot.Inverse * currMiddleRot
+        let deltaRot = Trafo3d.RotateInto(oldCtr1To2, currCtr1To2)
 //        printfn "deltaTrans = %A, deltaScale = %A" deltaTrans deltaScale
 
         let pivot = currMiddleTrans
