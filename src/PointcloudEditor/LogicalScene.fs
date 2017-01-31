@@ -49,14 +49,21 @@ module LogicalScene =
                     else
                         (scene.specialObjectIds.controller2ObjectId, scene.interactionInfo2)
                         
-                let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * t
+                        
+
+//                let deltaTrafo = interactionInfo.lastContrTrafo.Inverse * t
                 let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects)
-                let newScene = if interactionInfo.triggerPressed then 
-                                    let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, deltaTrafo, newObjects)
-                                    //{scene with pointCloudTrafo = scene.pointCloudTrafo * deltaTrafo; objects = newObjects} 
-                                    {scene with objects = newObjects} 
-                                else 
-                                    {scene with objects = newObjects}
+                let newScene = {scene with objects = newObjects}
+                let newObjects =    if scene.interactionInfo1.triggerPressed && scene.interactionInfo2.triggerPressed then 
+                                        transformPointCloudWithPinch(newScene)
+                                    else
+                                        newObjects
+                let newScene = {scene with objects = newObjects}
+//                let newScene = if interactionInfo.triggerPressed then 
+//                                    let newObjects = transformTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, deltaTrafo, newObjects)
+//                                    {scene with objects = newObjects} 
+//                                else 
+//                                    {scene with objects = newObjects}
                 let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, newScene)
                 newScene
@@ -74,7 +81,7 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let newInteractionInfo = {interactionInfo with lastContrTrafo = Trafo3d.Identity; triggerPressed = false }
+                let newInteractionInfo = {interactionInfo with triggerPressed = false }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 newScene
 
@@ -103,46 +110,22 @@ module LogicalScene =
                 }
                 
             | TimeElapsed(dt) ->
-                let newObjects = scene.objects
-                
-                let getScaleFactorForController(firstController : bool) =
-                    let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
+//                let newObjects = scalePointCloudWithTrackpad(scene, dt.TotalSeconds)
+                let newObjects =    
+//                    if scene.interactionInfo1.triggerPressed && scene.interactionInfo2.triggerPressed then 
+//                        transformPointCloudWithPinch(scene)
+//                    else
+                        scene.objects
 
-                    if interactionInfo.trackpadPressed then 
-                        let getAxisValue(deviceId : uint32) = 
-                            let mutable state = VRControllerState_t()
-                            let axisPosition =
-                                if system.GetControllerState(deviceId, &state) then
-                                    Some (V2d(state.[0].x, state.[0].y))
-                                else None
-                            let axisValue = if axisPosition.IsSome then axisPosition.Value else V2d()
-                            axisValue
-
-                        let axisValue = if firstController then getAxisValue(uint32 assignedInputs.controller1Id) else getAxisValue(uint32 assignedInputs.controller2Id)
-                        let scalingFactor = axisValue.Y
-                        scalingFactor
-                    else
-                        0.0
-
-                let scalePointCloud(scalingFactor : float, currTrafo : Trafo3d, pivot : V3d) =
-                        let scalingSpeed = 1.1
-                        let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
-//                        printfn "axisValue = %A, scalingFactorForFrame %A" axisValue.Y scalingFactorForFrame
-
-                        let deltaTrafo = Trafo3d.Scale(scalingFactorForFrame)
-                        let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()) - pivot)
-                        translation.Inverse * deltaTrafo * translation
-
-                let pivot = V3d()
-                let currCentroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, newObjects)
-                let scaleFactor1 = getScaleFactorForController(true)
-                let scaleFactor2 = getScaleFactorForController(false)
-                let scaleFactor = scaleFactor1 + scaleFactor2
-                let deltaTrafo = scalePointCloud(scaleFactor, currCentroidTrafo, pivot)
-                let newCentroidTrafo = currCentroidTrafo * deltaTrafo
-                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.centroidId, newCentroidTrafo, newObjects)
-
-                { scene with deltaTime = dt.TotalSeconds; objects = newObjects }
+                                        
+//                let currController1Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, newObjects)
+//                let currController2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, newObjects)
+                { scene with 
+                    deltaTime = dt.TotalSeconds
+                    objects = newObjects
+//                    interactionInfo1 = {scene.interactionInfo1 with lastContrTrafo = currController1Trafo}
+//                    interactionInfo2 = {scene.interactionInfo1 with lastContrTrafo = currController2Trafo}
+                }
             
             | EndFrame ->
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)

@@ -52,8 +52,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <None Include="App.config" />
     <Compile Include="Shapes.fs" />
-    <Compile Include="VrInteractions.fs" />
     <Compile Include="SceneTypes.fs" />
+    <Compile Include="VrInteractions.fs" />
     <Compile Include="OctreeHelper.fs" />
     <Compile Include="Octree.fs" />
     <Compile Include="BoundingBox.fs" />
