@@ -120,6 +120,9 @@ let main _ =
     let cushionSize = pedestalRadius * 1.5
     let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
         
+    let selectionVolumeRadius = 0.065
+    let controllerRingCenter = V3d(0.0, -0.03, -0.02)
+
     let rec getPoints (n : OctreeNode) =
         match n with
             | Empty -> [||]
@@ -188,6 +191,12 @@ let main _ =
                                     OmnidirShadowShader.Effect false
                                 ]
     let centroidSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, centroidEffect) :> ISurface
+    let selectionVolumeEffect =      [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
+                                    defaultSimpleLightingEffect
+                                ]
+    let selectionVolumeSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, selectionVolumeEffect) :> ISurface
     //#endregion
     
     //#region Textures   
@@ -210,6 +219,9 @@ let main _ =
         Assimp.PostProcessSteps.None
         
     let loadVR f = Loader.Assimp.Load(f,assimpFlagsSteamVR)
+
+    let selectionVolumeSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant selectionVolumeRadius)
+    let selectionVolumeSg = selectionVolumeSg |> Sg.surface (Mod.constant selectionVolumeSurface) |> Sg.blendMode(Mod.constant (BlendMode(true))) |> Sg.trafo(Mod.constant(Trafo3d.Translation(controllerRingCenter)))
    
     let controllerSg = 
         let controllerBody = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj"|> loadVR |> Sg.AdapterNode :> ISg
@@ -219,7 +231,7 @@ let main _ =
         let controllerSysButton = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrackpad =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrigger =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj"|> loadVR |> Sg.AdapterNode :> ISg
-        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger ]
+        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; selectionVolumeSg ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
 
