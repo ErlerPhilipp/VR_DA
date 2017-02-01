@@ -15,9 +15,10 @@ type Point =
     struct
         val mutable public Position : V3d   
         val mutable public Normal   : V3d     
-        val mutable public Color    : C4b      
+        val mutable public Color    : C4b
+        val mutable public State    : byte
         //new(p,c) = { Position = p; Color = c }
-        new(p,n, c) = { Position = p; Normal = n; Color = c }
+        new(p,n, c) = { Position = p; Normal = n; Color = c; State = 0x0uy }
     end
 
 module PSeq =
@@ -421,7 +422,8 @@ module Octree =
                 Log.error "%A" e
                 raise e
  
-        let buildTree (db : Database) (splitThreshold : int) (offset : V3d) (approximateChunks : int) (points : seq<Point[]>) =
+        let buildTree (db : Database) (splitThreshold : int) (_ : V3d) (approximateChunks : int) (points : seq<Point[]>) =
+//        let buildTree (db : Database) (splitThreshold : int) (offset : V3d) (approximateChunks : int) (points : seq<Point[]>) =
 
             let mutable loaded = 0
             let mutable built = 0

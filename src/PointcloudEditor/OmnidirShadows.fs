@@ -136,4 +136,5 @@ module OmnidirShadows =
                 |> Sg.texture (Symbol.Create "ShadowTextureNegY") (shadowDepth(CubeFaceMatrices.[CubeFaces.FaceNegY |> int]))
                 |> Sg.texture (Symbol.Create "ShadowTexturePosZ") (shadowDepth(CubeFaceMatrices.[CubeFaces.FacePosZ |> int]))
                 |> Sg.texture (Symbol.Create "ShadowTextureNegZ") (shadowDepth(CubeFaceMatrices.[CubeFaces.FaceNegZ |> int]))
+                |> Sg.pass (Renderpasses.GeometryPass)
         sg

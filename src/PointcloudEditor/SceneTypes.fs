@@ -69,6 +69,7 @@ module LogicalSceneTypes =
             vibStrLastFrame     : float
             triggerPressed      : bool
             trackpadPressed     : bool
+            selectionVolumePath : Trafo3d[]
         }
 
     let DefaultInteractionInfo = 
@@ -78,6 +79,7 @@ module LogicalSceneTypes =
             vibStrLastFrame     = 0.0
             triggerPressed      = false
             trackpadPressed     = false
+            selectionVolumePath = [| |]
         }
 
     type Scene =
@@ -88,7 +90,6 @@ module LogicalSceneTypes =
             deltaTime           : float
             
             lightColor          : V3d
-            selectionVolume     : Shapes.Shape
             scoreTrafo          : Trafo3d
             scoreText           : string
             pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
@@ -159,6 +160,7 @@ module GraphicsSceneTypes =
             lightPos            : ModRef<V3d>
             lightColor          : ModRef<V3d>
             pointCloudTrafo     : ModRef<Trafo3d>
+            selVolPath          : ModRef<Trafo3d[]>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

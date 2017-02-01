@@ -27,7 +27,7 @@ module PointCloudHelper =
 
          module LodData =
             open System.Collections.Concurrent
-
+            
             type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
             
                 let bounds = tree.GetValue().bounds //Box3d( modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Min), modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Max))
@@ -38,14 +38,16 @@ module PointCloudHelper =
                         let bb = cell.BoundingBox
                         match n with
                             | Empty -> ()
-                            | Node (points,children)  ->
+                            | Node (_,children)  ->
+//                            | Node (points,children)  ->
                                 let nn = { id = (n :> obj); level = level; bounds = bb; 
                                            inner = true; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
                                            render = true}
 
                                 if f nn then
                                     children |> Array.iteri (fun i child -> traverse (level + 1) (cell.GetChild i) child.Value) 
-                            | Leaf points ->                             
+                            | Leaf _ ->                             
+//                            | Leaf points ->                             
                                 let nn = { id = (n :> obj); level = level; bounds = bb; 
                                            inner = true; granularity = 1.0; render = true }
                                 f nn |> ignore

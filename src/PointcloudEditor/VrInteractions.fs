@@ -88,9 +88,11 @@ module VrInteractions =
             let angle2 = acos(V3d.Dot(V3d.OIO, forward2OnYZ))
 
             (translation, scale, ctr1To2, angle1, angle2)
-
-        let (currMiddleTrans, currMiddleScale, currCtr1To2, currAngle1, currAngle2) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
-        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2, oldAngle1, oldAngle2) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
+            
+        let (currMiddleTrans, currMiddleScale, currCtr1To2, _, _) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
+        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2, _, _) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
+//        let (currMiddleTrans, currMiddleScale, currCtr1To2, currAngle1, currAngle2) = getControllerMiddleTrafo(currController1Trafo, currController2Trafo)
+//        let (oldMiddleTrans, oldMiddleScale, oldCtr1To2, oldAngle1, oldAngle2) = getControllerMiddleTrafo(oldController1Trafo, oldController2Trafo)
         
         let deltaTrans = Trafo3d.Translation(currMiddleTrans - oldMiddleTrans)
         let deltaScale = Trafo3d.Scale(currMiddleScale / oldMiddleScale)

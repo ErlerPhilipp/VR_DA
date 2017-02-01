@@ -18,6 +18,22 @@ module LogicalScene =
             { scene with interactionInfo1 = newInteractionInfo}
         else
             { scene with interactionInfo2 = newInteractionInfo}
+
+    let addTrafoToSelectionVolumePath(interactionInfo : InteractionInfo, t : Trafo3d, scene : Scene) =
+        if interactionInfo.trackpadPressed then
+            let newPos = t.Forward.TransformPos(V3d())
+            let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun t -> (t.Forward.TransformPos(V3d()) - newPos).Length < 0.001)
+            if hasPosNearNewPos then
+//                printfn "has sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath)
+                interactionInfo.selectionVolumePath
+            else
+//                printfn "add sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath + 1)
+                let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+                let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
+                let pos = t.Forward.TransformPos(V3d())
+                Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(pos)) * worldToPointcloud |]
+        else
+            interactionInfo.selectionVolumePath 
             
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -62,12 +78,14 @@ module LogicalScene =
                                     else
                                         newObjects
                 let newScene = {scene with objects = newObjects}
-                let newInteractionInfo = { interactionInfo with lastContrTrafo = t }
+
+                let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                let newInteractionInfo = { interactionInfo with lastContrTrafo = t; selectionVolumePath = newSelectionPath }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, newScene)
                 newScene
                  
             // press trigger
-            | DeviceTouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
+            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                         
@@ -75,7 +93,7 @@ module LogicalScene =
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
             // release trigger
-            | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
+            | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
@@ -84,20 +102,62 @@ module LogicalScene =
                 newScene
 
             // press touchpad
-            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
+            | DevicePress(deviceId, a, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let newInteractionInfo = {interactionInfo with trackpadPressed = true }
+                let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                let newInteractionInfo = {interactionInfo with trackpadPressed = true; selectionVolumePath = newSelectionPath }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 newScene
 
             // release touchpad
-            | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
+            | DeviceRelease(deviceId, a, t) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let newInteractionInfo = {interactionInfo with trackpadPressed = false }
+                let finalSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                
+                
+//                let rec traverse (node : OctreeNode) (cell: GridCell) (level : int) : PickCandidateNode[] =
+//                    let bb = cell.BoundingBox              
+//                    
+//                    match node with
+//                    | Empty             ->  [||]
+//                    | Leaf _            -> 
+//                                    let px = node.Points.Value := pointarray
+//                                    let lodDataNode = { 
+//                                            id = (node :> obj); level = level; bounds = bb; 
+//                                            inner = false; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
+//                                            render = true}
+//               
+//                                    if (isPickCandidateNode cell lodDataNode hull p.frustum p.view p.wantedNearPlaneDistance) then                                                                                                                                                         
+//                                            [|{node = node ; cell = cell ; color = C4b.Green}|]   
+//                                    else
+//                                        [||]  
+//                                                                               
+//                    | Node (_,children) ->                                      
+//                                    let lodDataNode = { 
+//                                            id = (node :> obj); level = level; bounds = bb; 
+//                                                inner = true; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
+//                                                render = true}
+//                                    
+//                                    if (isPickCandidateNode cell lodDataNode hull p.frustum p.view p.wantedNearPlaneDistance) then  
+//                                                                    
+//                                        let childCandidateNodes = children  |> Array.mapi (fun i child -> traverse (child.Value) (cell.GetChild i) (level + 1)) 
+//                                                                            |> Array.concat
+//                                        if(childCandidateNodes |> Array.length > 0 ) then 
+//                                            childCandidateNodes
+//                                        else
+//                                            [|{node = node ; cell = cell ; color = C4b.Green}|]     
+//                                    else 
+//                                        [||] 
+
+
+
+                let newSelectionPath = [| |]
+
+                let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 newScene
                     

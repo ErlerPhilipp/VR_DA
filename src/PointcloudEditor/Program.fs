@@ -25,7 +25,7 @@ open Aardvark.Database
 open Aardvark.Base.Native
 
 open LogicalSceneTypes
-open Shapes
+open SelectionVolume
 open Primitives
 open Sphere
 open SGHelper
@@ -48,8 +48,8 @@ let main _ =
     let storagePath = @"C:\bla\vgmCache"
 
     Directory.CreateDirectory(storagePath) |> ignore
-    let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"]) //Memory.hglobal 0L //Memory.mapped (Path.combine [storagePath;"memory.mapped"])
-    let get i   = NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i]) //Memory.hglobal 0L //NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i])
+    let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"])
+    let get i   = NewImpl.Memory.mapped (Path.combine [storagePath;sprintf "memory-chunk-%d.mapped" i])
     let store   = new BlobStore(mem,get)
     use db      = new Database(store)
         
@@ -119,14 +119,12 @@ let main _ =
     let cushionHeight = pedestalRadius * 0.75
     let cushionSize = pedestalRadius * 1.5
     let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
-        
-    let selectionVolumeRadius = 0.065
-    let controllerRingCenter = V3d(0.0, -0.03, -0.02)
 
     let rec getPoints (n : OctreeNode) =
         match n with
             | Empty -> [||]
-            | Node (points,children)  -> 
+//            | Node (points,children)  -> 
+            | Node (_,children)  -> 
                 children 
                     |> Array.map (fun c -> c.GetValue()) 
                     |> Array.map getPoints
@@ -191,12 +189,6 @@ let main _ =
                                     OmnidirShadowShader.Effect false
                                 ]
     let centroidSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, centroidEffect) :> ISurface
-    let selectionVolumeEffect =      [
-                                    defaultTrafoEffect
-                                    DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
-                                    defaultSimpleLightingEffect
-                                ]
-    let selectionVolumeSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, selectionVolumeEffect) :> ISurface
     //#endregion
     
     //#region Textures   
@@ -219,9 +211,6 @@ let main _ =
         Assimp.PostProcessSteps.None
         
     let loadVR f = Loader.Assimp.Load(f,assimpFlagsSteamVR)
-
-    let selectionVolumeSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant selectionVolumeRadius)
-    let selectionVolumeSg = selectionVolumeSg |> Sg.surface (Mod.constant selectionVolumeSurface) |> Sg.blendMode(Mod.constant (BlendMode(true))) |> Sg.trafo(Mod.constant(Trafo3d.Translation(controllerRingCenter)))
    
     let controllerSg = 
         let controllerBody = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj"|> loadVR |> Sg.AdapterNode :> ISg
@@ -231,7 +220,7 @@ let main _ =
         let controllerSysButton = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrackpad =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrigger =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj"|> loadVR |> Sg.AdapterNode :> ISg
-        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; selectionVolumeSg ]
+        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; makeSelectionVolumeSg(vrWin) ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
 
@@ -263,6 +252,7 @@ let main _ =
                 DefaultSurfaces.vertexColor |> toEffect
                 ]
             |> Sg.uniform "ViewportSize" vrWin.Sizes
+            |> Sg.pass (Renderpasses.PointcloudPass)
             
     let centroidSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.05)
                     |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
@@ -400,8 +390,6 @@ let main _ =
             scoreText           = "test"
             pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
-
-            selectionVolume     = Shape.Sphere(0.25)
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
