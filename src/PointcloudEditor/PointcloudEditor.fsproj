@@ -52,14 +52,14 @@
     <Compile Include="AssemblyInfo.fs" />
     <None Include="App.config" />
     <Compile Include="SelectionVolume.fs" />
-    <Compile Include="SceneTypes.fs" />
-    <Compile Include="VrInteractions.fs" />
     <Compile Include="OctreeHelper.fs" />
     <Compile Include="Octree.fs" />
     <Compile Include="BoundingBox.fs" />
+    <Compile Include="PointCloudHelper.fs" />
+    <Compile Include="SceneTypes.fs" />
+    <Compile Include="VrInteractions.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="OmnidirShadows.fs" />
-    <Compile Include="PointCloudHelper.fs" />
     <Compile Include="GraphicsScene.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

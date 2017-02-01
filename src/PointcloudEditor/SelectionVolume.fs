@@ -21,20 +21,8 @@ module SelectionVolume =
     type InstanceVertex = { 
             [<Position>] pos : V4d 
             [<Color>] col : V4d
-            //[<InstanceColor>] col : V4d
             [<InstanceTrafo>] trafo : M44d
         }
-
-//    type Shape =
-//        | Box            of size :  V3d
-//        | Sphere         of radius : float
-//        | CylinderX      of radius : float * height : float
-//        | CylinderY      of radius : float * height : float
-//        | CylinderZ      of radius : float * height : float
-//        | Plane          of Plane3d
-//        | Mesh           of IndexedGeometry
-//        | TriangleMesh   of Triangle3d[]
-//        | Compound       of list<Trafo3d * Shape>
         
     let selectionVolumeRadius = 0.065
     let private tesselationLevel = 5
@@ -55,25 +43,18 @@ module SelectionVolume =
                     trafo   = v.trafo
                 }
             }
-        let vertexColor (v:InstanceVertex) = fragment {return v.col}
 
-        let defaultTrafoEffect = DefaultSurfaces.instanceTrafo |> toEffect
-//        let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
         let selectionVolumeEffect = [
-//                                        defaultTrafoEffect
                                         instancedTrafo |> toEffect
                                         DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
-//                                        defaultSimpleLightingEffect
                                     ]
         vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, selectionVolumeEffect) :> ISurface
 
     let makeSelectionVolumeSurface(vrWin : VrWindow.VrWindow) = 
         let defaultTrafoEffect = DefaultSurfaces.trafo |> toEffect
-//        let defaultSimpleLightingEffect = DefaultSurfaces.simpleLighting |> toEffect
         let selectionVolumeEffect = [
                                         defaultTrafoEffect
                                         DefaultSurfaces.constantColor (C4f(0.3f, 0.3f, 0.9f, 0.3f)) |> toEffect
-//                                        defaultSimpleLightingEffect
                                     ]
         vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, selectionVolumeEffect) :> ISurface
 

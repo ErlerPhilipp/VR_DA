@@ -20,7 +20,6 @@ module PointCloudHelper =
             let force ( x : Lazy<'a> ) : 'a =
                 x.Value
 
-
     module Rendering =
 
         open PointSetStorage
@@ -30,7 +29,7 @@ module PointCloudHelper =
             
             type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
             
-                let bounds = tree.GetValue().bounds //Box3d( modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Min), modelTrafo.Forward.TransformPos(tree.GetValue().bounds.Max))
+                let bounds = tree.GetValue().bounds
 
                 member x.Traverse (f : LodDataNode -> bool) = 
              
@@ -55,7 +54,6 @@ module PointCloudHelper =
                
                     let tree = Mod.force tree
                     traverse 0 tree.cell tree.root.Value
-
 
                 member x.BoundingBox = bounds
 
@@ -85,8 +83,6 @@ module PointCloudHelper =
                         return Some r
                     }
             
-
-
                 interface ILodData with
             
                     member x.BoundingBox = bounds
@@ -94,8 +90,6 @@ module PointCloudHelper =
                     member x.GetData n = x.GetData n
                     member x.Dependencies = [ tree :> IMod ]
 
-            
-                
         module Logic =
             type LodUserSettings =
                 {
@@ -106,30 +100,11 @@ module PointCloudHelper =
 
         open Logic
 
-
         let lodSettings =
             {   
                 NodeCount = Mod.init 150.0
                 PointSize = Mod.init 0.01
             }
-
-
-//        let pointCloudInfoSettings =
-//            {
-//                targetPointDistance     = Mod.init 50.0
-//                maxReuseRatio           = 0.5
-//                minReuseCount           = 1L <<< 20
-//                pruneInterval           = 500
-//                customView              = None
-//                customProjection        = None
-//                attributeTypes =
-//                    Map.ofList [
-//                        DefaultSemantic.Positions, typeof<V3f>
-//                        DefaultSemantic.Colors, typeof<C4b>
-//                        DefaultSemantic.Normals, typeof<V3f>
-//                    ]
-//                boundingBoxSurface      = Some BoundingBox.effectRed
-//            }
 
         open LodData
         open FShade

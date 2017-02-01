@@ -17,7 +17,6 @@ type Point =
         val mutable public Normal   : V3d     
         val mutable public Color    : C4b
         val mutable public State    : byte
-        //new(p,c) = { Position = p; Color = c }
         new(p,n, c) = { Position = p; Normal = n; Color = c; State = 0x0uy }
     end
 
@@ -135,9 +134,6 @@ module PSeq =
 
         result.Task
 
-
-
-
 [<AllowNullLiteral>]
 type OctreeNode =
     class
@@ -156,7 +152,6 @@ type OctreeNode =
                     n.Count = x.Count && n.Points = x.Points// && n.Children = x.Children
                 | _ -> false
     end
-
 
 type Octree = 
     { 
@@ -179,20 +174,6 @@ module ``Octree Node Extensions`` =
     let Node(cnt,points,children)   : OctreeNode    = OctreeNode(cnt, points, children)
     let Leaf(cnt,points)            : OctreeNode    = OctreeNode(cnt, points, null)
     let Empty                       : OctreeNode    = null
-
-//
-//type DeleteHullOperation(h : Hull3d) =
-//    member x.Perform(t : thunk<OctreeNode>) =
-//        t |> Value.map (fun n ->
-//            match n with
-//                | Empty -> Empty
-//                | Leaf pts -> 
-//                    Leaf (n.Count, pts |> Value.map (Array.map id))
-//                | Node children ->
-//                    Node(n.Count, )
-//
-//        )
-
 
 module private MutableTree = 
 
@@ -320,8 +301,6 @@ module private MutableTree =
                     r.Delete()
                     l
 
-
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Octree =
     open System
@@ -329,7 +308,6 @@ module Octree =
     open System.Collections.Generic
     open System.Collections.Concurrent
     open System.Diagnostics
-
 
     let isRendering (node : LodDataNode)(hull: FastHull3d)(viewTrafo: Trafo3d)(frustum: Frustum)(wantedNearPlaneDistance: float)= 
                     if hull.Intersects(node.bounds) && node.inner then
@@ -354,7 +332,6 @@ module Octree =
                             false
                     else
                         false
-
 
     module private Internal = 
         open MutableTree
@@ -423,7 +400,6 @@ module Octree =
                 raise e
  
         let buildTree (db : Database) (splitThreshold : int) (_ : V3d) (approximateChunks : int) (points : seq<Point[]>) =
-//        let buildTree (db : Database) (splitThreshold : int) (offset : V3d) (approximateChunks : int) (points : seq<Point[]>) =
 
             let mutable loaded = 0
             let mutable built = 0
@@ -431,38 +407,6 @@ module Octree =
 
             let sw = Stopwatch()
             sw.Start()
-
-//            let map s chunk =
-//                Interlocked.Increment(&loaded) |> ignore
-//                let res = build splitThreshold db chunk
-//                Interlocked.Increment(&built) |> ignore
-//                Some res
-//
-//            let combine l r =
-//                match l,r with
-//                    | None, r -> r
-//                    | l, None -> l
-//                    | Some l, Some r -> 
-//                        let res = merge l r
-//                        Interlocked.Increment(&merged) |> ignore
-//                        Some res
-//
-//            let create () =
-//                None
-//
-//            let task = 
-//                async {
-//                    do! Async.SwitchToNewThread()
-//                    let r = 
-//                        points 
-//                            |> Nessos.Streams.ParStream.ofSeq
-//                            |> Nessos.Streams.ParStream.withDegreeOfParallelism 1
-//                            |> Nessos.Streams.ParStream.map id
-//                            |> Nessos.Streams.ParStream.withDegreeOfParallelism 4
-//                            |> Nessos.Streams.ParStream.fold map combine create
-//
-//                    return r.Value
-//                } |> Async.StartAsTask
 
             let task = 
                 points 
@@ -567,7 +511,6 @@ module Octree =
 
                     | Leaf pts -> 
                         let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Normal, p.Color))
-                        //let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Color))
                         pts := all
                         visited <- visited + all.Length
 
@@ -612,9 +555,7 @@ module Octree =
 //            traverse tree.root.Value
             tree 
 
-
     let private rand = Random()
-
 
     let build (db : Database) (splitThreshold : int) (offset : V3d) (approximateChunks : int) (points : seq<Point[]>) : Octree =
         Log.startTimed "building Octree"
@@ -622,7 +563,6 @@ module Octree =
         Log.startTimed "building tree"
         let res = Internal.buildTree db splitThreshold offset approximateChunks points
         Log.stop()
-
 
         Log.startTimed "post-processing"
         Log.startTimed "post-processing: Compute Normals"
@@ -637,7 +577,6 @@ module Octree =
         let res = Internal.buildRkDTrees res
         Log.stop()
 
-        
         res
 
     
@@ -663,7 +602,6 @@ module Pts =
 
         [<Literal>]
         let minus = 45uy
-
 
     type ByteString(stream : Stream) =
         
@@ -744,7 +682,6 @@ module Pts =
                 cnt > 0
             else
                 false
-                
                 
         member x.ReadInt(res : byref<int>) =
             if tryFillBuffer() then
@@ -866,7 +803,6 @@ module Pts =
 
            str.ReadToNewLine() |> ignore
            p <- Point(V3d(x,y,z), V3d.Zero, C4b(byte r, byte g, byte b,255uy))
-           //p <- Point(V3d(x,y,z), C4b(byte r, byte g, byte b,255uy))
 
            true
 
@@ -924,9 +860,3 @@ module Pts =
         Log.line "average: %A" (average / float count)
         Log.line "count:   %d" count
         Log.stop()
-
-
-
-
-
-

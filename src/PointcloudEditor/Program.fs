@@ -266,12 +266,6 @@ let main _ =
             surface = Some diffuseSurface
         }
     let controller2Object = { controller1Object with id = newId() }
-//    let grabTrigger1 = 
-//        { defaultObject with
-//            id = newId()
-//            castsShadow = false
-//        }
-//    let grabTrigger2 = { grabTrigger1 with id = newId() }
     let camObject1 = 
         { defaultObject with
             id = newId()
@@ -390,6 +384,7 @@ let main _ =
             scoreText           = "test"
             pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
+            pointCloudData      = lodData
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

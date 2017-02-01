@@ -61,15 +61,10 @@ module OctreeHelper =
 
     let fullscreenQuadSg =
             Sg.draw IndexedGeometryMode.TriangleStrip
-           
-
                 |> Sg.vertexAttribute DefaultSemantic.Positions (Mod.constant  [|V3f(-1.0,-1.0,0.0); V3f(1.0,-1.0,0.0); V3f(-1.0,1.0,0.0);V3f(1.0,1.0,0.0) |])
                 |> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates (Mod.constant [|V2f.OO; V2f.IO; V2f.OI; V2f.II|])
 
-
-
     let ig ( box : Box3d ) : IndexedGeometry =
-        
         let pa = [|
             V3f(box.Min.X, box.Min.Y, box.Min.Z);
             V3f(box.Max.X, box.Min.Y, box.Min.Z);
@@ -92,12 +87,10 @@ module OctreeHelper =
                         //(DefaultSemantic.Colors, (C4b.Red |> Array.replicate (pos |> Array.length)) :> Array)
                     ] |> SymDict.ofList
             
-        
         IndexedGeometry(
                     Mode = IndexedGeometryMode.LineList,
                     IndexedAttributes = attrs
                 )
-
 
     let instancedGeometry (trafos : IMod<Trafo3d[]>)(colors : IMod<C4f[]>) (g : IndexedGeometry) =
         let vertexAttributes = 
@@ -156,7 +149,6 @@ module OctreeHelper =
         let mutable yz = 0.0; 
         let mutable zz = 0.0;
 
-
         points |> Array.iter (fun point -> 
                                 let p = point - centroid
                                 xx <- xx + p.X * p.X
@@ -166,7 +158,6 @@ module OctreeHelper =
                                 yz <- yz + p.Y * p.Z
                                 zz <- zz + p.Z * p.Z
                                 )
-
         
         let det_X = yy * zz - yz * yz
         let det_Y = xx * zz - xz * xz

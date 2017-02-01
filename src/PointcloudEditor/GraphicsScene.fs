@@ -168,7 +168,6 @@ module GraphicsScene =
         let pointCloudSg = initialScene.pointCloudSg fakeView
 
         Sg.ofList ([selectionPath; fullscreenQuad; sg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
-//        Sg.ofList ([initialScene.pointCloudSg])
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
