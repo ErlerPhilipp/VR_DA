@@ -14,7 +14,7 @@ module Renderpasses =
     let PointcloudPass = RenderPass.main
     let SelectionPass = RenderPass.after "sel" RenderPassOrder.Arbitrary PointcloudPass
     let HighlightPass = RenderPass.after "high" RenderPassOrder.Arbitrary SelectionPass
-    let GeometryPass = RenderPass.after "Geo" RenderPassOrder.Arbitrary SelectionPass
+    let GeometryPass = RenderPass.after "Geo" RenderPassOrder.Arbitrary HighlightPass
     let SelectionVolumePass = RenderPass.after "selvol" RenderPassOrder.Arbitrary GeometryPass
 
 module SelectionVolume =

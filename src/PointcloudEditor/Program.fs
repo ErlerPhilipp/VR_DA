@@ -384,7 +384,8 @@ let main _ =
             scoreText           = "test"
             pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
-            pointCloudData      = lodData
+            pointCloudOctree    = pointSet
+            pointCloudLoDData   = lodData
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

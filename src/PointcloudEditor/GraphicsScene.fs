@@ -162,6 +162,7 @@ module GraphicsScene =
                 |> Sg.depthTest      (Rendering.DepthTestMode.None          |> Mod.constant)                     
                 |> Sg.blendMode      (BlendMode.Blend                       |> Mod.constant) 
                 |> Sg.stencilMode    (stencilModeHighLightOnes              |> Mod.constant)  
+                |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
                 |> Sg.pass (Renderpasses.HighlightPass)
            
         let fakeView = Mod.map2 (fun (m : Trafo3d) v -> m * v) graphicsScene.pointCloudTrafo graphicsScene.viewTrafo 

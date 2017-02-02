@@ -1,6 +1,7 @@
 ﻿namespace Aardvark.VR
 
 open Audio
+open InteractiveSegmentation
 open PointCloudHelper.Rendering.LodData
 
 module LogicalSceneTypes = 
@@ -95,7 +96,8 @@ module LogicalSceneTypes =
             scoreText           : string
             pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
-            pointCloudData      : PointSetLodData
+            pointCloudOctree    : Octree
+            pointCloudLoDData   : PointSetLodData
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

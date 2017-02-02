@@ -7,11 +7,40 @@ open Aardvark.Base.Incremental
 open Aardvark.Base.Rendering
 open Aardvark.SceneGraph
 
+open InteractiveSegmentation
+open InteractiveSegmentation.OctreeHelper
+open Aardvark.Database
+
+open System
+
+[<AutoOpen>]
+module UnsafeOperators =
+
+    let (:=) (r : thunk<'a>) (v : 'a) =
+        (unbox<dbref<'a>> r).Value <- v
+
+    let (!) (r : thunk<'a>) = r.Value
+
+    type thunk<'a> with
+        member x.Delete() = 
+            match x with
+                | :? dbref<'a> as r -> r.Delete()
+                | _ -> ()
+
 module LogicalScene =
     open LogicalSceneTypes
     open VrTypes
     open VrInteractions
     open VrDriver
+
+    type PickCandidateNode = 
+        {
+            node    : OctreeNode 
+            cell    : GridCell
+            color   : C4b
+        }
+
+    let myRand = Random()
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
@@ -20,9 +49,10 @@ module LogicalScene =
             { scene with interactionInfo2 = newInteractionInfo}
 
     let addTrafoToSelectionVolumePath(interactionInfo : InteractionInfo, t : Trafo3d, scene : Scene) =
+        let minDistToNextPos = 0.005
         if interactionInfo.trackpadPressed then
             let newPos = t.Forward.TransformPos(V3d())
-            let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun t -> (t.Forward.TransformPos(V3d()) - newPos).Length < 0.001)
+            let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun t -> (t.Forward.TransformPos(V3d()) - newPos).Length < minDistToNextPos)
             if hasPosNearNewPos then
 //                printfn "has sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath)
                 interactionInfo.selectionVolumePath
@@ -33,7 +63,58 @@ module LogicalScene =
                 let pos = t.Forward.TransformPos(V3d())
                 Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(pos)) * worldToPointcloud |]
         else
-            interactionInfo.selectionVolumePath 
+            interactionInfo.selectionVolumePath
+
+    let deleteSelection(scene : Scene) =
+        let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
+        let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+        let pointcloudToWorld = scene.pointCloudTrafo * centroidTrafo
+        let selectionVolumeRadius = SelectionVolume.selectionVolumeRadius
+        let selectionVolumeRadiusSquared = selectionVolumeRadius * selectionVolumeRadius
+//        let sphere(t : Trafo3d) = Sphere3d((t * pointcloudToWorld.Inverse).Forward.TransformPos(V3d()), selectionVolumeRadius)
+        let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadius)
+        let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
+        
+        let cellToBeTraversed (cell : GridCell) : bool = 
+            selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t)))
+
+        let cellToBeDeleted (cell : GridCell) : bool = 
+            selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t)))
+
+        let pointToBeDeleted (point : Point) : bool = 
+            selectionVolumeTrafos |> Array.exists (fun t -> (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared)
+
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) =
+            let n = !node           
+                    
+            match n with
+            | Empty             ->  
+                ()
+            | Leaf points       -> 
+                let dethunkedPoints = points.Value
+//                if cellToBeTraversed(cell) then
+//                    if cellToBeDeleted(cell) then
+                let newPoints = dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, newColor))
+                n.Points := newPoints
+//                    else
+//                        let newPoints = dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, newColor) else p)
+//                        n.Points := newPoints
+                ()
+                    
+            | Node (points,children) ->
+                let dethunkedPoints = points.Value
+//                if cellToBeTraversed(cell) then
+                children |> Array.mapi (fun i child -> traverse (child) (cell.GetChild i) (level + 1)) |> ignore
+//                    if cellToBeDeleted(cell) then
+                let newPoints = dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, newColor))
+                n.Points := newPoints
+//                    else
+//                        let newPoints = dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, newColor) else p)
+//                        n.Points := newPoints
+                ()
+            
+        traverse scene.pointCloudOctree.root scene.pointCloudOctree.cell 0 |> ignore
+        ()
             
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -116,45 +197,7 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let finalSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
-                
-                
-//                let rec traverse (node : OctreeNode) (cell: GridCell) (level : int) : PickCandidateNode[] =
-//                    let bb = cell.BoundingBox              
-//                    
-//                    match node with
-//                    | Empty             ->  [||]
-//                    | Leaf _            -> 
-//                                    let px = node.Points.Value := pointarray
-//                                    let lodDataNode = { 
-//                                            id = (node :> obj); level = level; bounds = bb; 
-//                                            inner = false; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
-//                                            render = true}
-//               
-//                                    if (isPickCandidateNode cell lodDataNode hull p.frustum p.view p.wantedNearPlaneDistance) then                                                                                                                                                         
-//                                            [|{node = node ; cell = cell ; color = C4b.Green}|]   
-//                                    else
-//                                        [||]  
-//                                                                               
-//                    | Node (_,children) ->                                      
-//                                    let lodDataNode = { 
-//                                            id = (node :> obj); level = level; bounds = bb; 
-//                                                inner = true; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
-//                                                render = true}
-//                                    
-//                                    if (isPickCandidateNode cell lodDataNode hull p.frustum p.view p.wantedNearPlaneDistance) then  
-//                                                                    
-//                                        let childCandidateNodes = children  |> Array.mapi (fun i child -> traverse (child.Value) (cell.GetChild i) (level + 1)) 
-//                                                                            |> Array.concat
-//                                        if(childCandidateNodes |> Array.length > 0 ) then 
-//                                            childCandidateNodes
-//                                        else
-//                                            [|{node = node ; cell = cell ; color = C4b.Green}|]     
-//                                    else 
-//                                        [||] 
-
-
-
+                deleteSelection(scene)
                 let newSelectionPath = [| |]
 
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
