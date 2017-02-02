@@ -68,17 +68,14 @@ module LogicalScene =
         else
             interactionInfo.selectionVolumePath
 
-    let deleteSelection(scene : Scene) =
+    let deleteSelectionAsync(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[], pointCloudOctree : Octree) =
         let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
-
+        
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
-        let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
-        let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
         let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
 
         let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadiusPC)
-        let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
         
         let cellToBeTraversed (cell : GridCell) : bool = 
             selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t)))
@@ -124,9 +121,16 @@ module LogicalScene =
                         n.Points := newPoints
                 ()
             
-        traverse scene.pointCloudOctree.root scene.pointCloudOctree.cell 0 |> ignore
 
-        printfn "deleted %A points" deletedPoints
+        let worker =
+            async {
+                do! Async.SwitchToNewThread()
+                traverse pointCloudOctree.root pointCloudOctree.cell 0 |> ignore
+            }
+
+        printfn "%A: start deleting points" DateTime.Now
+        Async.Start(worker)
+        printfn "%A: deleted %A points" DateTime.Now deletedPoints
         ()
             
     let update (scene : Scene) (message : Message) : Scene =
@@ -210,7 +214,10 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                deleteSelection(scene)
+                let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+                let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
+                let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
+                deleteSelectionAsync(worldToPointcloud, selectionVolumeTrafos, scene.pointCloudOctree)
                 let newSelectionPath = [| |]
 
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
