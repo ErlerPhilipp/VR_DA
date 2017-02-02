@@ -70,9 +70,14 @@ module LogicalScene =
 
     let deleteSelection(scene : Scene) =
         let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
-        let selectionVolumeRadius = SelectionVolume.selectionVolumeRadius
-        let selectionVolumeRadiusSquared = selectionVolumeRadius * selectionVolumeRadius
-        let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadius)
+
+        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+        let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+        let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
+        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
+        let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
+
+        let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadiusPC)
         let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
         
         let cellToBeTraversed (cell : GridCell) : bool = 
