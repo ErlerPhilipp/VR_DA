@@ -26,6 +26,7 @@ module SelectionVolume =
         
     let selectionVolumeRadius = 0.065
     let private tesselationLevel = 5
+    let controllerRingCenter = V3d(0.0, -0.03, -0.02)
 
     let makeSelectionVolumeGeometry() = 
         Sphere.get(tesselationLevel)
@@ -59,8 +60,6 @@ module SelectionVolume =
         vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, selectionVolumeEffect) :> ISurface
 
     let makeSelectionVolumeSg(vrWin : VrWindow.VrWindow) =
-        let controllerRingCenter = V3d(0.0, -0.03, -0.02)
-        
         let selectionVolumeSg = Sg.sphere tesselationLevel (Mod.constant C4b.Green) (Mod.constant selectionVolumeRadius)
         let selectionVolumeSg = 
                 selectionVolumeSg 
