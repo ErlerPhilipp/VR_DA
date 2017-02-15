@@ -46,6 +46,7 @@ module LogicalScene =
         {
             selectionVolumeTrafos   : Trafo3d[]
             worldToPointcloud       : Trafo3d
+            selectionVolumeRadiusPC : float
             color                   : C4b
         }
         
@@ -92,71 +93,105 @@ module LogicalScene =
         member x.Value = v.Value
         
 
-    let deleted (pointCloudOctree : Octree) (operations : Operation[]) =   
-        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+    let deleted (pointCloudOctree : Octree) (operations : Operation[]) =
+    
+        let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
+        let sphere(t : Trafo3d, op : Operation) = 
+            Sphere3d(t.Forward.TransformPos(V3d()), op.selectionVolumeRadiusPC)
 
-        let mutable newOctree = pointCloudOctree
-        for op in operations do
-            let selectionVolumeRadiusPC = op.worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
-            let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
+        let opIntersectsCell(op : Operation, cell : GridCell) =
+            op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t, op)))
 
-            let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadiusPC)
-        
-            let cellToBeTraversed (cell : GridCell) : bool = 
-                op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t)))
+        let cellToBeTraversed (cell : GridCell) : Operation option = 
+            operations |> Array.tryFindBack (fun op -> opIntersectsCell(op, cell))
+            
+        let opContainsCell(op : Operation, cell : GridCell) =
+            op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t, op)))
 
-            let cellToBeDeleted (cell : GridCell) : bool = 
-                op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t)))
+        let cellToBeDeleted (cell : GridCell) : Operation option = 
+            operations |> Array.tryFindBack (fun op -> opContainsCell(op, cell))
 
-            let mutable deletedPoints = 0
+        let mutable deletedPoints = 0
 
-            let pointToBeDeleted (point : Point) : bool = 
-                op.selectionVolumeTrafos |> Array.exists (fun t -> 
-                                                            let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared
-                                                            if pInSphere then deletedPoints <- deletedPoints + 1
-                                                            pInSphere
-                                                        )
+        let pointToBeDeleted (point : Point) : Operation option = 
+            operations |> Array.tryFindBack (
+                fun op -> op.selectionVolumeTrafos |> Array.exists (
+                            fun t -> 
+                                let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
+                                if pInSphere then deletedPoints <- deletedPoints + 1
+                                pInSphere
+                            ))
 
-            let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) =
-                let n = !node           
-                    
-                match n with
-                | Empty             ->  
-                    lazy n
-                | Leaf points       -> 
-                    lazy 
-                        let dethunkedPoints = points.Value
-                        if cellToBeTraversed(cell) then
-                            if cellToBeDeleted(cell) then
-                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
-                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
-                            else
-                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, op.color) else p))
-                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
-                        else
-                            n
-                | Node (points,children) ->
-                    lazy
-                        let dethunkedPoints = points.Value
-                        if cellToBeTraversed(cell) then
-                            let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1)) :> thunk<_>)
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) =
+            let n = !node           
+            
+            let checkPointsToBeDeleted(dethunkedPoints : Point[]) = 
+                lazy (dethunkedPoints |> Array.map (fun p -> 
+                                                        match pointToBeDeleted(p) with
+                                                            | Some op -> Point(p.Position, p.Normal, op.color)
+                                                            | None -> p))
 
-                            if cellToBeDeleted(cell) then
-                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
-                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
-                            else
-                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, op.color) else p))
-                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
-                        else
-                            n
+            let checkLeafToBeDeleted(dethunkedPoints : Point[]) = 
+                match cellToBeDeleted(cell) with
+                    | Some op -> 
+                        let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
+                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                    | None -> 
+                        let newPoints = checkPointsToBeDeleted(dethunkedPoints)
+                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
 
-            let newRoot = traverse newOctree.root newOctree.cell 0
-            newOctree <- { newOctree with root = memoryThunk newRoot }
-        newOctree
+            let checkNodeToBeDeleted(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) = 
+                match cellToBeDeleted(cell) with
+                    | Some op -> 
+                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (true)) :> thunk<_>)
+                        let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
+                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                    | None -> 
+                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (false)) :> thunk<_>)
+                        let newPoints = checkPointsToBeDeleted(dethunkedPoints)
+                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+
+            match n with
+            | Empty             ->  
+                lazy n
+            | Leaf points       -> 
+                lazy 
+                    let dethunkedPoints = points.Value
+
+                    if cellContained then 
+                        checkLeafToBeDeleted(dethunkedPoints)
+                    else
+                        match cellToBeTraversed(cell) with
+                            | Some _ ->    checkLeafToBeDeleted(dethunkedPoints)
+                            | None ->       n
+            | Node (points,children) ->
+                lazy
+                    let dethunkedPoints = points.Value
+
+                    if cellContained then 
+                        checkNodeToBeDeleted(dethunkedPoints, children)
+                    else
+                        match cellToBeTraversed(cell) with
+                            | Some _ ->    checkNodeToBeDeleted(dethunkedPoints, children)
+                            | None ->       n
+
+        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
+        { pointCloudOctree with root = memoryThunk newRoot }
 
     let deleteSelection(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
         let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
-        let newOperation = {selectionVolumeTrafos = selectionVolumeTrafos; worldToPointcloud = worldToPointcloud; color = newColor}
+        
+        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
+
+        let newOperation = 
+            {
+                selectionVolumeTrafos = selectionVolumeTrafos
+                worldToPointcloud = worldToPointcloud
+                color = newColor
+                selectionVolumeRadiusPC = selectionVolumeRadiusPC
+            }
+
         transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
             
     let update (scene : Scene) (message : Message) : Scene =
