@@ -19,6 +19,8 @@ open Aardvark.Base.Native
 
 module OctreeHelper = 
     
+    let currentOctree = Mod.init
+
     let frustum (f : IMod<CameraView>) (proj : IMod<Frustum>) =
         let invViewProj = Mod.map2 (fun v p -> (CameraView.viewTrafo v * Frustum.projTrafo p).Inverse) f proj
 

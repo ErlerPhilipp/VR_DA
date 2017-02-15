@@ -96,7 +96,6 @@ module LogicalSceneTypes =
             scoreText           : string
             pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
-            pointCloudOctree    : Octree
             pointCloudLoDData   : PointSetLodData
             
             specialObjectIds    : SpecialObjectIds

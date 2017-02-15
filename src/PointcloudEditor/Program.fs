@@ -242,9 +242,15 @@ let main _ =
                             |> pedestalDiffuseTexture |> pedestalNormalMap
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
-                            
-    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ// * Trafo3d.Translation(pointCloudResetPos)
-    let lodData = Rendering.LodData.PointSetLodData(Mod.constant pointSet, Rendering.lodSettings.NodeCount)
+          
+    let pointSet =
+        LogicalScene.Operations |> Mod.map
+            ( fun ops ->
+                    LogicalScene.deleted pointSet ops
+                )
+
+    let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ
+    let lodData = Rendering.LodData.PointSetLodData(pointSet, Rendering.lodSettings.NodeCount)
     let pointcloudSg (view : IMod<Trafo3d>) = 
         Rendering.mkSg view (lodData)
             |> Sg.effect [
@@ -384,7 +390,6 @@ let main _ =
             scoreText           = "test"
             pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
-            pointCloudOctree    = pointSet
             pointCloudLoDData   = lodData
             
             specialObjectIds    = specialObjectIds

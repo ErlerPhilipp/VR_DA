@@ -29,7 +29,7 @@ module PointCloudHelper =
             
             type PointSetLodData(tree : IMod<Octree>, nodeCount : IMod<float>) =
             
-                let bounds = tree.GetValue().bounds
+                let bounds = tree |> Mod.map ( fun t -> t.bounds )
 
                 member x.Traverse (f : LodDataNode -> bool) = 
              
@@ -42,6 +42,7 @@ module PointCloudHelper =
                                 let nn = { id = (n :> obj); level = level; bounds = bb; 
                                            inner = true; granularity = Fun.Cbrt(bb.Volume / 5000.0); 
                                            render = true}
+//                                printfn "traversed node"
 
                                 if f nn then
                                     children |> Array.iteri (fun i child -> traverse (level + 1) (cell.GetChild i) child.Value) 
@@ -49,6 +50,8 @@ module PointCloudHelper =
 //                            | Leaf points ->                             
                                 let nn = { id = (n :> obj); level = level; bounds = bb; 
                                            inner = true; granularity = 1.0; render = true }
+
+//                                printfn "traversed leaf"
                                 f nn |> ignore
                             
                
@@ -85,7 +88,7 @@ module PointCloudHelper =
             
                 interface ILodData with
             
-                    member x.BoundingBox = bounds
+                    member x.BoundingBox = bounds |> Mod.force
                     member x.Traverse f = x.Traverse f
                     member x.GetData n = x.GetData n
                     member x.Dependencies = [ tree :> IMod ]

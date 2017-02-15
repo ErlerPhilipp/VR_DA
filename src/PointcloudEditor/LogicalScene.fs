@@ -11,6 +11,8 @@ open InteractiveSegmentation
 open InteractiveSegmentation.OctreeHelper
 open Aardvark.Database
 
+open MBrace.FsPickler
+
 open System
 
 [<AutoOpen>]
@@ -40,6 +42,14 @@ module LogicalScene =
             color   : C4b
         }
 
+    type Operation =
+        {
+            selectionVolumeTrafos   : Trafo3d[]
+            worldToPointcloud       : Trafo3d
+            color                   : C4b
+        }
+        
+    let Operations = Mod.init [||]
     let myRand = Random()
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
@@ -68,70 +78,86 @@ module LogicalScene =
         else
             interactionInfo.selectionVolumePath
 
-    let deleteSelectionAsync(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[], pointCloudOctree : Octree) =
-        let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
+
+    type memoryThunk<'a>(v: Lazy<'a>) =  
+        inherit thunk<'a>()
+
+        override x.GetValue() = v.Value
+        override x.IsEvaluated = true
+        override x.IsSerializable = true
+
+        static member CreatePickler (r : IPicklerResolver) : Pickler<memoryThunk<'a>> =
+            Pickler.Null()
+    
+        member x.Value = v.Value
         
+
+    let deleted (pointCloudOctree : Octree) (operations : Operation[]) =   
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
-        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
-        let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
 
-        let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadiusPC)
+        let mutable newOctree = pointCloudOctree
+        for op in operations do
+            let selectionVolumeRadiusPC = op.worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
+            let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
+
+            let sphere(t : Trafo3d) = Sphere3d(t.Forward.TransformPos(V3d()), selectionVolumeRadiusPC)
         
-        let cellToBeTraversed (cell : GridCell) : bool = 
-            selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t)))
+            let cellToBeTraversed (cell : GridCell) : bool = 
+                op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t)))
 
-        let cellToBeDeleted (cell : GridCell) : bool = 
-            selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t)))
+            let cellToBeDeleted (cell : GridCell) : bool = 
+                op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t)))
 
-        let mutable deletedPoints = 0
+            let mutable deletedPoints = 0
 
-        let pointToBeDeleted (point : Point) : bool = 
-            selectionVolumeTrafos |> Array.exists (fun t -> 
-                                                        let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared
-                                                        if pInSphere then deletedPoints <- deletedPoints + 1
-                                                        pInSphere
-                                                    )
+            let pointToBeDeleted (point : Point) : bool = 
+                op.selectionVolumeTrafos |> Array.exists (fun t -> 
+                                                            let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared
+                                                            if pInSphere then deletedPoints <- deletedPoints + 1
+                                                            pInSphere
+                                                        )
 
-        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) =
-            let n = !node           
+            let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) =
+                let n = !node           
                     
-            match n with
-            | Empty             ->  
-                ()
-            | Leaf points       -> 
-                let dethunkedPoints = points.Value
-                if cellToBeTraversed(cell) then
-                    if cellToBeDeleted(cell) then
-                        let newPoints = dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, newColor))
-                        n.Points := newPoints
-                    else
-                        let newPoints = dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, newColor) else p)
-                        n.Points := newPoints
-                ()
-                    
-            | Node (points,children) ->
-                let dethunkedPoints = points.Value
-                if cellToBeTraversed(cell) then
-                    children |> Array.mapi (fun i child -> traverse (child) (cell.GetChild i) (level + 1)) |> ignore
-                    if cellToBeDeleted(cell) then
-                        let newPoints = dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, newColor))
-                        n.Points := newPoints
-                    else
-                        let newPoints = dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, newColor) else p)
-                        n.Points := newPoints
-                ()
-            
+                match n with
+                | Empty             ->  
+                    lazy n
+                | Leaf points       -> 
+                    lazy 
+                        let dethunkedPoints = points.Value
+                        if cellToBeTraversed(cell) then
+                            if cellToBeDeleted(cell) then
+                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
+                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                            else
+                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, op.color) else p))
+                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                        else
+                            n
+                | Node (points,children) ->
+                    lazy
+                        let dethunkedPoints = points.Value
+                        if cellToBeTraversed(cell) then
+                            let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1)) :> thunk<_>)
 
-        let worker =
-            async {
-                do! Async.SwitchToNewThread()
-                traverse pointCloudOctree.root pointCloudOctree.cell 0 |> ignore
-            }
+                            if cellToBeDeleted(cell) then
+                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
+                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                            else
+                                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, op.color) else p))
+                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                        else
+                            n
 
-        printfn "%A: start deleting points" DateTime.Now
-        Async.Start(worker)
-        printfn "%A: deleted %A points" DateTime.Now deletedPoints
-        ()
+            let newRoot = traverse newOctree.root newOctree.cell 0
+            newOctree <- { newOctree with root = memoryThunk newRoot }
+        newOctree
+
+    let deleteSelection(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
+        let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
+        let newOperation = {selectionVolumeTrafos = selectionVolumeTrafos; worldToPointcloud = worldToPointcloud; color = newColor}
+        transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
             
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -217,7 +243,7 @@ module LogicalScene =
                 let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
                 let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
-                deleteSelectionAsync(worldToPointcloud, selectionVolumeTrafos, scene.pointCloudOctree)
+                deleteSelection(worldToPointcloud, selectionVolumeTrafos)
                 let newSelectionPath = [| |]
 
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
