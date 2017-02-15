@@ -197,8 +197,8 @@ module LogicalScene =
 
         transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
         
-    let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree) =
-    
+    let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int) =
+        
         let selVolPosPC = (controllerTrafoWS * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
@@ -209,7 +209,7 @@ module LogicalScene =
         let cellContainsSelVol (cell : GridCell) : bool = cell.BoundingBox.Contains(sphere)
         let pointInSelVol (point : Point) : bool = (selVolPosPC - point.Position).LengthSquared < selectionVolumeRadiusSquared
 
-        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) : int =
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) (pointsFoundSoFar : int) : int =
             let n = !node
             
             let numPointsInSelectionVolume(dethunkedPoints : Point[]) = 
@@ -219,8 +219,12 @@ module LogicalScene =
                 dethunkedPoints |> Array.length
 
             let numPointsInCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) =
-                let pointsInChildren = children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (true)))
                 let pointsInCell = dethunkedPoints |> Array.length
+                let pointsFoundSoFar = pointsFoundSoFar + pointsInCell
+                let pointsInChildren =  if pointsFoundSoFar > traverseUntilXPointsFound then 
+                                            [||]
+                                        else
+                                            children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (true) (pointsFoundSoFar)))
                 let overallPoints = pointsInCell + (Array.sum pointsInChildren)
                 overallPoints
 
@@ -249,13 +253,18 @@ module LogicalScene =
                         if cellContainsSelVol(cell) then
                             numPointsInCell(dethunkedPoints, children)
                         else
-                            let pointsInChildren = children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (false)))
-                            let overallPoints = numPointsInSelectionVolume(dethunkedPoints) + (Array.sum pointsInChildren)
+                            let pointsInSelVol = numPointsInSelectionVolume(dethunkedPoints)
+                            let pointsFoundSoFar = pointsFoundSoFar + pointsInSelVol
+                            let pointsInChildren =  if pointsFoundSoFar > traverseUntilXPointsFound then
+                                                        [||]
+                                                    else
+                                                        children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (false)(pointsFoundSoFar)))
+                            let overallPoints = pointsInSelVol + (Array.sum pointsInChildren)
                             overallPoints
                             
                     else 0
 
-        traverse pointCloudOctree.root pointCloudOctree.cell 0 false
+        traverse pointCloudOctree.root pointCloudOctree.cell 0 false 0
             
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -303,9 +312,15 @@ module LogicalScene =
                 
                 let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
-                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree.GetValue())
+
+                let searchUntilXPoints = 1000
+                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree.GetValue(), searchUntilXPoints)
 //                printfn "numPointsInSelVol = %A" numPointsInSelVol
-                let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else 1.0
+                let minVibStrength = 0.0
+//                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))
+                let limitedGrowthStrength = clamp 0.0 1.0 (1.0 - (1.0 - minVibStrength) * Math.Exp(-0.05 * float numPointsInSelVol))
+
+                let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else printfn "numPointsInSelVol = %A; limitedGrowthStrength = %A" numPointsInSelVol limitedGrowthStrength; limitedGrowthStrength
 
                 let newInteractionInfo = { interactionInfo with 
                                             lastContrTrafo = t
