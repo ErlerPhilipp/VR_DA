@@ -314,7 +314,7 @@ module LogicalScene =
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
 
                 let searchUntilXPoints = 1000
-                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree.GetValue(), searchUntilXPoints)
+                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree, searchUntilXPoints)
 //                printfn "numPointsInSelVol = %A" numPointsInSelVol
                 let minVibStrength = 0.0
 //                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))

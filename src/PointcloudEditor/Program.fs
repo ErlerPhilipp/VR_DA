@@ -243,14 +243,14 @@ let main _ =
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
           
-    let pointSet =
+    let filteredPointSet =
         LogicalScene.Operations |> Mod.map
             ( fun ops ->
                     LogicalScene.deleted pointSet ops
                 )
 
     let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ
-    let lodData = Rendering.LodData.PointSetLodData(pointSet, Rendering.lodSettings.NodeCount)
+    let lodData = Rendering.LodData.PointSetLodData(filteredPointSet, Rendering.lodSettings.NodeCount)
     let pointcloudSg (view : IMod<Trafo3d>) = 
         Rendering.mkSg view (lodData)
             |> Sg.effect [

@@ -3,7 +3,6 @@
 open Audio
 open InteractiveSegmentation
 open PointCloudHelper.Rendering.LodData
-open Aardvark.Base.Incremental
 
 module LogicalSceneTypes = 
     open Aardvark.Base
@@ -100,7 +99,7 @@ module LogicalSceneTypes =
             pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
             pointCloudLoDData   : PointSetLodData
-            octree              : IMod<Octree>
+            octree              : Octree
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
