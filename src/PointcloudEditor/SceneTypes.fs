@@ -3,6 +3,7 @@
 open Audio
 open InteractiveSegmentation
 open PointCloudHelper.Rendering.LodData
+open Aardvark.Base.Incremental
 
 module LogicalSceneTypes = 
     open Aardvark.Base
@@ -72,6 +73,7 @@ module LogicalSceneTypes =
             triggerPressed      : bool
             trackpadPressed     : bool
             selectionVolumePath : Trafo3d[]
+            numPointsInSelVol   : int
         }
 
     let DefaultInteractionInfo = 
@@ -82,6 +84,7 @@ module LogicalSceneTypes =
             triggerPressed      = false
             trackpadPressed     = false
             selectionVolumePath = [| |]
+            numPointsInSelVol   = 0
         }
 
     type Scene =
@@ -97,6 +100,7 @@ module LogicalSceneTypes =
             pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
             pointCloudLoDData   : PointSetLodData
+            octree              : IMod<Octree>
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

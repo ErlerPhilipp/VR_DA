@@ -391,6 +391,7 @@ let main _ =
             pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
             pointCloudLoDData   = lodData
+            octree              = pointSet
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

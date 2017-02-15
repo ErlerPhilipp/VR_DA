@@ -55,18 +55,37 @@ module LogicalScene =
             let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
             let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
             
+//            let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+//            let newSelectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
             let minDistToNextPosWS = 0.01
             let minDistToNextPosPC = worldToPointcloud.Forward.TransformDir(V3d(minDistToNextPosWS, 0.0, 0.0)).Length
             let newPosWS = t.Forward.TransformPos(SelectionVolume.controllerRingCenter)
             let newPosPC = (t * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
 
             let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun oldTrafo -> (oldTrafo.Forward.TransformPos(V3d()) - newPosPC).Length < minDistToNextPosPC)
+
             if hasPosNearNewPos then
 //                printfn "has sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath)
                 interactionInfo.selectionVolumePath
             else
 //                printfn "add sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath + 1)
                 Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
+
+//                let containedInExistingSphere = 
+//                    Operations.Value |> Array.exists (fun op -> 
+//                            op.selectionVolumeTrafos |> Array.exists (fun t -> 
+//                                let oldPosPC = t.Forward.TransformPos(V3d())
+//                                let nearNewSphere = (oldPosPC - newPosPC).Length < minDistToNextPosPC
+//                                let oldIsBiggerThanNew = op.selectionVolumeRadiusPC >= newSelectionVolumeRadiusPC
+//                                let contained = nearNewSphere && oldIsBiggerThanNew
+////                                if contained then printfn "already exists!"
+//                                contained
+//                        ))
+//
+//                if not containedInExistingSphere then
+//                    Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
+//                else
+//                    interactionInfo.selectionVolumePath
         else
             interactionInfo.selectionVolumePath
 
@@ -78,7 +97,7 @@ module LogicalScene =
         override x.IsEvaluated = true
         override x.IsSerializable = true
 
-        static member CreatePickler (r : IPicklerResolver) : Pickler<memoryThunk<'a>> =
+        static member CreatePickler (_ : IPicklerResolver) : Pickler<memoryThunk<'a>> =
             Pickler.Null()
     
         member x.Value = v.Value
@@ -177,6 +196,66 @@ module LogicalScene =
             }
 
         transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
+        
+    let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree) =
+    
+        let selVolPosPC = (controllerTrafoWS * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
+        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
+        let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
+        let sphere = Sphere3d(selVolPosPC, selectionVolumeRadiusPC)
+
+        let cellIntersectsSelVol (cell : GridCell) : bool = cell.BoundingBox.Intersects(sphere)
+        let cellContainsSelVol (cell : GridCell) : bool = cell.BoundingBox.Contains(sphere)
+        let pointInSelVol (point : Point) : bool = (selVolPosPC - point.Position).LengthSquared < selectionVolumeRadiusSquared
+
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) : int =
+            let n = !node
+            
+            let numPointsInSelectionVolume(dethunkedPoints : Point[]) = 
+                dethunkedPoints |> Array.filter (fun p -> pointInSelVol(p)) |> Array.length
+
+            let numPointsInLeaf(dethunkedPoints : Point[]) =
+                dethunkedPoints |> Array.length
+
+            let numPointsInCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) =
+                let pointsInChildren = children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (true)))
+                let pointsInCell = dethunkedPoints |> Array.length
+                let overallPoints = pointsInCell + (Array.sum pointsInChildren)
+                overallPoints
+
+            match n with
+            | Empty             ->  
+                0
+            | Leaf points       -> 
+                let dethunkedPoints = points.Value
+
+                if cellContained then 
+                    numPointsInLeaf(dethunkedPoints)
+                else
+                    if cellIntersectsSelVol(cell) then 
+                        if cellContainsSelVol(cell) then
+                            numPointsInLeaf(dethunkedPoints)
+                        else
+                            numPointsInSelectionVolume(dethunkedPoints)
+                    else 0
+            | Node (points,children) ->
+                let dethunkedPoints = points.Value
+
+                if cellContained then 
+                    numPointsInCell(dethunkedPoints, children)
+                else
+                    if cellIntersectsSelVol(cell) then 
+                        if cellContainsSelVol(cell) then
+                            numPointsInCell(dethunkedPoints, children)
+                        else
+                            let pointsInChildren = children |> Array.mapi (fun i child -> (traverse (child) (cell.GetChild i) (level + 1) (false)))
+                            let overallPoints = numPointsInSelectionVolume(dethunkedPoints) + (Array.sum pointsInChildren)
+                            overallPoints
+                            
+                    else 0
+
+        traverse pointCloudOctree.root pointCloudOctree.cell 0 false
             
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -208,8 +287,6 @@ module LogicalScene =
                     else
                         (scene.specialObjectIds.controller2ObjectId, scene.interactionInfo2)
                         
-                        
-
                 let newObjects = setTrafoOfObjectsWithId(controllerObjectId, t, scene.objects)
                 let newScene = {scene with objects = newObjects}
 
@@ -223,7 +300,19 @@ module LogicalScene =
                 let newScene = {scene with objects = newObjects}
 
                 let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
-                let newInteractionInfo = { interactionInfo with lastContrTrafo = t; selectionVolumePath = newSelectionPath }
+                
+                let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+                let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
+                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree.GetValue())
+//                printfn "numPointsInSelVol = %A" numPointsInSelVol
+                let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else 1.0
+
+                let newInteractionInfo = { interactionInfo with 
+                                            lastContrTrafo = t
+                                            selectionVolumePath = newSelectionPath
+                                            numPointsInSelVol = numPointsInSelVol
+                                            vibrationStrength = newVibrationStrength
+                                         }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, newScene)
                 newScene
                  
@@ -277,31 +366,22 @@ module LogicalScene =
                 
             | TimeElapsed(dt) ->
 //                let newObjects = scalePointCloudWithTrackpad(scene, dt.TotalSeconds)
-                let newObjects =    
-//                    if scene.interactionInfo1.triggerPressed && scene.interactionInfo2.triggerPressed then 
-//                        transformPointCloudWithPinch(scene)
-//                    else
-                        scene.objects
-
-                                        
-//                let currController1Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, newObjects)
-//                let currController2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, newObjects)
+                let newObjects = scene.objects
+           
                 { scene with 
                     deltaTime = dt.TotalSeconds
                     objects = newObjects
-//                    interactionInfo1 = {scene.interactionInfo1 with lastContrTrafo = currController1Trafo}
-//                    interactionInfo2 = {scene.interactionInfo1 with lastContrTrafo = currController2Trafo}
                 }
             
             | EndFrame ->
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
 
-                // hit object
-                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
-                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
-                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
+//                // hit object
+//                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
+//                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
+//                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
+//                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
                 
                 // overlap
                 Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
