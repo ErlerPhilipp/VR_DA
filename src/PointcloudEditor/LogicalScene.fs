@@ -35,23 +35,14 @@ module LogicalScene =
     open VrInteractions
     open VrDriver
 
-    type PickCandidateNode = 
-        {
-            node    : OctreeNode 
-            cell    : GridCell
-            color   : C4b
-        }
-
     type Operation =
         {
             selectionVolumeTrafos   : Trafo3d[]
             worldToPointcloud       : Trafo3d
             selectionVolumeRadiusPC : float
-            color                   : C4b
         }
         
     let Operations = Mod.init [||]
-    let myRand = Random()
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
@@ -102,19 +93,19 @@ module LogicalScene =
         let opIntersectsCell(op : Operation, cell : GridCell) =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t, op)))
 
-        let cellToBeTraversed (cell : GridCell) : Operation option = 
-            operations |> Array.tryFindBack (fun op -> opIntersectsCell(op, cell))
+        let cellToBeTraversed (cell : GridCell) : bool = 
+            operations |> Array.exists (fun op -> opIntersectsCell(op, cell))
             
         let opContainsCell(op : Operation, cell : GridCell) =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t, op)))
 
-        let cellToBeDeleted (cell : GridCell) : Operation option = 
-            operations |> Array.tryFindBack (fun op -> opContainsCell(op, cell))
+        let cellToBeDeleted (cell : GridCell) : bool = 
+            operations |> Array.exists (fun op -> opContainsCell(op, cell))
 
         let mutable deletedPoints = 0
 
-        let pointToBeDeleted (point : Point) : Operation option = 
-            operations |> Array.tryFindBack (
+        let pointToBeDeleted (point : Point) : bool = 
+            operations |> Array.exists (
                 fun op -> op.selectionVolumeTrafos |> Array.exists (
                             fun t -> 
                                 let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
@@ -123,33 +114,20 @@ module LogicalScene =
                             ))
 
         let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) =
-            let n = !node           
+            let deletedColor = C4b(1.0, 0.0, 0.0, 1.0)
+            let n = !node
             
             let checkPointsToBeDeleted(dethunkedPoints : Point[]) = 
-                lazy (dethunkedPoints |> Array.map (fun p -> 
-                                                        match pointToBeDeleted(p) with
-                                                            | Some op -> Point(p.Position, p.Normal, op.color)
-                                                            | None -> p))
+                lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, deletedColor) else p))
 
-            let checkLeafToBeDeleted(dethunkedPoints : Point[]) = 
-                match cellToBeDeleted(cell) with
-                    | Some op -> 
-                        let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
-                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
-                    | None -> 
-                        let newPoints = checkPointsToBeDeleted(dethunkedPoints)
-                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
+            let deleteEntireLeaf(dethunkedPoints : Point[]) =
+                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, deletedColor)))
+                Leaf(newPoints.Value.Length, memoryThunk newPoints)
 
-            let checkNodeToBeDeleted(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) = 
-                match cellToBeDeleted(cell) with
-                    | Some op -> 
-                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (true)) :> thunk<_>)
-                        let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, op.color)))
-                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
-                    | None -> 
-                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (false)) :> thunk<_>)
-                        let newPoints = checkPointsToBeDeleted(dethunkedPoints)
-                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+            let deleteEntireCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) =
+                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (true)) :> thunk<_>)
+                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, deletedColor)))
+                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
 
             match n with
             | Empty             ->  
@@ -159,28 +137,35 @@ module LogicalScene =
                     let dethunkedPoints = points.Value
 
                     if cellContained then 
-                        checkLeafToBeDeleted(dethunkedPoints)
+                        deleteEntireLeaf(dethunkedPoints)
                     else
-                        match cellToBeTraversed(cell) with
-                            | Some _ ->    checkLeafToBeDeleted(dethunkedPoints)
-                            | None ->       n
+                        if cellToBeTraversed(cell) then 
+                            if cellToBeDeleted(cell) then
+                                deleteEntireLeaf(dethunkedPoints)
+                            else
+                                let newPoints = checkPointsToBeDeleted(dethunkedPoints)
+                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                        else n
             | Node (points,children) ->
                 lazy
                     let dethunkedPoints = points.Value
 
                     if cellContained then 
-                        checkNodeToBeDeleted(dethunkedPoints, children)
+                        deleteEntireCell(dethunkedPoints, children)
                     else
-                        match cellToBeTraversed(cell) with
-                            | Some _ ->    checkNodeToBeDeleted(dethunkedPoints, children)
-                            | None ->       n
+                        if cellToBeTraversed(cell) then 
+                            if cellToBeDeleted(cell) then
+                                deleteEntireCell(dethunkedPoints, children)
+                            else
+                                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (false)) :> thunk<_>)
+                                let newPoints = checkPointsToBeDeleted(dethunkedPoints)
+                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                        else n
 
         let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
         { pointCloudOctree with root = memoryThunk newRoot }
 
     let deleteSelection(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
-        let newColor = C4b(C4f(myRand.NextDouble(), myRand.NextDouble(), myRand.NextDouble(), 1.0))
-        
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
 
@@ -188,7 +173,6 @@ module LogicalScene =
             {
                 selectionVolumeTrafos = selectionVolumeTrafos
                 worldToPointcloud = worldToPointcloud
-                color = newColor
                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
             }
 
