@@ -160,7 +160,13 @@ module PointCloudHelper =
                 let wp  = p.Value.wp
                 let vp  = uniform.ViewTrafo * wp
             
-                let vpCenter = vp
+                // prevent culling mess at near plane
+                let ndcp = uniform.ProjTrafo * vp
+                let ndcp = ndcp / ndcp.W
+                let ndcs = uniform.ProjTrafo * uniform.ViewTrafo * V4d(0.0, 0.0, s, 0.0)
+                let newZ = if (ndcp + ndcs).Z < -1.0 then vp.Z else vp.Z + s
+
+                let vpCenter = V4d(vp.X, vp.Y, newZ, vp.W)
                 let wpCenter = uniform.ViewTrafoInv * vpCenter
                 let posCenter = uniform.ProjTrafo * vpCenter
 
@@ -197,21 +203,7 @@ module PointCloudHelper =
 
         let sphereImposterFragment (v : Vertex) =
            fragment {
-//                let c = 2.0 * v.tc - V2d.II
-
-//                let z = sqrt (1.0 - c.LengthSquared)
-                
-                //let n = V3d(c.XY,z)
-//                let d = z * uniform.PointSize * 0.5
-                
-//                let vp = uniform.ViewTrafo * v.wp
-//                let vp = vp / vp.W
-//                let vp = V4d(vp.X, vp.Y, vp.Z + d, 1.0)
-
-//                let sp = uniform.ProjTrafo *vp
-//                let sp = sp / sp.W
-
-                return {color = v.c}//; depth = sp.Z * 0.5 + 0.5} 
+                return {color = v.c}
             }
     
     
