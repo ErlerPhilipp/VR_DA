@@ -27,6 +27,13 @@ module LogicalSceneTypes =
         | EndFrame
         | UpdateViewTrafo of Trafo3d
 
+    type Operation =
+        {
+            selectionVolumeTrafos   : Trafo3d[]
+            worldToPointcloud       : Trafo3d
+            selectionVolumeRadiusPC : float
+        }
+
     [<ReferenceEquality;NoComparison>]
     type Object =
         {
@@ -96,10 +103,9 @@ module LogicalSceneTypes =
             lightColor          : V3d
             scoreTrafo          : Trafo3d
             scoreText           : string
-            pointCloudSg        : Aardvark.Base.Incremental.IMod<Trafo3d> -> ISg
             pointCloudTrafo     : Trafo3d
-            pointCloudLoDData   : PointSetLodData
             octree              : Octree
+            operations          : Operation[]
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
@@ -167,6 +173,7 @@ module GraphicsSceneTypes =
             lightColor          : ModRef<V3d>
             pointCloudTrafo     : ModRef<Trafo3d>
             selVolPath          : ModRef<Trafo3d[]>
+            operations          : ModRef<Operation[]>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

@@ -243,22 +243,7 @@ let main _ =
     let cushionSg = BoxSg.box (Mod.constant C4b.Gray) (Mod.constant (Box3d.FromCenterAndSize(V3d.OOO, V3d(cushionSize, cushionHeight, cushionSize))))
                             |> cushionDiffuseTexture |> cushionNormalMap
           
-    let filteredPointSet =
-        LogicalScene.Operations |> Mod.map
-            ( fun ops ->
-                    LogicalScene.deleted pointSet ops
-                )
-
     let pointCloudModelTrafo = pointCloudCenterTrafo * pointCloudScaleCorrection * flipYZ
-    let lodData = Rendering.LodData.PointSetLodData(filteredPointSet, Rendering.lodSettings.NodeCount)
-    let pointcloudSg (view : IMod<Trafo3d>) = 
-        Rendering.mkSg view (lodData)
-            |> Sg.effect [
-                DefaultSurfaces.trafo |> toEffect
-                DefaultSurfaces.vertexColor |> toEffect
-                ]
-            |> Sg.uniform "ViewportSize" vrWin.Sizes
-            |> Sg.pass (Renderpasses.PointcloudPass)
             
     let centroidSg = Sg.sphere 6 (Mod.constant C4b.DarkYellow) (Mod.constant 0.05)
                     |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\balls\SoftballColor.jpg", textureParam) :> ITexture))
@@ -388,10 +373,9 @@ let main _ =
             deltaTime           = 0.0
             scoreTrafo          = scoreTrafo
             scoreText           = "test"
-            pointCloudSg        = pointcloudSg
             pointCloudTrafo     = pointCloudModelTrafo
-            pointCloudLoDData   = lodData
             octree              = pointSet
+            operations          = [||]
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

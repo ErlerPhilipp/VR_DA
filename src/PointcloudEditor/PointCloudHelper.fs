@@ -153,7 +153,6 @@ module PointCloudHelper =
         let sphereImposterGeometry (p : Point<Vertex>) =
             triangle {
                 let sqrt2Half = 0.7071067812
-                let oneMinusAns = 0.2928932188
                 let tcPiQuarter = 0.8535533906
                 let oneMinusTcPiQuarter = 0.1464466094
 
@@ -191,30 +190,26 @@ module PointCloudHelper =
                 
                 yield { p.Value with c = p.Value.c; wp = wp.[7];    pos = pos.[7] / pos.[7].W;  tc = tc.[7] }
                 for i in 0..7 do
-//                    let nextI = (i+1)%7
                     yield { p.Value with c = p.Value.c; wp = wpCenter;      pos = posCenter / posCenter.W;      tc = V2d(0.5, 0.5) }
                     yield { p.Value with c = p.Value.c; wp = wp.[i];        pos = pos.[i] / pos.[i].W;          tc = tc.[i] }
-//                    yield { p.Value with c = p.Value.c; wp = wp.[nextI];    pos = pos.[nextI] / pos.[nextI].W;  tc = tc.[nextI] }
             }       
 
 
         let sphereImposterFragment (v : Vertex) =
            fragment {
-                let c = 2.0 * v.tc - V2d.II
-//                if c.Length > 1.0 then
-//                    discard()
+//                let c = 2.0 * v.tc - V2d.II
 
-                let z = sqrt (1.0 - c.LengthSquared)
+//                let z = sqrt (1.0 - c.LengthSquared)
                 
                 //let n = V3d(c.XY,z)
-                let d = z * uniform.PointSize * 0.5
+//                let d = z * uniform.PointSize * 0.5
                 
-                let vp = uniform.ViewTrafo * v.wp
-                let vp = vp / vp.W
-                let vp = V4d(vp.X, vp.Y, vp.Z + d, 1.0)
+//                let vp = uniform.ViewTrafo * v.wp
+//                let vp = vp / vp.W
+//                let vp = V4d(vp.X, vp.Y, vp.Z + d, 1.0)
 
-                let sp = uniform.ProjTrafo *vp
-                let sp = sp / sp.W
+//                let sp = uniform.ProjTrafo *vp
+//                let sp = sp / sp.W
 
                 return {color = v.c}//; depth = sp.Z * 0.5 + 0.5} 
             }

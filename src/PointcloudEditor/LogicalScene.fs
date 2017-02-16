@@ -35,15 +35,6 @@ module LogicalScene =
     open VrInteractions
     open VrDriver
 
-    type Operation =
-        {
-            selectionVolumeTrafos   : Trafo3d[]
-            worldToPointcloud       : Trafo3d
-            selectionVolumeRadiusPC : float
-        }
-        
-    let Operations = Mod.init [||]
-
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
             { scene with interactionInfo1 = newInteractionInfo}
@@ -184,7 +175,7 @@ module LogicalScene =
         let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
         { pointCloudOctree with root = memoryThunk newRoot }
 
-    let deleteSelection(worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
+    let deleteSelection(operations : Operation[], worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
 
@@ -194,8 +185,9 @@ module LogicalScene =
                 worldToPointcloud = worldToPointcloud
                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
             }
-
-        transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
+            
+        Array.append operations [| newOperation |]
+//        transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
         
     let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int) =
         
@@ -320,7 +312,8 @@ module LogicalScene =
 //                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))
                 let limitedGrowthStrength = clamp 0.0 1.0 (1.0 - (1.0 - minVibStrength) * Math.Exp(-0.05 * float numPointsInSelVol))
 
-                let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else printfn "numPointsInSelVol = %A; limitedGrowthStrength = %A" numPointsInSelVol limitedGrowthStrength; limitedGrowthStrength
+//                printfn "numPointsInSelVol = %A; limitedGrowthStrength = %A" numPointsInSelVol limitedGrowthStrength; 
+                let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else limitedGrowthStrength
 
                 let newInteractionInfo = { interactionInfo with 
                                             lastContrTrafo = t
@@ -366,12 +359,12 @@ module LogicalScene =
                 let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
                 let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
-                deleteSelection(worldToPointcloud, selectionVolumeTrafos)
+                let newOperations = deleteSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos)
                 let newSelectionPath = [| |]
 
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                newScene
+                { newScene with operations = newOperations }
                     
             | StartFrame ->
                 { scene with 

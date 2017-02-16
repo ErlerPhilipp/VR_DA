@@ -9,6 +9,8 @@ open Aardvark.Rendering.Text
 open Aardvark.SceneGraph
 
 open OmnidirShadows
+open PointCloudHelper
+open InteractiveSegmentation
 
 module GraphicsScene =
     open LogicalSceneTypes
@@ -38,6 +40,7 @@ module GraphicsScene =
                 lightPos            = Mod.init lightPos
                 lightColor          = Mod.init s.lightColor
                 selVolPath          = Mod.init (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
+                operations          = Mod.init s.operations
 
                 scoreTrafo          = Mod.init s.scoreTrafo
                 scoreText           = Mod.init s.scoreText
@@ -61,6 +64,7 @@ module GraphicsScene =
                 ms.lightPos.Value <- lightPos
                 ms.lightColor.Value <- s.lightColor
                 ms.selVolPath.Value <- (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
+                ms.operations.Value <- s.operations
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo
                 ms.scoreText.Value <- s.scoreText
@@ -165,8 +169,24 @@ module GraphicsScene =
                 |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
                 |> Sg.pass (Renderpasses.HighlightPass)
            
+        let filteredPointSet =
+            graphicsScene.operations |> Mod.map
+                ( fun ops ->
+                        LogicalScene.deleted initialScene.octree ops
+                    )
+
+        let lodData = Rendering.LodData.PointSetLodData(filteredPointSet, Rendering.lodSettings.NodeCount)
+        let pointcloudSg (view : IMod<Trafo3d>) = 
+            Rendering.mkSg view (lodData)
+                |> Sg.effect [
+                    DefaultSurfaces.trafo |> toEffect
+                    DefaultSurfaces.vertexColor |> toEffect
+                    ]
+                |> Sg.uniform "ViewportSize" win.Sizes
+                |> Sg.pass (Renderpasses.PointcloudPass)
+
         let fakeView = Mod.map2 (fun (m : Trafo3d) v -> m * v) graphicsScene.pointCloudTrafo graphicsScene.viewTrafo 
-        let pointCloudSg = initialScene.pointCloudSg fakeView |> Sg.cullMode (Mod.constant CullMode.None)
+        let pointCloudSg = pointcloudSg fakeView |> Sg.cullMode (Mod.constant CullMode.None)
 
         Sg.ofList ([selectionPath; fullscreenQuad; sg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
             |> Sg.viewTrafo graphicsScene.viewTrafo
