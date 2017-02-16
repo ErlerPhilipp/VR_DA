@@ -166,7 +166,7 @@ module GraphicsScene =
                 |> Sg.pass (Renderpasses.HighlightPass)
            
         let fakeView = Mod.map2 (fun (m : Trafo3d) v -> m * v) graphicsScene.pointCloudTrafo graphicsScene.viewTrafo 
-        let pointCloudSg = initialScene.pointCloudSg fakeView
+        let pointCloudSg = initialScene.pointCloudSg fakeView |> Sg.cullMode (Mod.constant CullMode.None)
 
         Sg.ofList ([selectionPath; fullscreenQuad; sg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
             |> Sg.viewTrafo graphicsScene.viewTrafo

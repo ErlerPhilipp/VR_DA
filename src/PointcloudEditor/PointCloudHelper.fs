@@ -139,45 +139,70 @@ module PointCloudHelper =
             {
                 [<Color>]
                 color : V4d
-                [<Depth>]
-                depth : float
+//                [<Depth>]
+//                depth : float
             }
             
+        [<ReflectedDefinition>]
+        let emptyArray =
+            [|
+                for i in 0..7 do
+                    yield V4d.OOOO
+            |]
+
         let sphereImposterGeometry (p : Point<Vertex>) =
             triangle {
+                let sqrt2Half = 0.7071067812
+                let oneMinusAns = 0.2928932188
+                let tcPiQuarter = 0.8535533906
+                let oneMinusTcPiQuarter = 0.1464466094
+
                 let s   = uniform.PointSize * 0.5
                 let wp  = p.Value.wp
                 let vp  = uniform.ViewTrafo * wp
             
-                let vp00 = vp + V4d( -s, -s, 0.0, 0.0 )
-                let vp01 = vp + V4d( -s,  s, 0.0, 0.0 )
-                let vp10 = vp + V4d(  s, -s, 0.0, 0.0 )
-                let vp11 = vp + V4d(  s,  s, 0.0, 0.0 )
+                let vpCenter = vp
+                let wpCenter = uniform.ViewTrafoInv * vpCenter
+                let posCenter = uniform.ProjTrafo * vpCenter
 
-                let wp00 = uniform.ViewTrafoInv * vp00 
-                let wp01 = uniform.ViewTrafoInv * vp01 
-                let wp10 = uniform.ViewTrafoInv * vp10 
-                let wp11 = uniform.ViewTrafoInv * vp11 
+                let vp = [|vp + V4d(  s,              0.0,           0.0, 0.0 )
+                           vp + V4d(  s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
+                           vp + V4d(  0.0,            s,             0.0, 0.0 )
+                           vp + V4d( -s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
+                           vp + V4d( -s,              0.0,           0.0, 0.0 )
+                           vp + V4d( -s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )
+                           vp + V4d(  0.0,           -s,             0.0, 0.0 )
+                           vp + V4d(  s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )|]
 
-
-                let p00 = uniform.ProjTrafo * vp00
-                let p01 = uniform.ProjTrafo * vp01
-                let p10 = uniform.ProjTrafo * vp10
-                let p11 = uniform.ProjTrafo * vp11
-
-
-                yield { p.Value with c = p.Value.c; wp = wp00; pos = p00 / p00.W; tc = V2d.OO }
-                yield { p.Value with c = p.Value.c; wp = wp01; pos = p01 / p01.W; tc = V2d.IO }
-                yield { p.Value with c = p.Value.c; wp = wp10; pos = p10 / p10.W; tc = V2d.OI }
-                yield { p.Value with c = p.Value.c; wp = wp11; pos = p11 / p11.W; tc = V2d.II }
+                let tc = [|V2d( 1.0,                    0.5                 )
+                           V2d( tcPiQuarter,            tcPiQuarter         )
+                           V2d( 0.5,                    1.0                 )
+                           V2d( oneMinusTcPiQuarter,    tcPiQuarter         )
+                           V2d( 0.0,                    0.5                 )
+                           V2d( oneMinusTcPiQuarter,    oneMinusTcPiQuarter )
+                           V2d( 0.5,                    0.0                 )
+                           V2d( tcPiQuarter,            oneMinusTcPiQuarter )|]
+                           
+                let wp =  emptyArray 
+                let pos = emptyArray 
+                for i in 0..7 do
+                    wp.[i] <- uniform.ViewTrafoInv * vp.[i]
+                    pos.[i] <- uniform.ProjTrafo * vp.[i]
+                
+                yield { p.Value with c = p.Value.c; wp = wp.[7];    pos = pos.[7] / pos.[7].W;  tc = tc.[7] }
+                for i in 0..7 do
+//                    let nextI = (i+1)%7
+                    yield { p.Value with c = p.Value.c; wp = wpCenter;      pos = posCenter / posCenter.W;      tc = V2d(0.5, 0.5) }
+                    yield { p.Value with c = p.Value.c; wp = wp.[i];        pos = pos.[i] / pos.[i].W;          tc = tc.[i] }
+//                    yield { p.Value with c = p.Value.c; wp = wp.[nextI];    pos = pos.[nextI] / pos.[nextI].W;  tc = tc.[nextI] }
             }       
 
 
         let sphereImposterFragment (v : Vertex) =
            fragment {
                 let c = 2.0 * v.tc - V2d.II
-                if c.Length > 1.0 then
-                    discard()
+//                if c.Length > 1.0 then
+//                    discard()
 
                 let z = sqrt (1.0 - c.LengthSquared)
                 
@@ -191,7 +216,7 @@ module PointCloudHelper =
                 let sp = uniform.ProjTrafo *vp
                 let sp = sp / sp.W
 
-                return {color = v.c; depth = sp.Z * 0.5 + 0.5} 
+                return {color = v.c}//; depth = sp.Z * 0.5 + 0.5} 
             }
     
     
