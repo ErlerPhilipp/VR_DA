@@ -65,6 +65,7 @@ module SelectionVolume =
                 selectionVolumeSg 
                 |> Sg.surface (Mod.constant (makeSelectionVolumeSurface(vrWin))) 
                 |> Sg.blendMode(Mod.constant (BlendMode(true))) 
+                |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
                 |> Sg.trafo(Mod.constant(Trafo3d.Translation(controllerRingCenter)))
                 |> Sg.pass (Renderpasses.SelectionVolumePass)
         selectionVolumeSg

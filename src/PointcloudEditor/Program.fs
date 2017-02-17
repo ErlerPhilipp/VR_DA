@@ -172,7 +172,8 @@ let main argv =
 //    let pointCloudBBSize = lodData.BoundingBox.Size
     let pointCloudBBSize = variance
     let pointCloudScaleCorrection = Trafo3d.Scale(1.0 / pointCloudBBSize.Length * 0.5)
-
+    
+    let controllerToTrackpadTrafo = Trafo3d.Scale(0.0200) * Trafo3d.RotationInDegrees(-83.0, 0.0, 0.0) * Trafo3d.Translation(0.0, 0.006, 0.050)
     //#endregion
        
     //#region Effects and Surfaces   
@@ -186,6 +187,11 @@ let main argv =
                                     defaultSimpleLightingEffect
                                 ]
     let constColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constColorEffect) :> ISurface
+    let constTextureEffect =    [
+                                    defaultTrafoEffect
+                                    defaultDiffuseTextureEffect
+                                ] 
+    let constTextureSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constTextureEffect) :> ISurface
     let diffuseEffect =         [
                                     defaultTrafoEffect
                                     defaultDiffuseTextureEffect
@@ -223,6 +229,8 @@ let main argv =
     let wallDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Painted Bricks\TexturesCom_Painted Bricks_albedo_S.jpg", textureParam) :> ITexture))
     let cushionDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Tufted Leather\TexturesCom_TuftedLeather_albedo_S.png", textureParam) :> ITexture))
     let pedestalDiffuseTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\Marble Polished\TexturesCom_MarblePolishedWhite1_diffuse_S.png", textureParam) :> ITexture))
+
+    let controllerOverlayTexture = Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\textures\overlay.png", textureParam) :> ITexture))
     //#endregion
     
     //#region SceneGraph
@@ -239,7 +247,15 @@ let main argv =
         let controllerSysButton = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\sysbuttontri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrackpad =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\trackpadtri.obj" |> loadVR |> Sg.AdapterNode :> ISg
         let controllerTrigger =  @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\triggertri.obj"|> loadVR |> Sg.AdapterNode :> ISg
-        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; makeSelectionVolumeSg(vrWin) ]
+        let controllerOverlay = Sg.fullScreenQuad 
+                                    |> Sg.surface (Mod.constant constTextureSurface)
+                                    |> controllerOverlayTexture 
+                                    |> Sg.blendMode(Mod.constant (BlendMode(true)))
+                                    |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
+                                    |> Sg.trafo (Mod.constant controllerToTrackpadTrafo)
+                                    |> Sg.pass (Renderpasses.SelectionVolumePass)
+        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; 
+            makeSelectionVolumeSg(vrWin); controllerOverlay ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
 
