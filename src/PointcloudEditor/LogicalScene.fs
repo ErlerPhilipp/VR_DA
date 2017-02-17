@@ -46,8 +46,6 @@ module LogicalScene =
             let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
             let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
             
-//            let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
-//            let newSelectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
             let minDistToNextPosWS = 0.01
             let minDistToNextPosPC = worldToPointcloud.Forward.TransformDir(V3d(minDistToNextPosWS, 0.0, 0.0)).Length
             let newPosWS = t.Forward.TransformPos(SelectionVolume.controllerRingCenter)
@@ -61,22 +59,6 @@ module LogicalScene =
             else
 //                printfn "add sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath + 1)
                 Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
-
-//                let containedInExistingSphere = 
-//                    Operations.Value |> Array.exists (fun op -> 
-//                            op.selectionVolumeTrafos |> Array.exists (fun t -> 
-//                                let oldPosPC = t.Forward.TransformPos(V3d())
-//                                let nearNewSphere = (oldPosPC - newPosPC).Length < minDistToNextPosPC
-//                                let oldIsBiggerThanNew = op.selectionVolumeRadiusPC >= newSelectionVolumeRadiusPC
-//                                let contained = nearNewSphere && oldIsBiggerThanNew
-////                                if contained then printfn "already exists!"
-//                                contained
-//                        ))
-//
-//                if not containedInExistingSphere then
-//                    Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
-//                else
-//                    interactionInfo.selectionVolumePath
         else
             interactionInfo.selectionVolumePath
 
@@ -94,8 +76,8 @@ module LogicalScene =
         member x.Value = v.Value
         
 
-    let deleted (pointCloudOctree : Octree) (operations : Operation[]) =
-    
+    let marked (pointCloudOctree : Octree) (operations : Operation[]) =
+        let markedColor = C4b(1.0, 0.0, 0.0, 1.0)
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
         let sphere(t : Trafo3d, op : Operation) = 
             Sphere3d(t.Forward.TransformPos(V3d()), op.selectionVolumeRadiusPC)
@@ -103,40 +85,41 @@ module LogicalScene =
         let opIntersectsCell(op : Operation, cell : GridCell) =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t, op)))
 
-        let cellToBeTraversed (cell : GridCell) : bool = 
-            operations |> Array.exists (fun op -> opIntersectsCell(op, cell))
+        let cellToBeTraversed (cell : GridCell) = 
+            operations |> Array.tryFindBack (fun op -> opIntersectsCell(op, cell))
             
         let opContainsCell(op : Operation, cell : GridCell) =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t, op)))
 
-        let cellToBeDeleted (cell : GridCell) : bool = 
-            operations |> Array.exists (fun op -> opContainsCell(op, cell))
+        let cellToBeMarked (cell : GridCell) = 
+            operations |> Array.tryFindBack (fun op -> opContainsCell(op, cell))
 
-        let mutable deletedPoints = 0
-
-        let pointToBeDeleted (point : Point) : bool = 
-            operations |> Array.exists (
+        let pointToBeMarked (point : Point) = 
+            operations |> Array.tryFindBack (
                 fun op -> op.selectionVolumeTrafos |> Array.exists (
                             fun t -> 
-                                let pInSphere = (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
-                                if pInSphere then deletedPoints <- deletedPoints + 1
-                                pInSphere
+                                (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
                             ))
+            
+        let checkPointsToBeMarked(dethunkedPoints : Point[]) = 
+            lazy (dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p) with
+//                                                            | Some op -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)
+                                                            | Some op -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p
+                                                            | None -> p
+                                               ))
 
-        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) =
-            let deletedColor = C4b(1.0, 0.0, 0.0, 1.0)
+        let markEntireLeaf(dethunkedPoints : Point[], op : Operation) =
+//            let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)))
+            let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p))
+            Leaf(newPoints.Value.Length, memoryThunk newPoints)
+
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContainedInOperation : Operation option) =
             let n = !node
             
-            let checkPointsToBeDeleted(dethunkedPoints : Point[]) = 
-                lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeDeleted(p) then Point(p.Position, p.Normal, deletedColor) else p))
-
-            let deleteEntireLeaf(dethunkedPoints : Point[]) =
-                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, deletedColor)))
-                Leaf(newPoints.Value.Length, memoryThunk newPoints)
-
-            let deleteEntireCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[]) =
-                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (true)) :> thunk<_>)
-                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, deletedColor)))
+            let markEntireCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[], op : Operation) =
+                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (Some op)) :> thunk<_>)
+//                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)))
+                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p))
                 Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
 
             match n with
@@ -144,43 +127,52 @@ module LogicalScene =
                 lazy n
             | Leaf points       -> 
                 lazy 
-                    let dethunkedPoints = points.Value
-
-                    if cellContained then 
-                        deleteEntireLeaf(dethunkedPoints)
-                    else
-                        if cellToBeTraversed(cell) then 
-                            if cellToBeDeleted(cell) then
-                                deleteEntireLeaf(dethunkedPoints)
-                            else
-                                let newPoints = checkPointsToBeDeleted(dethunkedPoints)
-                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
-                        else n
+                    match cellContainedInOperation with 
+                        | Some op -> //when op.opType = OperationType.Select -> 
+                            let dethunkedPoints = points.Value
+                            markEntireLeaf(dethunkedPoints, op)
+                        | _ ->  match cellToBeTraversed(cell) with
+                                    | Some op -> //when op.opType = OperationType.Select ->  
+                                        match cellToBeMarked(cell) with
+                                            | Some op -> //when op.opType = OperationType.Select -> 
+                                                let dethunkedPoints = points.Value
+                                                markEntireLeaf(dethunkedPoints, op)
+                                            | _ ->  //if op.opType = OperationType.Select then 
+                                                        let dethunkedPoints = points.Value
+                                                        let newPoints = checkPointsToBeMarked(dethunkedPoints)
+                                                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                                                    //else n
+                                    | _ -> n
             | Node (points,children) ->
                 lazy
-                    let dethunkedPoints = points.Value
+                    match cellContainedInOperation with 
+                        | Some op -> //when op.opType = OperationType.Select -> 
+                            let dethunkedPoints = points.Value
+                            markEntireCell(dethunkedPoints, children, op)
+                        | _ ->  match cellToBeTraversed(cell) with
+                                    | Some op -> //when op.opType = OperationType.Select ->  
+                                        match cellToBeMarked(cell) with
+                                            | Some op -> //when op.opType = OperationType.Select -> 
+                                                let dethunkedPoints = points.Value
+                                                markEntireCell(dethunkedPoints, children, op)
+                                            | _ ->  //if op.opType = OperationType.Select then 
+                                                        let dethunkedPoints = points.Value
+                                                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (None)) :> thunk<_>)
+                                                        let newPoints = checkPointsToBeMarked(dethunkedPoints)
+                                                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                                                    //else n
+                                    | _ -> n
 
-                    if cellContained then 
-                        deleteEntireCell(dethunkedPoints, children)
-                    else
-                        if cellToBeTraversed(cell) then 
-                            if cellToBeDeleted(cell) then
-                                deleteEntireCell(dethunkedPoints, children)
-                            else
-                                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (false)) :> thunk<_>)
-                                let newPoints = checkPointsToBeDeleted(dethunkedPoints)
-                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
-                        else n
-
-        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
+        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 None
         { pointCloudOctree with root = memoryThunk newRoot }
 
-    let deleteSelection(operations : Operation[], worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[]) =
+    let operateSelection(operations : Operation[], worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[], opType : OperationType) =
         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
 
         let newOperation = 
             {
+                opType = opType
                 selectionVolumeTrafos = selectionVolumeTrafos
                 worldToPointcloud = worldToPointcloud
                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
@@ -346,8 +338,25 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
+                let getAxisValue(deviceId : uint32) = 
+                    let mutable state = VRControllerState_t()
+                    let axisPosition =
+                        if system.GetControllerState(deviceId, &state) then
+                            Some (V2d(state.[0].x, state.[0].y))
+                        else None
+                    let axisValue = if axisPosition.IsSome then axisPosition.Value else V2d()
+                    axisValue
+
+                let axisValue = if firstController then getAxisValue(uint32 assignedInputs.controller1Id) else getAxisValue(uint32 assignedInputs.controller2Id)
+                let newOpType = if abs(axisValue.Y) < 0.5 then 
+                                    if axisValue.X < -0.5 then TrackpadActionType.Select elif axisValue.X > 0.5 then TrackpadActionType.Deselect else TrackpadActionType.Nop
+                                elif abs(axisValue.X) < 0.5 then 
+                                    if axisValue.Y < -0.5 then TrackpadActionType.Downscale elif axisValue.Y > 0.5 then TrackpadActionType.Upscale else TrackpadActionType.Nop
+                                else
+                                    TrackpadActionType.Nop
+                                        
                 let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
-                let newInteractionInfo = {interactionInfo with trackpadPressed = true; selectionVolumePath = newSelectionPath }
+                let newInteractionInfo = {interactionInfo with trackpadPressed = true; selectionVolumePath = newSelectionPath; currActionType = newOpType }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 newScene
 
@@ -355,14 +364,22 @@ module LogicalScene =
             | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-                
-                let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
-                let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
-                let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
-                let newOperations = deleteSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos)
-                let newSelectionPath = [| |]
 
-                let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = newSelectionPath }
+                let newOperations =  
+                    if interactionInfo.currActionType = TrackpadActionType.Select || interactionInfo.currActionType = TrackpadActionType.Deselect then
+                        let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
+                        let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
+                        let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
+                        if interactionInfo.currActionType = TrackpadActionType.Select then
+                            operateSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos, OperationType.Select)
+                        elif interactionInfo.currActionType = TrackpadActionType.Deselect then
+                            operateSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos, OperationType.Deselect)
+                        else
+                            scene.operations
+                    else
+                        scene.operations
+                    
+                let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = [||]; currActionType = TrackpadActionType.Nop }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 { newScene with operations = newOperations }
                     
@@ -375,7 +392,18 @@ module LogicalScene =
             | TimeElapsed(dt) ->
 //                let newObjects = scalePointCloudWithTrackpad(scene, dt.TotalSeconds)
                 let newObjects = scene.objects
-           
+                
+                //TODO:
+//                if scene.interactionInfo1.currActionType = OperationType.Upscale then
+//                let scalingSpeed = 1.1
+//                let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
+//                let deltaTrafo = Trafo3d.Scale(scalingFactorForFrame)
+//                printfn "axisValue = %A, scalingFactorForFrame %A" axisValue.Y scalingFactorForFrame
+//
+//                let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()))
+//                translation.Inverse * deltaTrafo * translation
+
+
                 { scene with 
                     deltaTime = dt.TotalSeconds
                     objects = newObjects

@@ -172,7 +172,7 @@ module GraphicsScene =
         let filteredPointSet =
             graphicsScene.operations |> Mod.map
                 ( fun ops ->
-                        LogicalScene.deleted initialScene.octree ops
+                        LogicalScene.marked initialScene.octree ops
                     )
 
         let lodData = Rendering.LodData.PointSetLodData(filteredPointSet, Rendering.lodSettings.NodeCount)

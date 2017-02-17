@@ -27,8 +27,20 @@ module LogicalSceneTypes =
         | EndFrame
         | UpdateViewTrafo of Trafo3d
 
+    type TrackpadActionType =
+        | Nop
+        | Select
+        | Deselect
+        | Upscale
+        | Downscale
+        
+    type OperationType =
+        | Select
+        | Deselect
+
     type Operation =
         {
+            opType                  : OperationType
             selectionVolumeTrafos   : Trafo3d[]
             worldToPointcloud       : Trafo3d
             selectionVolumeRadiusPC : float
@@ -80,6 +92,7 @@ module LogicalSceneTypes =
             trackpadPressed     : bool
             selectionVolumePath : Trafo3d[]
             numPointsInSelVol   : int
+            currActionType      : TrackpadActionType
         }
 
     let DefaultInteractionInfo = 
@@ -91,6 +104,7 @@ module LogicalSceneTypes =
             trackpadPressed     = false
             selectionVolumePath = [| |]
             numPointsInSelVol   = 0
+            currActionType      = TrackpadActionType.Nop
         }
 
     type Scene =

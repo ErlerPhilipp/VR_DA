@@ -39,10 +39,29 @@ open PointCloudHelper
 open InteractiveSegmentation
 
 [<EntryPoint>]
-let main _ =
+let main argv =
+
     Ag.initialize()
     Aardvark.Init()
-    
+
+//    let firstArgAsInt = 
+//        if argv.Length > 0 then
+//            let firstArg = argv.[0]
+//            let mutable asInt = 0
+//            let success = System.Int32.TryParse(firstArg, &asInt)
+//            if success then asInt else 0
+//        else 0
+//
+//    if firstArgAsInt = 0 then printfn "No argument given. Using both feedback types"
+//    let argToFeedbackType(a : int) =
+//        match a with
+//            | 0 -> FeedbackTypes.Both
+//            | 1 -> FeedbackTypes.OpticalFeedback
+//            | 2 -> FeedbackTypes.HapticFeedback
+//            | 3 -> FeedbackTypes.NoFeedback
+//            | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
+//    let feedback = argToFeedbackType(firstArgAsInt)
+
 //    let psp = @"..\..\resources\pointclouds\Laserscan-MS60_Beiglboeck-2015.pts"
     let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
     let storagePath = @"C:\bla\vgmCache"
@@ -351,7 +370,7 @@ let main _ =
         @ [pedestal; cushion]
         @ [controller1Object; controller2Object; camObject1; camObject2]
     //#endregion
-        
+    
     //#region Scene   
     let specialObjectIds =
         {
