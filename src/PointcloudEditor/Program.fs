@@ -185,7 +185,7 @@ let main argv =
     let constColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constColorEffect) :> ISurface
     let constTransparentColorEffect =    [
                                     defaultTrafoEffect
-                                    DefaultSurfaces.constantColor (C4f(0.5f, 0.5f, 0.5f, 0.5f)) |> toEffect
+                                    DefaultSurfaces.constantColor (C4f(0.5f, 0.5f, 0.5f, 0.75f)) |> toEffect
                                 ] 
     let constTransparentColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constTransparentColorEffect) :> ISurface
     let constTextureEffect =    [
@@ -243,7 +243,7 @@ let main argv =
     let thumbPosSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant 1.0)
                                 |> Sg.blendMode(Mod.constant (BlendMode(true))) 
                                 |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
-                                |> Sg.pass (Renderpasses.SelectionVolumePass)
+                                |> Sg.pass (Renderpasses.ThumbPass)
    
     let controllerSg = 
         let controllerBody = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj"|> loadVR |> Sg.AdapterNode :> ISg

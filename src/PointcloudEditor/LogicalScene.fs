@@ -138,7 +138,7 @@ module LogicalScene =
                             let dethunkedPoints = points.Value
                             markEntireLeaf(dethunkedPoints, op)
                         | _ ->  match cellToBeTraversed(cell) with
-                                    | Some op -> //when op.opType = OperationType.Select ->  
+                                    | Some _ -> //when op.opType = OperationType.Select ->  
                                         match cellToBeMarked(cell) with
                                             | Some op -> //when op.opType = OperationType.Select -> 
                                                 let dethunkedPoints = points.Value
@@ -156,7 +156,7 @@ module LogicalScene =
                             let dethunkedPoints = points.Value
                             markEntireCell(dethunkedPoints, children, op)
                         | _ ->  match cellToBeTraversed(cell) with
-                                    | Some op -> //when op.opType = OperationType.Select ->  
+                                    | Some _ -> //when op.opType = OperationType.Select ->  
                                         match cellToBeMarked(cell) with
                                             | Some op -> //when op.opType = OperationType.Select -> 
                                                 let dethunkedPoints = points.Value

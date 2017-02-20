@@ -16,6 +16,7 @@ module Renderpasses =
     let HighlightPass = RenderPass.after "high" RenderPassOrder.Arbitrary SelectionPass
     let GeometryPass = RenderPass.after "Geo" RenderPassOrder.Arbitrary HighlightPass
     let SelectionVolumePass = RenderPass.after "selvol" RenderPassOrder.Arbitrary GeometryPass
+    let ThumbPass = RenderPass.after "thumb" RenderPassOrder.Arbitrary SelectionVolumePass
 
 module SelectionVolume =
     type InstanceVertex = { 
