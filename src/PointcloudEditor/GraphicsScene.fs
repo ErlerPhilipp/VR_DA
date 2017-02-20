@@ -41,6 +41,7 @@ module GraphicsScene =
                 lightColor          = Mod.init s.lightColor
                 selVolPath          = Mod.init (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
                 operations          = Mod.init s.operations
+                octree              = Mod.init s.currentOctree
 
                 scoreTrafo          = Mod.init s.scoreTrafo
                 scoreText           = Mod.init s.scoreText
@@ -65,6 +66,7 @@ module GraphicsScene =
                 ms.lightColor.Value <- s.lightColor
                 ms.selVolPath.Value <- (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
                 ms.operations.Value <- s.operations
+                ms.octree.Value <- s.currentOctree
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo
                 ms.scoreText.Value <- s.scoreText
@@ -169,13 +171,7 @@ module GraphicsScene =
                 |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
                 |> Sg.pass (Renderpasses.HighlightPass)
            
-        let filteredPointSet =
-            graphicsScene.operations |> Mod.map
-                ( fun ops ->
-                        LogicalScene.marked initialScene.octree ops
-                    )
-
-        let lodData = Rendering.LodData.PointSetLodData(filteredPointSet, Rendering.lodSettings.NodeCount)
+        let lodData = Rendering.LodData.PointSetLodData(graphicsScene.octree, Rendering.lodSettings.NodeCount)
         let pointcloudSg (view : IMod<Trafo3d>) = 
             Rendering.mkSg view (lodData)
                 |> Sg.effect [

@@ -120,7 +120,8 @@ module LogicalSceneTypes =
             scoreTrafo          : Trafo3d
             scoreText           : string
             pointCloudTrafo     : Trafo3d
-            octree              : Octree
+            initialOctree       : Octree
+            currentOctree       : Octree
             operations          : Operation[]
             contrToTrackpad     : Trafo3d
             
@@ -191,6 +192,7 @@ module GraphicsSceneTypes =
             pointCloudTrafo     : ModRef<Trafo3d>
             selVolPath          : ModRef<Trafo3d[]>
             operations          : ModRef<Operation[]>
+            octree              : ModRef<Octree>
 
             scoreTrafo          : ModRef<Trafo3d>
             scoreText           : ModRef<string>

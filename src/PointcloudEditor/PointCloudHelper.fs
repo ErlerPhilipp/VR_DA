@@ -69,9 +69,11 @@ module PointCloudHelper =
                                 | Node (points,_) | Leaf points  -> points.Value
                                 | Empty -> [||]
                     
-
-                        let (p,n,c) = points    |> Array.map ( fun p -> V3f p.Position, V3f p.Normal, p.Color)
-                                                |> Array.unzip3
+                    
+                        let p = points    |> Array.map ( fun p -> V3f p.Position)
+                        let n = points    |> Array.map ( fun p -> V3f p.Normal)
+                        let c = points    |> Array.map ( fun p -> p.Color)
+                        let s = points    |> Array.map ( fun p -> p.State |> int)
 
                         let r = 
                             IndexedGeometry(
@@ -80,6 +82,7 @@ module PointCloudHelper =
                                         DefaultSemantic.Positions,  p :> Array
                                         DefaultSemantic.Normals,    n :> Array
                                         DefaultSemantic.Colors,     c :> Array
+                                        Sym.ofString "State",       s :> Array
                                     ]
                             )
 
@@ -113,13 +116,26 @@ module PointCloudHelper =
         open FShade
         open Aardvark.Base.Rendering.Effects
 
-        let internal debugNormal (v : Vertex) =
+        type StateAttribute() = inherit SemanticAttribute("State")
+
+        type PointCloudVertex = {
+            [<Position>]        pos     : V4d
+            [<WorldPosition>]   wp      : V4d
+            [<Normal>]          n       : V3d
+            [<BiNormal>]        b       : V3d
+            [<Tangent>]         t       : V3d
+            [<Color>]           c       : V4d
+            [<TexCoord>]        tc      : V2d
+            [<State>]           s       : int
+        }
+
+        let internal debugNormal (v : PointCloudVertex) =
             fragment {
                 return V3d(abs v.n.X, abs v.n.Y, abs v.n.Z)
             }
 
 
-        let viewSizedPointSprites (p : Point<Effects.Vertex>) =
+        let viewSizedPointSprites (p : Point<PointCloudVertex>) =
             triangle {
                 let s = uniform.PointSize * 0.5
                 let vp = uniform.ViewTrafo * p.Value.wp
@@ -139,18 +155,16 @@ module PointCloudHelper =
             {
                 [<Color>]
                 color : V4d
-//                [<Depth>]
-//                depth : float
             }
             
         [<ReflectedDefinition>]
         let emptyArray =
             [|
-                for i in 0..7 do
+                for _ in 0..7 do
                     yield V4d.OOOO
             |]
 
-        let sphereImposterGeometry (p : Point<Vertex>) =
+        let sphereImposterGeometry (p : Point<PointCloudVertex>) =
             triangle {
                 let sqrt2Half = 0.7071067812
                 let tcPiQuarter = 0.8535533906
@@ -201,9 +215,10 @@ module PointCloudHelper =
             }       
 
 
-        let sphereImposterFragment (v : Vertex) =
+        let sphereImposterFragment (v : PointCloudVertex) =
            fragment {
-                return {color = v.c}
+                let newColor = if v.s = 0 then v.c else V4d(1.0, 0.0, 0.0, 0.5)
+                return {color = newColor}
             }
     
     
@@ -227,6 +242,7 @@ module PointCloudHelper =
                             DefaultSemantic.Positions, typeof<V3f>
                             DefaultSemantic.Colors, typeof<C4b>
                             DefaultSemantic.Normals, typeof<V3f>
+                            Sym.ofString "State", typeof<int>
                         ]
                     boundingBoxSurface      = Some BoundingBox.effectRed
                 }
@@ -237,6 +253,5 @@ module PointCloudHelper =
                     DefaultSurfaces.trafo       |> toEffect
                     sphereImposterGeometry      |> toEffect
                     sphereImposterFragment      |> toEffect
-                    DefaultSurfaces.vertexColor |> toEffect
                 ]
             |> Sg.uniform "PointSize" lodSettings.PointSize  

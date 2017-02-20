@@ -17,7 +17,7 @@ type Point =
         val mutable public Normal   : V3d     
         val mutable public Color    : C4b
         val mutable public State    : byte
-        new(p,n, c) = { Position = p; Normal = n; Color = c; State = 0x0uy }
+        new(p,n,c,s) = { Position = p; Normal = n; Color = c; State = s }
     end
 
 module PSeq =
@@ -510,7 +510,7 @@ module Octree =
                         empty
 
                     | Leaf pts -> 
-                        let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Normal, p.Color))
+                        let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Normal, p.Color, 0x0uy))
                         pts := all
                         visited <- visited + all.Length
 
@@ -802,7 +802,7 @@ module Pts =
            str.ReadInt(&b) then
 
            str.ReadToNewLine() |> ignore
-           p <- Point(V3d(x,y,z), V3d.Zero, C4b(byte r, byte g, byte b,255uy))
+           p <- Point(V3d(x,y,z), V3d.Zero, C4b(byte r, byte g, byte b, 255uy), 0x0uy)
 
            true
 

@@ -142,7 +142,6 @@ let main argv =
     let rec getPoints (n : OctreeNode) =
         match n with
             | Empty -> [||]
-//            | Node (points,children)  -> 
             | Node (_,children)  -> 
                 children 
                     |> Array.map (fun c -> c.GetValue()) 
@@ -161,15 +160,12 @@ let main argv =
         let variance = varSum / count
         (avgPos, variance)
         
-//    let pointCloudBBCenter = lodData.BoundingBox.Center
     let (pointCloudBBCenter, variance) = centroid(pointSet.root.GetValue())
-//    let pointCloudBBCenter = V3d(pointCloudBBCenter.X, pointCloudBBCenter.Z, pointCloudBBCenter.Y)
     printfn "centroid = %A, variance = %A" pointCloudBBCenter variance
     let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.3, cushionPosition.Z)
     let pointCloudOffset = -pointCloudBBCenter
     let pointCloudCenterTrafo = Trafo3d.Translation(pointCloudOffset)
         
-//    let pointCloudBBSize = lodData.BoundingBox.Size
     let pointCloudBBSize = variance
     let pointCloudScaleCorrection = Trafo3d.Scale(1.0 / pointCloudBBSize.Length * 0.5)
     
@@ -189,7 +185,7 @@ let main argv =
     let constColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constColorEffect) :> ISurface
     let constTransparentColorEffect =    [
                                     defaultTrafoEffect
-                                    DefaultSurfaces.constantColor (C4f(0.5f, 0.5f, 0.5f, 0.3f)) |> toEffect
+                                    DefaultSurfaces.constantColor (C4f(0.5f, 0.5f, 0.5f, 0.5f)) |> toEffect
                                 ] 
     let constTransparentColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constTransparentColorEffect) :> ISurface
     let constTextureEffect =    [
@@ -433,7 +429,8 @@ let main argv =
             scoreTrafo          = scoreTrafo
             scoreText           = "test"
             pointCloudTrafo     = pointCloudModelTrafo
-            octree              = pointSet
+            initialOctree       = pointSet
+            currentOctree       = pointSet
             operations          = [||]
             contrToTrackpad     = controllerToTrackpadTrafo
             

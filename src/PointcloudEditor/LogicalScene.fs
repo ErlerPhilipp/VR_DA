@@ -78,7 +78,7 @@ module LogicalScene =
         
 
     let marked (pointCloudOctree : Octree) (operations : Operation[]) =
-        let markedColor = C4b(1.0, 0.0, 0.0, 1.0)
+
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
         let sphere(t : Trafo3d, op : Operation) = 
             Sphere3d(t.Forward.TransformPos(V3d()), op.selectionVolumeRadiusPC)
@@ -102,16 +102,22 @@ module LogicalScene =
                                 (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
                             ))
             
+        let updatePointState(p : Point, op : Operation) =
+            if op.opType = OperationType.Select then 
+                Point(p.Position, p.Normal, p.Color, 0x1uy) 
+            elif op.opType = OperationType.Deselect then 
+                Point(p.Position, p.Normal, p.Color, 0x0uy) 
+            else 
+                p
+
         let checkPointsToBeMarked(dethunkedPoints : Point[]) = 
             lazy (dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p) with
-//                                                            | Some op -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)
-                                                            | Some op -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p
+                                                            | Some op -> updatePointState(p, op)
                                                             | None -> p
                                                ))
 
         let markEntireLeaf(dethunkedPoints : Point[], op : Operation) =
-//            let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)))
-            let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p))
+            let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> updatePointState(p, op)))
             Leaf(newPoints.Value.Length, memoryThunk newPoints)
 
         let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContainedInOperation : Operation option) =
@@ -119,8 +125,7 @@ module LogicalScene =
             
             let markEntireCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[], op : Operation) =
                 let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (Some op)) :> thunk<_>)
-//                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> Point(p.Position, p.Normal, if op.opType = OperationType.Select then markedColor else p.Color)))
-                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if op.opType = OperationType.Select then Point(p.Position, p.Normal, markedColor) else p))
+                let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> updatePointState(p, op)))
                 Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
 
             match n with
@@ -179,7 +184,8 @@ module LogicalScene =
                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
             }
             
-        Array.append operations [| newOperation |]
+//        Array.append operations [| newOperation |]
+        [| newOperation |]
 //        transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
         
     let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int) =
@@ -299,7 +305,7 @@ module LogicalScene =
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
 
                 let searchUntilXPoints = 100
-                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree, searchUntilXPoints)
+                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.initialOctree, searchUntilXPoints)
 //                printfn "numPointsInSelVol = %A" numPointsInSelVol
                 let minVibStrength = 0.0
 //                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))
@@ -370,10 +376,11 @@ module LogicalScene =
                             scene.operations
                     else
                         scene.operations
-                    
+                        
+                let newOctree = marked scene.currentOctree newOperations
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = [||]; currActionType = TrackpadActionType.Nop }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with operations = newOperations }
+                { newScene with operations = newOperations; currentOctree = newOctree }
                     
             | StartFrame ->
                 { scene with 
@@ -389,8 +396,8 @@ module LogicalScene =
                 let axisValue2 = getAxisValue(uint32 assignedInputs.controller2Id, 0)
                 let controller1Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, scene.objects)
                 let controller2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller2ObjectId, scene.objects)
-                let thumbPosTrafo1 = Trafo3d.Translation(axisValue1.X, axisValue1.Y, 0.0) * scene.contrToTrackpad * controller1Trafo
-                let thumbPosTrafo2 = Trafo3d.Translation(axisValue2.X, axisValue2.Y, 0.0) * scene.contrToTrackpad * controller2Trafo
+                let thumbPosTrafo1 = Trafo3d.Scale(0.33) * Trafo3d.Translation(axisValue1.X, axisValue1.Y, 0.0) * scene.contrToTrackpad * controller1Trafo
+                let thumbPosTrafo2 = Trafo3d.Scale(0.33) * Trafo3d.Translation(axisValue2.X, axisValue2.Y, 0.0) * scene.contrToTrackpad * controller2Trafo
                 let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos1, thumbPosTrafo1, newObjects)
                 let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos2, thumbPosTrafo2, newObjects)
 
