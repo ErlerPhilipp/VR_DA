@@ -84,3 +84,12 @@ module VrDriver =
         
     let assignedInputs = getInputAssignment ()
     let inputDevices = getInputDevices ()
+    
+    let getAxisValue(deviceId : uint32, axisIndex : int) = 
+        let mutable state = VRControllerState_t()
+        let axisPosition =
+            if system.GetControllerState(deviceId, &state) then
+                Some (V2d(state.[axisIndex].x, state.[axisIndex].y))
+            else None
+        let axisValue = if axisPosition.IsSome then axisPosition.Value else V2d()
+        axisValue

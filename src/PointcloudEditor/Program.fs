@@ -187,6 +187,11 @@ let main argv =
                                     defaultSimpleLightingEffect
                                 ]
     let constColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constColorEffect) :> ISurface
+    let constTransparentColorEffect =    [
+                                    defaultTrafoEffect
+                                    DefaultSurfaces.constantColor (C4f(0.5f, 0.5f, 0.5f, 0.3f)) |> toEffect
+                                ] 
+    let constTransparentColorSurface = vrWin.Runtime.PrepareEffect(vrWin.FramebufferSignature, constTransparentColorEffect) :> ISurface
     let constTextureEffect =    [
                                     defaultTrafoEffect
                                     defaultDiffuseTextureEffect
@@ -238,6 +243,11 @@ let main argv =
         Assimp.PostProcessSteps.None
         
     let loadVR f = Loader.Assimp.Load(f,assimpFlagsSteamVR)
+                    
+    let thumbPosSg = Sg.sphere 4 (Mod.constant C4b.Green) (Mod.constant 1.0)
+                                |> Sg.blendMode(Mod.constant (BlendMode(true))) 
+                                |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
+                                |> Sg.pass (Renderpasses.SelectionVolumePass)
    
     let controllerSg = 
         let controllerBody = @"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodytri.obj"|> loadVR |> Sg.AdapterNode :> ISg
@@ -314,6 +324,18 @@ let main argv =
             trafo = Trafo3d.Translation(pointCloudResetPos)
             surface = Some centroidSurface
         }
+    let thumbPosObject1 =
+        { defaultObject with
+            id = newId()
+            castsShadow = false
+            trafo = Trafo3d.Identity
+            model = Some thumbPosSg
+            surface = Some constTransparentColorSurface
+        }
+    let thumbPosObject2 =
+        { thumbPosObject1 with
+            id = newId()
+        }
 
     let groundTilingFactor = 0.3
     let ceilingTilingFactor = 0.4
@@ -384,7 +406,7 @@ let main argv =
         @ [groundObject; ceilingObject]
         @ [wall1; wall2; wall3; wall4]
         @ [pedestal; cushion]
-        @ [controller1Object; controller2Object; camObject1; camObject2]
+        @ [controller1Object; controller2Object; camObject1; camObject2; thumbPosObject1; thumbPosObject2]
     //#endregion
     
     //#region Scene   
@@ -396,6 +418,8 @@ let main argv =
             controller2ObjectId = controller2Object.id
             lightId             = lightObject.id
             centroidId          = centroidObject.id
+            thumbPos1           = thumbPosObject1.id
+            thumbPos2           = thumbPosObject2.id
         }
 
     let sceneObj =
@@ -411,6 +435,7 @@ let main argv =
             pointCloudTrafo     = pointCloudModelTrafo
             octree              = pointSet
             operations          = [||]
+            contrToTrackpad     = controllerToTrackpadTrafo
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

@@ -58,4 +58,3 @@ module VrAxis =
                 match position.Value with
                     | Some _ -> transact (fun () -> position.Value <- None)
                     | _ -> ()
-

@@ -81,6 +81,8 @@ module LogicalSceneTypes =
             controller2ObjectId : int
             lightId             : int
             centroidId          : int
+            thumbPos1           : int
+            thumbPos2           : int
         }
 
     type InteractionInfo =
@@ -120,6 +122,7 @@ module LogicalSceneTypes =
             pointCloudTrafo     : Trafo3d
             octree              : Octree
             operations          : Operation[]
+            contrToTrackpad     : Trafo3d
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

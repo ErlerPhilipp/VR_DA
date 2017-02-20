@@ -15,6 +15,11 @@ open MBrace.FsPickler
 
 open System
 
+open LogicalSceneTypes
+open VrTypes
+open VrInteractions
+open VrDriver
+
 [<AutoOpen>]
 module UnsafeOperators =
 
@@ -30,10 +35,6 @@ module UnsafeOperators =
                 | _ -> ()
 
 module LogicalScene =
-    open LogicalSceneTypes
-    open VrTypes
-    open VrInteractions
-    open VrDriver
 
     let makeSceneWithInteractionInfo(firstController : bool, newInteractionInfo : InteractionInfo, scene : Scene) =
         if firstController then
@@ -297,7 +298,7 @@ module LogicalScene =
                 let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
 
-                let searchUntilXPoints = 1000
+                let searchUntilXPoints = 100
                 let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.octree, searchUntilXPoints)
 //                printfn "numPointsInSelVol = %A" numPointsInSelVol
                 let minVibStrength = 0.0
@@ -338,16 +339,7 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let getAxisValue(deviceId : uint32) = 
-                    let mutable state = VRControllerState_t()
-                    let axisPosition =
-                        if system.GetControllerState(deviceId, &state) then
-                            Some (V2d(state.[0].x, state.[0].y))
-                        else None
-                    let axisValue = if axisPosition.IsSome then axisPosition.Value else V2d()
-                    axisValue
-
-                let axisValue = if firstController then getAxisValue(uint32 assignedInputs.controller1Id) else getAxisValue(uint32 assignedInputs.controller2Id)
+                let axisValue = if firstController then getAxisValue(uint32 assignedInputs.controller1Id, 0) else getAxisValue(uint32 assignedInputs.controller2Id, 0)
                 let newOpType = if abs(axisValue.Y) < 0.5 then 
                                     if axisValue.X < -0.5 then TrackpadActionType.Select elif axisValue.X > 0.5 then TrackpadActionType.Deselect else TrackpadActionType.Nop
                                 elif abs(axisValue.X) < 0.5 then 
@@ -393,6 +385,17 @@ module LogicalScene =
 //                let newObjects = scalePointCloudWithTrackpad(scene, dt.TotalSeconds)
                 let newObjects = scene.objects
                 
+                let axisValue1 = getAxisValue(uint32 assignedInputs.controller1Id, 0) 
+                let axisValue2 = getAxisValue(uint32 assignedInputs.controller2Id, 0)
+                let controller1Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller1ObjectId, scene.objects)
+                let controller2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller2ObjectId, scene.objects)
+                let thumbPosTrafo1 = Trafo3d.Translation(axisValue1.X, axisValue1.Y, 0.0) * scene.contrToTrackpad * controller1Trafo
+                let thumbPosTrafo2 = Trafo3d.Translation(axisValue2.X, axisValue2.Y, 0.0) * scene.contrToTrackpad * controller2Trafo
+                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos1, thumbPosTrafo1, newObjects)
+                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos2, thumbPosTrafo2, newObjects)
+
+//                printfn "ctrl = %A |thumb = %A" (controller1Trafo.Forward.TransformPos(V3d())) (thumbPosTrafo1.Forward.TransformPos(V3d()))
+
                 //TODO:
 //                if scene.interactionInfo1.currActionType = OperationType.Upscale then
 //                let scalingSpeed = 1.1
