@@ -40,7 +40,6 @@ module GraphicsScene =
                 lightPos            = Mod.init lightPos
                 lightColor          = Mod.init s.lightColor
                 selVolPath          = Mod.init (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
-                operations          = Mod.init s.operations
                 octree              = Mod.init s.currentOctree
 
                 scoreTrafo          = Mod.init s.scoreTrafo
@@ -65,7 +64,6 @@ module GraphicsScene =
                 ms.lightPos.Value <- lightPos
                 ms.lightColor.Value <- s.lightColor
                 ms.selVolPath.Value <- (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
-                ms.operations.Value <- s.operations
                 ms.octree.Value <- s.currentOctree
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo

@@ -431,7 +431,6 @@ let main argv =
             pointCloudTrafo     = pointCloudModelTrafo
             initialOctree       = pointSet
             currentOctree       = pointSet
-            operations          = [||]
             contrToTrackpad     = controllerToTrackpadTrafo
             
             specialObjectIds    = specialObjectIds

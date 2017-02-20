@@ -122,7 +122,6 @@ module LogicalSceneTypes =
             pointCloudTrafo     : Trafo3d
             initialOctree       : Octree
             currentOctree       : Octree
-            operations          : Operation[]
             contrToTrackpad     : Trafo3d
             
             specialObjectIds    : SpecialObjectIds
@@ -191,7 +190,6 @@ module GraphicsSceneTypes =
             lightColor          : ModRef<V3d>
             pointCloudTrafo     : ModRef<Trafo3d>
             selVolPath          : ModRef<Trafo3d[]>
-            operations          : ModRef<Operation[]>
             octree              : ModRef<Octree>
 
             scoreTrafo          : ModRef<Trafo3d>

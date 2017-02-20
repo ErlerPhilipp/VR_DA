@@ -77,7 +77,7 @@ module LogicalScene =
         member x.Value = v.Value
         
 
-    let marked (pointCloudOctree : Octree) (operations : Operation[]) =
+    let marked (pointCloudOctree : Octree) (operation : Operation) =
 
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
         let sphere(t : Trafo3d, op : Operation) = 
@@ -87,20 +87,19 @@ module LogicalScene =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t, op)))
 
         let cellToBeTraversed (cell : GridCell) = 
-            operations |> Array.tryFindBack (fun op -> opIntersectsCell(op, cell))
+            opIntersectsCell(operation, cell)
             
         let opContainsCell(op : Operation, cell : GridCell) =
             op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t, op)))
 
         let cellToBeMarked (cell : GridCell) = 
-            operations |> Array.tryFindBack (fun op -> opContainsCell(op, cell))
+            opContainsCell(operation, cell)
 
         let pointToBeMarked (point : Point) = 
-            operations |> Array.tryFindBack (
-                fun op -> op.selectionVolumeTrafos |> Array.exists (
-                            fun t -> 
-                                (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)
-                            ))
+            operation.selectionVolumeTrafos |> Array.exists (
+                fun t -> 
+                    (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(operation)
+                )
             
         let updatePointState(p : Point, op : Operation) =
             if op.opType = OperationType.Select then 
@@ -111,20 +110,17 @@ module LogicalScene =
                 p
 
         let checkPointsToBeMarked(dethunkedPoints : Point[]) = 
-            lazy (dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p) with
-                                                            | Some op -> updatePointState(p, op)
-                                                            | None -> p
-                                               ))
+            lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeMarked(p) then updatePointState(p, operation) else p))
 
         let markEntireLeaf(dethunkedPoints : Point[], op : Operation) =
             let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> updatePointState(p, op)))
             Leaf(newPoints.Value.Length, memoryThunk newPoints)
 
-        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContainedInOperation : Operation option) =
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContainedInOperation : bool) =
             let n = !node
             
             let markEntireCell(dethunkedPoints : Point[], children : thunk<OctreeNode>[], op : Operation) =
-                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (Some op)) :> thunk<_>)
+                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (true)) :> thunk<_>)
                 let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> updatePointState(p, op)))
                 Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
 
@@ -133,61 +129,39 @@ module LogicalScene =
                 lazy n
             | Leaf points       -> 
                 lazy 
-                    match cellContainedInOperation with 
-                        | Some op -> //when op.opType = OperationType.Select -> 
-                            let dethunkedPoints = points.Value
-                            markEntireLeaf(dethunkedPoints, op)
-                        | _ ->  match cellToBeTraversed(cell) with
-                                    | Some _ -> //when op.opType = OperationType.Select ->  
-                                        match cellToBeMarked(cell) with
-                                            | Some op -> //when op.opType = OperationType.Select -> 
-                                                let dethunkedPoints = points.Value
-                                                markEntireLeaf(dethunkedPoints, op)
-                                            | _ ->  //if op.opType = OperationType.Select then 
-                                                        let dethunkedPoints = points.Value
-                                                        let newPoints = checkPointsToBeMarked(dethunkedPoints)
-                                                        Leaf(newPoints.Value.Length, memoryThunk newPoints)
-                                                    //else n
-                                    | _ -> n
+                    if cellContainedInOperation then 
+                        let dethunkedPoints = points.Value
+                        markEntireLeaf(dethunkedPoints, operation)
+                    else
+                        if cellToBeTraversed(cell) then
+                            if cellToBeMarked(cell) then
+                                let dethunkedPoints = points.Value
+                                markEntireLeaf(dethunkedPoints, operation)
+                            else 
+                                let dethunkedPoints = points.Value
+                                let newPoints = checkPointsToBeMarked(dethunkedPoints)
+                                Leaf(newPoints.Value.Length, memoryThunk newPoints)
+                        else n
             | Node (points,children) ->
                 lazy
-                    match cellContainedInOperation with 
-                        | Some op -> //when op.opType = OperationType.Select -> 
-                            let dethunkedPoints = points.Value
-                            markEntireCell(dethunkedPoints, children, op)
-                        | _ ->  match cellToBeTraversed(cell) with
-                                    | Some _ -> //when op.opType = OperationType.Select ->  
-                                        match cellToBeMarked(cell) with
-                                            | Some op -> //when op.opType = OperationType.Select -> 
-                                                let dethunkedPoints = points.Value
-                                                markEntireCell(dethunkedPoints, children, op)
-                                            | _ ->  //if op.opType = OperationType.Select then 
-                                                        let dethunkedPoints = points.Value
-                                                        let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (None)) :> thunk<_>)
-                                                        let newPoints = checkPointsToBeMarked(dethunkedPoints)
-                                                        Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
-                                                    //else n
-                                    | _ -> n
+                    if cellContainedInOperation then 
+                        let dethunkedPoints = points.Value
+                        markEntireCell(dethunkedPoints, children, operation)
+                    else
+                        if cellToBeTraversed(cell) then
+                            if cellToBeMarked(cell) then
+                                let dethunkedPoints = points.Value
+                                markEntireCell(dethunkedPoints, children, operation)
+                            else
+                                let dethunkedPoints = points.Value
+                                let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i) (level + 1) (false)) :> thunk<_>)
+                                let newPoints = checkPointsToBeMarked(dethunkedPoints)
+                                Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+                        else n
 
-        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 None
+        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
         { pointCloudOctree with root = memoryThunk newRoot }
 
-    let operateSelection(operations : Operation[], worldToPointcloud : Trafo3d, selectionVolumeTrafos : Trafo3d[], opType : OperationType) =
-        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
-        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
-
-        let newOperation = 
-            {
-                opType = opType
-                selectionVolumeTrafos = selectionVolumeTrafos
-                worldToPointcloud = worldToPointcloud
-                selectionVolumeRadiusPC = selectionVolumeRadiusPC
-            }
-            
-//        Array.append operations [| newOperation |]
-        [| newOperation |]
-//        transact (fun () -> Operations.Value <- Array.append Operations.Value [| newOperation |])
-        
     let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int) =
         
         let selVolPosPC = (controllerTrafoWS * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
@@ -362,25 +336,33 @@ module LogicalScene =
             | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trackpad) ->
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
-
-                let newOperations =  
+                
+                let newOctree = 
                     if interactionInfo.currActionType = TrackpadActionType.Select || interactionInfo.currActionType = TrackpadActionType.Deselect then
                         let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                         let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
                         let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
-                        if interactionInfo.currActionType = TrackpadActionType.Select then
-                            operateSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos, OperationType.Select)
-                        elif interactionInfo.currActionType = TrackpadActionType.Deselect then
-                            operateSelection(scene.operations, worldToPointcloud, selectionVolumeTrafos, OperationType.Deselect)
-                        else
-                            scene.operations
-                    else
-                        scene.operations
                         
-                let newOctree = marked scene.currentOctree newOperations
+                        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+                        let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
+                        
+                        let opType = if interactionInfo.currActionType = TrackpadActionType.Select then OperationType.Select else OperationType.Deselect
+
+                        let newOperation = 
+                            {
+                                opType = opType
+                                selectionVolumeTrafos = selectionVolumeTrafos
+                                worldToPointcloud = worldToPointcloud
+                                selectionVolumeRadiusPC = selectionVolumeRadiusPC
+                            }
+                        let newOctree = marked scene.currentOctree newOperation
+                        newOctree
+                    else
+                        scene.currentOctree
+                        
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = [||]; currActionType = TrackpadActionType.Nop }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with operations = newOperations; currentOctree = newOctree }
+                { newScene with currentOctree = newOctree }
                     
             | StartFrame ->
                 { scene with 
