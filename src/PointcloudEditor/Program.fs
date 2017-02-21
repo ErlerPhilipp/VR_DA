@@ -64,6 +64,7 @@ let main argv =
 
 //    let psp = @"..\..\resources\pointclouds\Laserscan-MS60_Beiglboeck-2015.pts"
     let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
+    let referenceOperationsFile = @"..\..\resources\pointclouds\JBs_Haus_groundTruth.xml"
     let storagePath = @"C:\bla\vgmCache"
 
     Directory.CreateDirectory(storagePath) |> ignore
@@ -447,6 +448,8 @@ let main argv =
             initialOctree       = pointSet
             currentOctree       = pointSet
             contrToTrackpad     = controllerToTrackpadTrafo
+            allOperations       = [||]
+            refOperationsFile   = referenceOperationsFile
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

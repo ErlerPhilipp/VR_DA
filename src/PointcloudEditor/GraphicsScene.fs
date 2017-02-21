@@ -128,11 +128,6 @@ module GraphicsScene =
         win.Update <- update
 
         let sg = OmnidirShadows.init(win, graphicsScene)
-
-//        let textSg =
-////            Sg.text (new Font("Arial",FontStyle.Bold)) C4b.Red graphicsScene.scoreText :> ISg
-//            Sg.markdown MarkdownConfig.light graphicsScene.scoreText
-//                |> Sg.trafo graphicsScene.scoreTrafo
                 
         // Stencil Mode for Addtivie Selection (AND, OR, XOR, SINGLE)
         let Additive = Rendering.StencilMode(

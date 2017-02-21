@@ -127,6 +127,8 @@ module LogicalSceneTypes =
             initialOctree       : Octree
             currentOctree       : Octree
             contrToTrackpad     : Trafo3d
+            allOperations       : Operation[]
+            refOperationsFile   : string
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

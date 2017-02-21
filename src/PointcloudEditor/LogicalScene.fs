@@ -19,6 +19,7 @@ open LogicalSceneTypes
 open VrTypes
 open VrInteractions
 open VrDriver
+open OperationsComp
 
 [<AutoOpen>]
 module UnsafeOperators =
@@ -311,7 +312,45 @@ module LogicalScene =
                     
             // press grip button
             | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Grip) ->
-                printfn "grip button"
+                
+                //OperationsComp.saveOperationsToFile(scene.allOperations, scene.refOperationsFile)
+                let refOps = OperationsComp.loadOperationsFromFile(scene.refOperationsFile)
+                let compRes = OperationsComp.compareOperations(refOps, scene.allOperations, scene.initialOctree)
+                
+                let arrayToString(arr : array<_>) =
+                    "[|" + (arr |> Array.map(fun i -> i.ToString()) |> String.concat ";") + "|]"
+
+                let operationTypesA = compRes.operationTypesA |> arrayToString
+                let operationTypesB = compRes.operationTypesB |> arrayToString
+                let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
+                let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
+                
+                let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+                let compResString = 
+                    compRes.selectionQualityMeasure.ToString()   + System.Environment.NewLine +
+                    "numSelectOperationsA =     " + compRes.numSelectOperationsA.ToString()     + System.Environment.NewLine +
+                    "numSelectOperationsB =     " + compRes.numSelectOperationsB.ToString()     + System.Environment.NewLine +
+                    "numDeSelectOperationsA =   " + compRes.numDeSelectOperationsA.ToString()   + System.Environment.NewLine +
+                    "numDeSelectOperationsB =   " + compRes.numDeSelectOperationsB.ToString()   + System.Environment.NewLine +
+                    "operationTypesA =          " + operationTypesA                             + System.Environment.NewLine +
+                    "operationTypesB =          " + operationTypesB                             + System.Environment.NewLine +
+                    "numSelectionVolumesA =     " + numSelectionVolumesA                        + System.Environment.NewLine +
+                    "numSelectionVolumesB =     " + numSelectionVolumesB                        + System.Environment.NewLine
+                Logging.log (currentTimeString + " ### Comparison Result ###" + System.Environment.NewLine + compResString)
+                
+                let screenshot = new System.Drawing.Bitmap(System.Windows.Forms.SystemInformation.VirtualScreen.Width, 
+                                                            System.Windows.Forms.SystemInformation.VirtualScreen.Height, 
+                                                            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                let screenGraph = System.Drawing.Graphics.FromImage(screenshot);
+                screenGraph.CopyFromScreen(System.Windows.Forms.SystemInformation.VirtualScreen.X, 
+                                           System.Windows.Forms.SystemInformation.VirtualScreen.Y, 
+                                           0, 
+                                           0, 
+                                           System.Windows.Forms.SystemInformation.VirtualScreen.Size, 
+                                           System.Drawing.CopyPixelOperation.SourceCopy);
+
+                screenshot.Save(@"output\" + currentTimeString + "_screenshot.png", System.Drawing.Imaging.ImageFormat.Png);
+
                 scene
                     
             // release trigger
@@ -350,7 +389,7 @@ module LogicalScene =
                 let firstController = deviceId = assignedInputs.controller1Id
                 let interactionInfo = if firstController then scene.interactionInfo1 else scene.interactionInfo2
                 
-                let newOctree = 
+                let newOctree, newOperations = 
                     if interactionInfo.currActionType = TrackpadActionType.Select || interactionInfo.currActionType = TrackpadActionType.Deselect then
                         let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                         let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
@@ -369,13 +408,13 @@ module LogicalScene =
                                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
                             }
                         let newOctree = marked scene.currentOctree newOperation
-                        newOctree
+                        newOctree, Array.append (scene.allOperations) [|newOperation|]
                     else
-                        scene.currentOctree
+                        scene.currentOctree, scene.allOperations
                         
                 let newInteractionInfo = {interactionInfo with trackpadPressed = false; selectionVolumePath = [||]; currActionType = TrackpadActionType.Nop }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
-                { newScene with currentOctree = newOctree }
+                { newScene with currentOctree = newOctree; allOperations = newOperations }
                     
             | StartFrame ->
                 { scene with 

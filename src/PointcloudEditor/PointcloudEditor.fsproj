@@ -59,6 +59,7 @@
     <Compile Include="PointCloudHelper.fs" />
     <Compile Include="SceneTypes.fs" />
     <Compile Include="VrInteractions.fs" />
+    <Compile Include="OperationsComp.fs" />
     <Compile Include="LogicalScene.fs" />
     <Compile Include="OmnidirShadows.fs" />
     <Compile Include="GraphicsScene.fs" />
