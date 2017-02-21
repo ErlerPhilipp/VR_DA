@@ -139,29 +139,37 @@ let main argv =
     let cushionSize = pedestalRadius * 1.5
     let cushionPosition = V3d(pedestalPosition.X, pedestalPosition.Y + pedestalHeight / 2.0 + cushionHeight / 2.0, pedestalPosition.Z)
 
-    let rec getPoints (n : OctreeNode) =
+    let minNumPoints = 100000
+
+    let rec getPoints (numPoints : int) (n : OctreeNode) =
         match n with
             | Empty -> [||]
-            | Node (_,children)  -> 
-                children 
-                    |> Array.map (fun c -> c.GetValue()) 
-                    |> Array.map getPoints
-                    |> Array.concat
+            | Node (points, children)  -> 
+                let points = points.GetValue() |> Array.map (fun p -> p.Position)
+                let childPoints =
+                    if numPoints < minNumPoints then
+                        children 
+                            |> Array.map (fun c -> c.GetValue()) 
+                            |> Array.map (getPoints (numPoints + points.Length))
+                            |> Array.concat
+                    else
+                        [||]
+                Array.append points childPoints
             | Leaf points -> 
                 points.GetValue() |> Array.map (fun p -> p.Position)
 
     let centroid (n : OctreeNode) = 
-        let pos = getPoints (n) 
+        let pos = getPoints 0 n
         let posSum = (pos |> Array.fold (+) V3d.OOO)
         let count = pos |> Array.length |> float
         let avgPos = posSum / count
         let variances = pos |> Array.map (fun p -> (avgPos - p).Length )
         let varSum = (variances |> Array.fold (+) V3d.OOO)
         let variance = varSum / count
-        (avgPos, variance)
+        (avgPos, variance, count)
         
-    let (pointCloudBBCenter, variance) = centroid(pointSet.root.GetValue())
-    printfn "centroid = %A, variance = %A" pointCloudBBCenter variance
+    let (pointCloudBBCenter, variance, count) = centroid(pointSet.root.GetValue())
+    printfn "centroid = %A, variance = %A, count = %A" pointCloudBBCenter variance count
     let pointCloudResetPos = V3d(cushionPosition.X, cushionPosition.Y + 0.3, cushionPosition.Z)
     let pointCloudOffset = -pointCloudBBCenter
     let pointCloudCenterTrafo = Trafo3d.Translation(pointCloudOffset)
