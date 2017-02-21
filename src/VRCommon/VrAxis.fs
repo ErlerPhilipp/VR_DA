@@ -9,8 +9,11 @@ module VrAxis =
     open VrTypes
     
     type VrControllerAxis =
-        | Trackpad = 0
-        | Trigger = 1
+        | System = 0
+        | ApplicationMenu = 1
+        | Grip = 2
+        | Trackpad = 32
+        | Trigger = 33
 
     type VrAxis(system : CVRSystem, axisType : EVRControllerAxisType, deviceIndex : int, index : int) =
     

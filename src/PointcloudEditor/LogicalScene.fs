@@ -309,6 +309,11 @@ module LogicalScene =
                 let newInteractionInfo = { interactionInfo with triggerPressed = true}
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
+            // press grip button
+            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Grip) ->
+                printfn "grip button"
+                scene
+                    
             // release trigger
             | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
                 let firstController = deviceId = assignedInputs.controller1Id

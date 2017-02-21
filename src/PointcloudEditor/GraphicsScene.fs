@@ -106,7 +106,7 @@ module GraphicsScene =
             if e.trackedDeviceIndex >= 0u && e.trackedDeviceIndex < uint32 deviceCount then
                 let deviceId = e.trackedDeviceIndex |> int
                 let button = int e.data.controller.button |> unbox<EVRButtonId>
-                let axis = button - EVRButtonId.k_EButton_Axis0 |> int
+                let axis = button |> int
                 let trafo = trafos.[deviceId]
 
                 match unbox<EVREventType> (int e.eventType) with
