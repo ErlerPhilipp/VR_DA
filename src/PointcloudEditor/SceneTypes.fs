@@ -81,8 +81,10 @@ module LogicalSceneTypes =
             controller2ObjectId : int
             lightId             : int
             centroidId          : int
-            thumbPos1           : int
-            thumbPos2           : int
+            thumbPos1Id         : int
+            thumbPos2Id         : int
+            selectionVolume1Id  : int
+            selectionVolume2Id  : int
         }
 
     type InteractionInfo =
@@ -95,6 +97,7 @@ module LogicalSceneTypes =
             selectionVolumePath : Trafo3d[]
             numPointsInSelVol   : int
             currActionType      : TrackpadActionType
+            currSelVolScale     : float
         }
 
     let DefaultInteractionInfo = 
@@ -107,6 +110,7 @@ module LogicalSceneTypes =
             selectionVolumePath = [| |]
             numPointsInSelVol   = 0
             currActionType      = TrackpadActionType.Nop
+            currSelVolScale     = 1.0
         }
 
     type Scene =

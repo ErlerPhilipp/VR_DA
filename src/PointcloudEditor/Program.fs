@@ -260,8 +260,7 @@ let main argv =
                                     |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors))
                                     |> Sg.trafo (Mod.constant controllerToTrackpadTrafo)
                                     |> Sg.pass (Renderpasses.SelectionVolumePass)
-        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; 
-            makeSelectionVolumeSg(vrWin); controllerOverlay ]
+        [ controllerBody; controllerButton; controllerLGrip; controllerRGrip; controllerSysButton; controllerTrackpad; controllerTrigger; controllerOverlay ]
             |> Sg.group :> ISg
             |> Sg.texture DefaultSemantic.DiffuseColorTexture (Mod.constant (FileTexture(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\onepointfive_texture.png", textureParam) :> ITexture))
 
@@ -328,10 +327,16 @@ let main argv =
             model = Some thumbPosSg
             surface = Some constTransparentColorSurface
         }
-    let thumbPosObject2 =
-        { thumbPosObject1 with
+    let thumbPosObject2 = { thumbPosObject1 with id = newId()}
+    let selectionVolumeObject1 =
+        { defaultObject with
             id = newId()
+            castsShadow = false
+            trafo = Trafo3d.Identity
+            model = Some selectionVolumeSg
+            surface = Some (makeSelectionVolumeSurface(vrWin))
         }
+    let selectionVolumeObject2 = { selectionVolumeObject1 with id = newId()}
 
     let groundTilingFactor = 0.3
     let ceilingTilingFactor = 0.4
@@ -402,7 +407,7 @@ let main argv =
         @ [groundObject; ceilingObject]
         @ [wall1; wall2; wall3; wall4]
         @ [pedestal; cushion]
-        @ [controller1Object; controller2Object; camObject1; camObject2; thumbPosObject1; thumbPosObject2]
+        @ [controller1Object; controller2Object; camObject1; camObject2; thumbPosObject1; thumbPosObject2; selectionVolumeObject1; selectionVolumeObject2]
     //#endregion
     
     //#region Scene   
@@ -414,8 +419,10 @@ let main argv =
             controller2ObjectId = controller2Object.id
             lightId             = lightObject.id
             centroidId          = centroidObject.id
-            thumbPos1           = thumbPosObject1.id
-            thumbPos2           = thumbPosObject2.id
+            thumbPos1Id         = thumbPosObject1.id
+            thumbPos2Id         = thumbPosObject2.id
+            selectionVolume1Id  = selectionVolumeObject1.id
+            selectionVolume2Id  = selectionVolumeObject2.id
         }
 
     let sceneObj =

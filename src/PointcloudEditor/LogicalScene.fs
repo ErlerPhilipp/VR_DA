@@ -49,8 +49,8 @@ module LogicalScene =
             
             let minDistToNextPosWS = 0.01
             let minDistToNextPosPC = worldToPointcloud.Forward.TransformDir(V3d(minDistToNextPosWS, 0.0, 0.0)).Length
-            let newPosWS = t.Forward.TransformPos(SelectionVolume.controllerRingCenter)
-            let newPosPC = (t * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
+            let newPosWS = t.Forward.TransformPos(SelectionVolume.controllerToRingCenter)
+            let newPosPC = (t * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerToRingCenter)
 
             let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun oldTrafo -> (oldTrafo.Forward.TransformPos(V3d()) - newPosPC).Length < minDistToNextPosPC)
 
@@ -59,7 +59,8 @@ module LogicalScene =
                 interactionInfo.selectionVolumePath
             else
 //                printfn "add sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath + 1)
-                Array.append interactionInfo.selectionVolumePath [| (Trafo3d.Scale(SelectionVolume.selectionVolumeRadius) * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
+                let scaleTrafo = Trafo3d.Scale(SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale)
+                Array.append interactionInfo.selectionVolumePath [| (scaleTrafo * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
         else
             interactionInfo.selectionVolumePath
 
@@ -162,10 +163,10 @@ module LogicalScene =
         let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell 0 false
         { pointCloudOctree with root = memoryThunk newRoot }
 
-    let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int) =
+    let pointsInSelectionVolume (controllerTrafoWS : Trafo3d, worldToPointcloud : Trafo3d, pointCloudOctree : Octree, traverseUntilXPointsFound : int, interactionInfo : InteractionInfo) =
         
-        let selVolPosPC = (controllerTrafoWS * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerRingCenter)
-        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+        let selVolPosPC = (controllerTrafoWS * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerToRingCenter)
+        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale
         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
         let selectionVolumeRadiusSquared = selectionVolumeRadiusPC * selectionVolumeRadiusPC
         let sphere = Sphere3d(selVolPosPC, selectionVolumeRadiusPC)
@@ -272,14 +273,17 @@ module LogicalScene =
                                     else
                                         newObjects
                 let newScene = {scene with objects = newObjects}
-
-                let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                
+                let newSelectionPath =  if interactionInfo.currActionType = TrackpadActionType.Select || interactionInfo.currActionType = TrackpadActionType.Deselect then 
+                                            addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                                        else
+                                            interactionInfo.selectionVolumePath
                 
                 let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                 let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
 
                 let searchUntilXPoints = 100
-                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.initialOctree, searchUntilXPoints)
+                let numPointsInSelVol = pointsInSelectionVolume(t, worldToPointcloud, scene.initialOctree, searchUntilXPoints, interactionInfo)
 //                printfn "numPointsInSelVol = %A" numPointsInSelVol
                 let minVibStrength = 0.0
 //                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))
@@ -327,7 +331,11 @@ module LogicalScene =
                                 else
                                     TrackpadActionType.Nop
                                         
-                let newSelectionPath =  addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                let newSelectionPath =  if newOpType = TrackpadActionType.Select || newOpType = TrackpadActionType.Deselect then 
+                                            addTrafoToSelectionVolumePath(interactionInfo, t, scene)
+                                        else
+                                            interactionInfo.selectionVolumePath
+
                 let newInteractionInfo = {interactionInfo with trackpadPressed = true; selectionVolumePath = newSelectionPath; currActionType = newOpType }
                 let newScene = makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                 newScene
@@ -343,7 +351,7 @@ module LogicalScene =
                         let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
                         let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
                         
-                        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius
+                        let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale
                         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
                         
                         let opType = if interactionInfo.currActionType = TrackpadActionType.Select then OperationType.Select else OperationType.Deselect
@@ -371,7 +379,6 @@ module LogicalScene =
                 }
                 
             | TimeElapsed(dt) ->
-//                let newObjects = scalePointCloudWithTrackpad(scene, dt.TotalSeconds)
                 let newObjects = scene.objects
                 
                 let axisValue1 = getAxisValue(uint32 assignedInputs.controller1Id, 0) 
@@ -380,37 +387,42 @@ module LogicalScene =
                 let controller2Trafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.controller2ObjectId, scene.objects)
                 let thumbPosTrafo1 = Trafo3d.Scale(0.33) * Trafo3d.Translation(axisValue1.X, axisValue1.Y, 0.0) * scene.contrToTrackpad * controller1Trafo
                 let thumbPosTrafo2 = Trafo3d.Scale(0.33) * Trafo3d.Translation(axisValue2.X, axisValue2.Y, 0.0) * scene.contrToTrackpad * controller2Trafo
-                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos1, thumbPosTrafo1, newObjects)
-                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos2, thumbPosTrafo2, newObjects)
+                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos1Id, thumbPosTrafo1, newObjects)
+                let newObjects = setTrafoOfObjectsWithId(scene.specialObjectIds.thumbPos2Id, thumbPosTrafo2, newObjects)
 
-//                printfn "ctrl = %A |thumb = %A" (controller1Trafo.Forward.TransformPos(V3d())) (thumbPosTrafo1.Forward.TransformPos(V3d()))
+                let updateSelectionVolumeScale(interactionInfo : InteractionInfo) =
+                    if interactionInfo.currActionType = TrackpadActionType.Upscale || interactionInfo.currActionType = TrackpadActionType.Downscale then
+                        
+                        let scalingFactor = if interactionInfo.currActionType = TrackpadActionType.Upscale then 1.0 else -1.0
+                        let scalingSpeed = 1.1
+                        let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
+                        let newSelVolScale = interactionInfo.currSelVolScale * scalingFactorForFrame
+                        { interactionInfo with currSelVolScale = newSelVolScale }
+                    else
+                        interactionInfo
 
-                //TODO:
-//                if scene.interactionInfo1.currActionType = OperationType.Upscale then
-//                let scalingSpeed = 1.1
-//                let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
-//                let deltaTrafo = Trafo3d.Scale(scalingFactorForFrame)
-//                printfn "axisValue = %A, scalingFactorForFrame %A" axisValue.Y scalingFactorForFrame
-//
-//                let translation = Trafo3d.Translation(currTrafo.Forward.TransformPos(V3d()))
-//                translation.Inverse * deltaTrafo * translation
-
+                let updateSelectionVolumeTrafo(controllerId : int, selVolId : int, objects : PersistentHashSet<Object>, newScale : float) =
+                        let controllerTrafo = getTrafoOfFirstObjectWithId(controllerId, objects)
+                        let controllerToRingCenter = Trafo3d.Translation(SelectionVolume.controllerToRingCenter)
+                        let newSelVolTrafo = Trafo3d.Scale(newScale) * controllerToRingCenter * controllerTrafo
+                        setTrafoOfObjectsWithId(selVolId, newSelVolTrafo, objects)
+                        
+                let newInteractionInfo1 = updateSelectionVolumeScale(scene.interactionInfo1)
+                let newInteractionInfo2 = updateSelectionVolumeScale(scene.interactionInfo2)
+                let newObjects = updateSelectionVolumeTrafo(scene.specialObjectIds.controller1ObjectId, scene.specialObjectIds.selectionVolume1Id, newObjects, newInteractionInfo1.currSelVolScale)
+                let newObjects = updateSelectionVolumeTrafo(scene.specialObjectIds.controller2ObjectId, scene.specialObjectIds.selectionVolume2Id, newObjects, newInteractionInfo2.currSelVolScale)
 
                 { scene with 
                     deltaTime = dt.TotalSeconds
                     objects = newObjects
+                    interactionInfo1 = newInteractionInfo1
+                    interactionInfo2 = newInteractionInfo2
                 }
             
             | EndFrame ->
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id)
                 Vibration.stopVibration(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id)
 
-//                // hit object
-//                if scene.interactionInfo1.vibStrLastFrame = 0.0 && scene.interactionInfo1.vibrationStrength <> 0.0 then
-//                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller1Id, 0.1, 0.5)
-//                if scene.interactionInfo2.vibStrLastFrame = 0.0 && scene.interactionInfo2.vibrationStrength <> 0.0 then
-//                    Vibration.vibrate(Vibration.HitObject, uint32 assignedInputs.controller2Id, 0.1, 0.5)
-                
                 // overlap
                 Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller1Id, 1.0, scene.interactionInfo1.vibrationStrength)
                 Vibration.vibrate(Vibration.OverlappingObject, uint32 assignedInputs.controller2Id, 1.0, scene.interactionInfo2.vibrationStrength)

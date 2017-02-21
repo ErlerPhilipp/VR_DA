@@ -166,58 +166,59 @@ module PointCloudHelper =
 
         let sphereImposterGeometry (p : Point<PointCloudVertex>) =
             triangle {
-                let sqrt2Half = 0.7071067812
-                let tcPiQuarter = 0.8535533906
-                let oneMinusTcPiQuarter = 0.1464466094
+//                if p.Value.s = 0 then
+                    let sqrt2Half = 0.7071067812
+                    let tcPiQuarter = 0.8535533906
+                    let oneMinusTcPiQuarter = 0.1464466094
 
-                let s   = uniform.PointSize * 0.5
-                let wp  = p.Value.wp
-                let vp  = uniform.ViewTrafo * wp
+                    let s   = uniform.PointSize * 0.5
+                    let wp  = p.Value.wp
+                    let vp  = uniform.ViewTrafo * wp
             
-                // prevent culling mess at near plane
-                let ndcp = uniform.ProjTrafo * vp
-                let ndcp = ndcp / ndcp.W
-                let ndcs = uniform.ProjTrafo * uniform.ViewTrafo * V4d(0.0, 0.0, s, 0.0)
-                let newZ = if (ndcp + ndcs).Z < -1.0 then vp.Z else vp.Z + s
+                    // prevent culling mess at near plane
+                    let ndcp = uniform.ProjTrafo * vp
+                    let ndcp = ndcp / ndcp.W
+                    let ndcs = uniform.ProjTrafo * uniform.ViewTrafo * V4d(0.0, 0.0, s, 0.0)
+                    let newZ = if (ndcp + ndcs).Z < -1.0 then vp.Z else vp.Z + s
 
-                let vpCenter = V4d(vp.X, vp.Y, newZ, vp.W)
-                let wpCenter = uniform.ViewTrafoInv * vpCenter
-                let posCenter = uniform.ProjTrafo * vpCenter
+                    let vpCenter = V4d(vp.X, vp.Y, newZ, vp.W)
+                    let wpCenter = uniform.ViewTrafoInv * vpCenter
+                    let posCenter = uniform.ProjTrafo * vpCenter
 
-                let vp = [|vp + V4d(  s,              0.0,           0.0, 0.0 )
-                           vp + V4d(  s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
-                           vp + V4d(  0.0,            s,             0.0, 0.0 )
-                           vp + V4d( -s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
-                           vp + V4d( -s,              0.0,           0.0, 0.0 )
-                           vp + V4d( -s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )
-                           vp + V4d(  0.0,           -s,             0.0, 0.0 )
-                           vp + V4d(  s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )|]
+                    let vp = [|vp + V4d(  s,              0.0,           0.0, 0.0 )
+                               vp + V4d(  s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
+                               vp + V4d(  0.0,            s,             0.0, 0.0 )
+                               vp + V4d( -s * sqrt2Half,  s * sqrt2Half, 0.0, 0.0 )
+                               vp + V4d( -s,              0.0,           0.0, 0.0 )
+                               vp + V4d( -s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )
+                               vp + V4d(  0.0,           -s,             0.0, 0.0 )
+                               vp + V4d(  s * sqrt2Half, -s * sqrt2Half, 0.0, 0.0 )|]
 
-                let tc = [|V2d( 1.0,                    0.5                 )
-                           V2d( tcPiQuarter,            tcPiQuarter         )
-                           V2d( 0.5,                    1.0                 )
-                           V2d( oneMinusTcPiQuarter,    tcPiQuarter         )
-                           V2d( 0.0,                    0.5                 )
-                           V2d( oneMinusTcPiQuarter,    oneMinusTcPiQuarter )
-                           V2d( 0.5,                    0.0                 )
-                           V2d( tcPiQuarter,            oneMinusTcPiQuarter )|]
+                    let tc = [|V2d( 1.0,                    0.5                 )
+                               V2d( tcPiQuarter,            tcPiQuarter         )
+                               V2d( 0.5,                    1.0                 )
+                               V2d( oneMinusTcPiQuarter,    tcPiQuarter         )
+                               V2d( 0.0,                    0.5                 )
+                               V2d( oneMinusTcPiQuarter,    oneMinusTcPiQuarter )
+                               V2d( 0.5,                    0.0                 )
+                               V2d( tcPiQuarter,            oneMinusTcPiQuarter )|]
                            
-                let wp =  emptyArray 
-                let pos = emptyArray 
-                for i in 0..7 do
-                    wp.[i] <- uniform.ViewTrafoInv * vp.[i]
-                    pos.[i] <- uniform.ProjTrafo * vp.[i]
+                    let wp =  emptyArray 
+                    let pos = emptyArray 
+                    for i in 0..7 do
+                        wp.[i] <- uniform.ViewTrafoInv * vp.[i]
+                        pos.[i] <- uniform.ProjTrafo * vp.[i]
                 
-                yield { p.Value with c = p.Value.c; wp = wp.[7];    pos = pos.[7] / pos.[7].W;  tc = tc.[7] }
-                for i in 0..7 do
-                    yield { p.Value with c = p.Value.c; wp = wpCenter;      pos = posCenter / posCenter.W;      tc = V2d(0.5, 0.5) }
-                    yield { p.Value with c = p.Value.c; wp = wp.[i];        pos = pos.[i] / pos.[i].W;          tc = tc.[i] }
+                    yield { p.Value with c = p.Value.c; wp = wp.[7];    pos = pos.[7] / pos.[7].W;  tc = tc.[7] }
+                    for i in 0..7 do
+                        yield { p.Value with c = p.Value.c; wp = wpCenter;      pos = posCenter / posCenter.W;      tc = V2d(0.5, 0.5) }
+                        yield { p.Value with c = p.Value.c; wp = wp.[i];        pos = pos.[i] / pos.[i].W;          tc = tc.[i] }
             }       
 
 
         let sphereImposterFragment (v : PointCloudVertex) =
            fragment {
-                let newColor = if v.s = 0 then v.c else V4d(1.0, 0.0, 0.0, 0.5)
+                let newColor = if v.s = 0 then v.c else V4d(1.0, 0.0, 0.0, 1.0)
                 return {color = newColor}
             }
     
