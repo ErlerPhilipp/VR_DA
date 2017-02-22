@@ -74,7 +74,8 @@ How to Use
 
  * To rotate and move the point-cloud, hold the trigger of a controller down and move it. 
  * If you hold down the triggers of both controllers, you can also scale the pointcloud like with a pinch gesture from touch-screens. 
- * You can select and un-select points when pressing the trackpad left or right respectively. * You can scale the selection volume when pressing the trackpad top or bottom. 
+ * You can select and un-select points when pressing the trackpad left or right respectively. 
+ * You can scale the selection volume when pressing the trackpad top or bottom. 
  * When you press the application menu button, your current selection is compared to the reference selection or your selection is saved as a future reference selection, depending on the command line parameters.
  * Comparison results are stored in 'bin\Release\output\'.
 

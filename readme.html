@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Untitled Document.md</title><style></style></head><body id="preview">
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aardvark VR</title><style></style></head><body id="preview">
 <h1><a id="Basketball_0"></a>Basketball</h1>
 <p><img src="Basketball.png" alt="Basketball screen shot" title="Basketball screen shot"></p>
 <p>The Basketball project is a virtual reality game for the HTC Vive. You can grab a ball and throw it through a hoop. The aim is to get as many points as possible in the given time. There are multiple rounds with increasing difficulty.</p>
@@ -39,8 +39,35 @@
 <li>There are several rounds. The selection volume shrinks after each round approaching the controller’s collidier.</li>
 <li>The light is yellow during the warm-up phase. Also, there is a short green flash when a new round begins.</li>
 </ul>
-<h1><a id="Notes_50"></a>Notes</h1>
-<h2><a id="How_to_Build_53"></a>How to Build</h2>
+<h1><a id="Pointcloud_Editor_50"></a>Pointcloud Editor</h1>
+<p><img src="Pointcloud.png" alt="Pointcloud screen shot" title="Pointcloud screen shot"></p>
+<p>The point-cloud editor is a virtual reality application for the HTC Vive. The aim of this application is to enable users to mark points. For example, you can select outliers and vegetation in laser scans of buildings.</p>
+<h2><a id="How_to_Start_58"></a>How to Start</h2>
+<ol>
+<li>Start SteamVR and make sure all controllers are detected.</li>
+<li>Start PointcloudEditor.exe directly or with command line parameters. The parameters are:
+<ol>
+<li>Rendering quality: float, 0.0 - 1.0</li>
+<li>Pointset file: string, path + file name + extension to a pointset file; 1st line is number of points, other lines are: pos.x pos.y pos.z intensity red green blue</li>
+<li>Reference operations file: string, path + file name + extension to an XML file containing the reference operations</li>
+<li>Load reference: bool, should load the reference operations and compare the current selection with it, or save the current selection to the reference file</li>
+<li>Storage path: string, path where the compressed cache of the pointset should be stored</li>
+<li>Auto compare in sec: float, time after which the comparison is automatically performed; 0 to disable</li>
+</ol>
+</li>
+<li>Put on the head mounted display and start</li>
+</ol>
+<h2><a id="How_to_Use_71"></a>How to Use</h2>
+<ul>
+<li>To rotate and move the point-cloud, hold the trigger of a controller down and move it.</li>
+<li>If you hold down the triggers of both controllers, you can also scale the pointcloud like with a pinch gesture from touch-screens.</li>
+<li>You can select and un-select points when pressing the trackpad left or right respectively.</li>
+<li>You can scale the selection volume when pressing the trackpad top or bottom.</li>
+<li>When you press the application menu button, your current selection is compared to the reference selection or your selection is saved as a future reference selection, depending on the command line parameters.</li>
+<li>Comparison results are stored in ‘bin\Release\output’.</li>
+</ul>
+<h1><a id="Notes_81"></a>Notes</h1>
+<h2><a id="How_to_Build_84"></a>How to Build</h2>
 <ol>
 <li>Clone the repository or download the zip.</li>
 <li>Open a command line window in the solution directory.</li>
@@ -49,7 +76,7 @@
 <li>Set the desired project as start-up project.</li>
 <li>Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take up to 5 minutes.</li>
 </ol>
-<h2><a id="Credits_63"></a>Credits</h2>
+<h2><a id="Credits_94"></a>Credits</h2>
 <ul>
 <li>We use textures from <a href="http://www.textures.com/">http://www.textures.com/</a>. The textures are converted to compressed formats.</li>
 <li><a href="http://www.textures.com/download/3dscans0045/127218">http://www.textures.com/download/3dscans0045/127218</a></li>
@@ -69,6 +96,7 @@
 <li>Ambient 2: <a href="https://www.freesound.org/people/PatrickLieberkind/sounds/245187/">https://www.freesound.org/people/PatrickLieberkind/sounds/245187/</a></li>
 <li>Pop sound: <a href="https://www.freesound.org/people/qubodup/sounds/222373/">https://www.freesound.org/people/qubodup/sounds/222373/</a></li>
 <li>Sirene: <a href="https://www.freesound.org/people/santino_c/sounds/170825/">https://www.freesound.org/people/santino_c/sounds/170825/</a></li>
+<li>Pointcloud dataset by VRVis</li>
 </ul>
 
 </body></html>
