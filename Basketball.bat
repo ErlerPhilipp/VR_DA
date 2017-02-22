@@ -1,2 +1,2 @@
-cd bin\Debug\
+cd bin\Release\
 Basketball.exe

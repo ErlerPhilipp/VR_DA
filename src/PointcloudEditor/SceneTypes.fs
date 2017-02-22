@@ -129,8 +129,10 @@ module LogicalSceneTypes =
             contrToTrackpad     : Trafo3d
             allOperations       : Operation[]
             refOperationsFile   : string
-            referenceOperations : Operation[] option
+            referenceOperations : Operation[]
             timeSinceLastComp   : float
+            loadGroundTruth     : bool
+            autoCompareInSec   : float
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo

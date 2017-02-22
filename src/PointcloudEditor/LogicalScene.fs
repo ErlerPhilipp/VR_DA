@@ -233,17 +233,16 @@ module LogicalScene =
 
         traverse pointCloudOctree.root pointCloudOctree.cell 0 false 0
             
-    let updateReferenceOperations(refOps : Operation[] option, myOps : Operation[], octree : Octree, refOperationsFile : string) = 
+    let updateReferenceOperations(compare : bool, refOps : Operation[], myOps : Operation[], octree : Octree, refOperationsFile : string) = 
         let worker =
             async {
                 do! Async.SwitchToNewThread()
-                match refOps with
-                    | None -> 
-                        OperationsComp.saveOperationsToFile(myOps, refOperationsFile)
-                    | Some refOps -> 
-                        printfn "%A: start comparison" DateTime.Now
-                        OperationsComp.performComparison(refOps, myOps, octree)
-                        printfn "%A: finish comparison" DateTime.Now
+                if compare then
+                    printfn "%A: start comparison" DateTime.Now
+                    OperationsComp.performComparison(refOps, myOps, octree)
+                    printfn "%A: finish comparison" DateTime.Now
+                else
+                    OperationsComp.saveOperationsToFile(myOps, refOperationsFile)
             }
 
         Async.Start(worker)
@@ -327,7 +326,7 @@ module LogicalScene =
                     
             // press app menu button
             | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.ApplicationMenu) ->
-                updateReferenceOperations(scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
+                updateReferenceOperations(scene.loadGroundTruth, scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
                 scene
                     
             // release trigger
@@ -438,12 +437,15 @@ module LogicalScene =
                 let newObjects = updateSelectionVolumeTrafo(scene.specialObjectIds.controller2ObjectId, scene.specialObjectIds.selectionVolume2Id, newObjects, newInteractionInfo2.currSelVolScale)
 
                 let newTimeSinceLastComp = 
-                    let timeBetweenComparisons = 60.0
-                    if scene.timeSinceLastComp > timeBetweenComparisons then
-                        updateReferenceOperations(scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
-                        0.0
+                    if scene.autoCompareInSec > 0.0 then
+                        let timeBetweenComparisons = 60.0
+                        if scene.timeSinceLastComp > timeBetweenComparisons then
+                            updateReferenceOperations(scene.loadGroundTruth, scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
+                            0.0
+                        else
+                            scene.timeSinceLastComp + dt.TotalSeconds
                     else
-                        scene.timeSinceLastComp + dt.TotalSeconds
+                        0.0
 
                 { scene with 
                     deltaTime = dt.TotalSeconds

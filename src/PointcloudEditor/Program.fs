@@ -43,32 +43,60 @@ let main argv =
 
     Ag.initialize()
     Aardvark.Init()
+    
+    let renderingQuality = 
+        if argv.Length > 0 then
+            let arg = argv.[0]
+            let mutable asFloat = 0.0
+            let success = System.Double.TryParse(arg, &asFloat)
+            if success then asFloat else 1.0
+        else 
+            printfn @"No argument given for rendering quality. Using full quality '1.0'"
+            1.0
 
-//    let firstArgAsInt = 
-//        if argv.Length > 0 then
-//            let firstArg = argv.[0]
-//            let mutable asInt = 0
-//            let success = System.Int32.TryParse(firstArg, &asInt)
-//            if success then asInt else 0
-//        else 0
-//
-//    if firstArgAsInt = 0 then printfn "No argument given. Using both feedback types"
-//    let argToFeedbackType(a : int) =
-//        match a with
-//            | 0 -> FeedbackTypes.Both
-//            | 1 -> FeedbackTypes.OpticalFeedback
-//            | 2 -> FeedbackTypes.HapticFeedback
-//            | 3 -> FeedbackTypes.NoFeedback
-//            | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
-//    let feedback = argToFeedbackType(firstArgAsInt)
+    let pointSetFile = 
+        if argv.Length > 1 then
+            argv.[1]
+        else 
+            printfn @"No argument given for point set file. Using '..\..\resources\pointclouds\JBs_Haus.pts'"
+            @"..\..\resources\pointclouds\JBs_Haus.pts"
 
+    let referenceOperationsFile = 
+        if argv.Length > 2 then
+            argv.[2]
+        else 
+            printfn @"No argument given for reference operation. Using '..\..\resources\pointclouds\JBs_Haus_groundTruth.xml'"
+            @"..\..\resources\pointclouds\JBs_Haus_groundTruth.xml"
 
-//    let psp = @"..\..\resources\pointclouds\Laserscan-MS60_Beiglboeck-2015.pts"
-    let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
-    let referenceOperationsFile = @"..\..\resources\pointclouds\JBs_Haus_groundTruth.xml"
-    let storagePath = @"C:\bla\vgmCache"
+    let loadGroundTruth =
+        if argv.Length > 3 then
+            let arg = argv.[3]
+            let mutable asBool = false
+            let success = System.Boolean.TryParse(arg, &asBool)
+            if success then asBool else false
+        else 
+            printfn @"No argument given for loading ground truth. Using 'false'"
+            false
 
-    let refOps = Some (OperationsComp.loadOperationsFromFile(referenceOperationsFile))
+    let storagePath = 
+        if argv.Length > 4 then
+            argv.[4]
+        else 
+            printfn @"No argument given for storage path. Using 'C:\bla\vgmCache'"
+            @"C:\bla\vgmCache"
+
+    let autoCompareInSec = 
+        if argv.Length > 5 then
+            let arg = argv.[5]
+            let mutable asFloat = 0.0
+            let success = System.Double.TryParse(arg, &asFloat)
+            if success then asFloat else 60.0
+        else 
+            printfn @"No argument given for auto compare time. Using full '60.0' sec"
+            60.0
+    
+
+    let refOps = OperationsComp.loadOperationsFromFile(referenceOperationsFile)
 
     Directory.CreateDirectory(storagePath) |> ignore
     let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"])
@@ -76,7 +104,7 @@ let main argv =
     let store   = new BlobStore(mem,get)
     use db      = new Database(store)
         
-    let lastSixteenChars = psp.Substring(psp.Length-20, 16)
+    let lastSixteenChars = pointSetFile.Substring(pointSetFile.Length-20, 16)
     let hash = System.Text.Encoding.ASCII.GetBytes(lastSixteenChars)
     let r = db.Get(System.Guid(hash))
 
@@ -94,7 +122,7 @@ let main argv =
 
             t
         else
-            let file = psp
+            let file = pointSetFile
 
             let cnt = Pts.approximatePointCount file
             let chunkSize = 1 <<< 20//1 <<< 16
@@ -455,6 +483,8 @@ let main argv =
             refOperationsFile   = referenceOperationsFile
             referenceOperations = refOps
             timeSinceLastComp   = 0.0
+            loadGroundTruth     = loadGroundTruth
+            autoCompareInSec   = autoCompareInSec
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
