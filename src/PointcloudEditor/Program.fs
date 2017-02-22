@@ -454,6 +454,7 @@ let main argv =
             allOperations       = [||]
             refOperationsFile   = referenceOperationsFile
             referenceOperations = refOps
+            timeSinceLastComp   = 0.0
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo

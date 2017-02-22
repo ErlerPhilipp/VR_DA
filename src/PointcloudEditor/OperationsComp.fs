@@ -160,10 +160,10 @@ module OperationsComp =
         let arrayToString(arr : array<_>) =
             "[|" + (arr |> Array.map(fun i -> i.ToString()) |> String.concat ";") + "|]"
 
-        let operationTypesA = compRes.operationTypesA |> arrayToString
-//        let operationTypesB = compRes.operationTypesB |> arrayToString
-        let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
-//        let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
+//        let operationTypesA = compRes.operationTypesA |> arrayToString
+        let operationTypesB = compRes.operationTypesB |> arrayToString
+//        let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
+        let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
                 
         let compResString = 
             compRes.selectionQualityMeasure.ToString()   + System.Environment.NewLine +
@@ -174,6 +174,6 @@ module OperationsComp =
             "numSelectOperationsB =     " + compRes.numSelectOperationsB.ToString()         + System.Environment.NewLine +
             "numDeSelectOperationsA =   " + compRes.numDeSelectOperationsA.ToString()       + System.Environment.NewLine +
             "numDeSelectOperationsB =   " + compRes.numDeSelectOperationsB.ToString()       + System.Environment.NewLine +
-            "operationTypes =           " + operationTypesA                                 + System.Environment.NewLine +
-            "numSelectionVolumes =      " + numSelectionVolumesA                            + System.Environment.NewLine
+            "operationTypes =           " + operationTypesB                                 + System.Environment.NewLine +
+            "numSelectionVolumes =      " + numSelectionVolumesB                            + System.Environment.NewLine
         Logging.log (currentTimeString + " ### Comparison Result ###" + System.Environment.NewLine + compResString)

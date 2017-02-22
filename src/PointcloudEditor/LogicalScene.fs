@@ -437,11 +437,20 @@ module LogicalScene =
                 let newObjects = updateSelectionVolumeTrafo(scene.specialObjectIds.controller1ObjectId, scene.specialObjectIds.selectionVolume1Id, newObjects, newInteractionInfo1.currSelVolScale)
                 let newObjects = updateSelectionVolumeTrafo(scene.specialObjectIds.controller2ObjectId, scene.specialObjectIds.selectionVolume2Id, newObjects, newInteractionInfo2.currSelVolScale)
 
+                let newTimeSinceLastComp = 
+                    let timeBetweenComparisons = 60.0
+                    if scene.timeSinceLastComp > timeBetweenComparisons then
+                        updateReferenceOperations(scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
+                        0.0
+                    else
+                        scene.timeSinceLastComp + dt.TotalSeconds
+
                 { scene with 
                     deltaTime = dt.TotalSeconds
                     objects = newObjects
                     interactionInfo1 = newInteractionInfo1
                     interactionInfo2 = newInteractionInfo2
+                    timeSinceLastComp = newTimeSinceLastComp
                 }
             
             | EndFrame ->

@@ -130,6 +130,7 @@ module LogicalSceneTypes =
             allOperations       : Operation[]
             refOperationsFile   : string
             referenceOperations : Operation[] option
+            timeSinceLastComp   : float
             
             specialObjectIds    : SpecialObjectIds
             interactionInfo1    : InteractionInfo
