@@ -135,7 +135,8 @@ module OperationsComp =
         
     let performComparison (refOps : Operation[], myOps : Operation[], octree : Octree) = 
         let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
-
+        
+        System.IO.Directory.CreateDirectory("output") |> ignore
         let screenshot = new System.Drawing.Bitmap(System.Windows.Forms.SystemInformation.VirtualScreen.Width, 
                                                     System.Windows.Forms.SystemInformation.VirtualScreen.Height, 
                                                     System.Drawing.Imaging.PixelFormat.Format32bppArgb);

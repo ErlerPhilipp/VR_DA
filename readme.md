@@ -48,6 +48,36 @@ How to Play
  * There are several rounds. The selection volume shrinks after each round approaching the controller's collidier.
  * The light is yellow during the warm-up phase. Also, there is a short green flash when a new round begins.
 
+Pointcloud Editor
+==========
+
+![Pointcloud screen shot](Pointcloud.png "Pointcloud screen shot")
+
+The point-cloud editor is a virtual reality application for the HTC Vive. The aim of this application is to enable users to mark points. For example, you can select outliers and vegetation in laser scans of buildings. 
+
+
+How to Start
+------------
+
+ 1. Start SteamVR and make sure all controllers are detected.
+ 2. Start PointcloudEditor.exe directly or with command line parameters. The parameters are:
+    1. Rendering quality: float, 0.0 - 1.0
+	2. Pointset file: string, path + file name + extension to a pointset file; 1st line is number of points, other lines are: pos.x pos.y pos.z intensity red green blue
+	3. Reference operations file: string, path + file name + extension to an XML file containing the reference operations
+	4. Load reference: bool, should load the reference operations and compare the current selection with it, or save the current selection to the reference file
+	5. Storage path: string, path where the compressed cache of the pointset should be stored
+	6. Auto compare in sec: float, time after which the comparison is automatically performed; 0 to disable
+ 3. Put on the head mounted display and start
+
+How to Use
+------------
+
+ * To rotate and move the point-cloud, hold the trigger of a controller down and move it. 
+ * If you hold down the triggers of both controllers, you can also scale the pointcloud like with a pinch gesture from touch-screens. 
+ * You can select and un-select points when pressing the trackpad left or right respectively. * You can scale the selection volume when pressing the trackpad top or bottom. 
+ * When you press the application menu button, your current selection is compared to the reference selection or your selection is saved as a future reference selection, depending on the command line parameters.
+ * Comparison results are stored in 'bin\Release\output\'.
+
 Notes
 ==========
 
@@ -81,3 +111,4 @@ Credits
   * Ambient 2: https://www.freesound.org/people/PatrickLieberkind/sounds/245187/
   * Pop sound: https://www.freesound.org/people/qubodup/sounds/222373/
   * Sirene: https://www.freesound.org/people/santino_c/sounds/170825/
+ * Pointcloud dataset by VRVis
