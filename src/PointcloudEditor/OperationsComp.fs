@@ -132,3 +132,48 @@ module OperationsComp =
                 numSelectionVolumesB    = numSelectionVolumesB
             }
         comparisonResults
+        
+    let performComparison (refOps : Operation[], myOps : Operation[], octree : Octree) = 
+        let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+
+        let screenshot = new System.Drawing.Bitmap(System.Windows.Forms.SystemInformation.VirtualScreen.Width, 
+                                                    System.Windows.Forms.SystemInformation.VirtualScreen.Height, 
+                                                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        let screenGraph = System.Drawing.Graphics.FromImage(screenshot);
+        screenGraph.CopyFromScreen(System.Windows.Forms.SystemInformation.VirtualScreen.X, 
+                                    System.Windows.Forms.SystemInformation.VirtualScreen.Y, 
+                                    0, 
+                                    0, 
+                                    System.Windows.Forms.SystemInformation.VirtualScreen.Size, 
+                                    System.Drawing.CopyPixelOperation.SourceCopy);
+
+        screenshot.Save(@"output\" + currentTimeString + "_screenshot.png", System.Drawing.Imaging.ImageFormat.Png);
+
+
+        let compRes = compareOperations(refOps, myOps, octree)
+        let qualMeas = compRes.selectionQualityMeasure
+        let correctlySelectedOfAllSelected = float qualMeas.correctlySelectedPoints / float (qualMeas.correctlySelectedPoints + qualMeas.wronglySelectedPoints)
+        let correctlyNonSelectedOfAllNonSelected = float qualMeas.correctlyNonSelectedPoints / float (qualMeas.correctlyNonSelectedPoints + qualMeas.wronglyNonSelectedPoints)
+        let correctOfAll = float (qualMeas.correctlySelectedPoints + qualMeas.correctlyNonSelectedPoints) / 
+                            float (qualMeas.correctlySelectedPoints + qualMeas.wronglySelectedPoints + qualMeas.correctlyNonSelectedPoints + qualMeas.wronglyNonSelectedPoints)
+
+        let arrayToString(arr : array<_>) =
+            "[|" + (arr |> Array.map(fun i -> i.ToString()) |> String.concat ";") + "|]"
+
+        let operationTypesA = compRes.operationTypesA |> arrayToString
+//        let operationTypesB = compRes.operationTypesB |> arrayToString
+        let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
+//        let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
+                
+        let compResString = 
+            compRes.selectionQualityMeasure.ToString()   + System.Environment.NewLine +
+            "correctlySelected =        " + correctlySelectedOfAllSelected.ToString()       + System.Environment.NewLine +
+            "correctlyNonSelected =     " + correctlyNonSelectedOfAllNonSelected.ToString() + System.Environment.NewLine +
+            "correctOfAll =             " + correctOfAll.ToString()                         + System.Environment.NewLine +
+            "numSelectOperationsA =     " + compRes.numSelectOperationsA.ToString()         + System.Environment.NewLine +
+            "numSelectOperationsB =     " + compRes.numSelectOperationsB.ToString()         + System.Environment.NewLine +
+            "numDeSelectOperationsA =   " + compRes.numDeSelectOperationsA.ToString()       + System.Environment.NewLine +
+            "numDeSelectOperationsB =   " + compRes.numDeSelectOperationsB.ToString()       + System.Environment.NewLine +
+            "operationTypes =           " + operationTypesA                                 + System.Environment.NewLine +
+            "numSelectionVolumes =      " + numSelectionVolumesA                            + System.Environment.NewLine
+        Logging.log (currentTimeString + " ### Comparison Result ###" + System.Environment.NewLine + compResString)

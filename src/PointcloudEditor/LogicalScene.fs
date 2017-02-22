@@ -233,6 +233,21 @@ module LogicalScene =
 
         traverse pointCloudOctree.root pointCloudOctree.cell 0 false 0
             
+    let updateReferenceOperations(refOps : Operation[] option, myOps : Operation[], octree : Octree, refOperationsFile : string) = 
+        let worker =
+            async {
+                do! Async.SwitchToNewThread()
+                match refOps with
+                    | None -> 
+                        OperationsComp.saveOperationsToFile(myOps, refOperationsFile)
+                    | Some refOps -> 
+                        printfn "%A: start comparison" DateTime.Now
+                        OperationsComp.performComparison(refOps, myOps, octree)
+                        printfn "%A: finish comparison" DateTime.Now
+            }
+
+        Async.Start(worker)
+
     let update (scene : Scene) (message : Message) : Scene =
 
         match message with
@@ -310,47 +325,9 @@ module LogicalScene =
                 let newInteractionInfo = { interactionInfo with triggerPressed = true}
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
-            // press grip button
-            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Grip) ->
-                
-                //OperationsComp.saveOperationsToFile(scene.allOperations, scene.refOperationsFile)
-                let refOps = OperationsComp.loadOperationsFromFile(scene.refOperationsFile)
-                let compRes = OperationsComp.compareOperations(refOps, scene.allOperations, scene.initialOctree)
-                
-                let arrayToString(arr : array<_>) =
-                    "[|" + (arr |> Array.map(fun i -> i.ToString()) |> String.concat ";") + "|]"
-
-                let operationTypesA = compRes.operationTypesA |> arrayToString
-                let operationTypesB = compRes.operationTypesB |> arrayToString
-                let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
-                let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
-                
-                let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
-                let compResString = 
-                    compRes.selectionQualityMeasure.ToString()   + System.Environment.NewLine +
-                    "numSelectOperationsA =     " + compRes.numSelectOperationsA.ToString()     + System.Environment.NewLine +
-                    "numSelectOperationsB =     " + compRes.numSelectOperationsB.ToString()     + System.Environment.NewLine +
-                    "numDeSelectOperationsA =   " + compRes.numDeSelectOperationsA.ToString()   + System.Environment.NewLine +
-                    "numDeSelectOperationsB =   " + compRes.numDeSelectOperationsB.ToString()   + System.Environment.NewLine +
-                    "operationTypesA =          " + operationTypesA                             + System.Environment.NewLine +
-                    "operationTypesB =          " + operationTypesB                             + System.Environment.NewLine +
-                    "numSelectionVolumesA =     " + numSelectionVolumesA                        + System.Environment.NewLine +
-                    "numSelectionVolumesB =     " + numSelectionVolumesB                        + System.Environment.NewLine
-                Logging.log (currentTimeString + " ### Comparison Result ###" + System.Environment.NewLine + compResString)
-                
-                let screenshot = new System.Drawing.Bitmap(System.Windows.Forms.SystemInformation.VirtualScreen.Width, 
-                                                            System.Windows.Forms.SystemInformation.VirtualScreen.Height, 
-                                                            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                let screenGraph = System.Drawing.Graphics.FromImage(screenshot);
-                screenGraph.CopyFromScreen(System.Windows.Forms.SystemInformation.VirtualScreen.X, 
-                                           System.Windows.Forms.SystemInformation.VirtualScreen.Y, 
-                                           0, 
-                                           0, 
-                                           System.Windows.Forms.SystemInformation.VirtualScreen.Size, 
-                                           System.Drawing.CopyPixelOperation.SourceCopy);
-
-                screenshot.Save(@"output\" + currentTimeString + "_screenshot.png", System.Drawing.Imaging.ImageFormat.Png);
-
+            // press app menu button
+            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.ApplicationMenu) ->
+                updateReferenceOperations(scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
                 scene
                     
             // release trigger
@@ -408,7 +385,11 @@ module LogicalScene =
                                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
                             }
                         let newOctree = marked scene.currentOctree newOperation
-                        newOctree, Array.append (scene.allOperations) [|newOperation|]
+                        let newOperations = Array.append (scene.allOperations) [|newOperation|]
+
+//                        updateReferenceOperations(scene.referenceOperations, newOperations, scene.initialOctree, scene.refOperationsFile)
+
+                        newOctree, newOperations
                     else
                         scene.currentOctree, scene.allOperations
                         
@@ -440,7 +421,7 @@ module LogicalScene =
                         let scalingFactor = if interactionInfo.currActionType = TrackpadActionType.Upscale then 1.0 else -1.0
                         let scalingSpeed = 1.1
                         let scalingFactorForFrame = 1.0 + scalingFactor * scalingSpeed * (dt.TotalSeconds)
-                        let newSelVolScale = interactionInfo.currSelVolScale * scalingFactorForFrame
+                        let newSelVolScale = clamp 0.1 10.0 interactionInfo.currSelVolScale * scalingFactorForFrame
                         { interactionInfo with currSelVolScale = newSelVolScale }
                     else
                         interactionInfo

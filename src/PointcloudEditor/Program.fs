@@ -62,10 +62,13 @@ let main argv =
 //            | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
 //    let feedback = argToFeedbackType(firstArgAsInt)
 
+
 //    let psp = @"..\..\resources\pointclouds\Laserscan-MS60_Beiglboeck-2015.pts"
     let psp = @"..\..\resources\pointclouds\JBs_Haus.pts"
     let referenceOperationsFile = @"..\..\resources\pointclouds\JBs_Haus_groundTruth.xml"
     let storagePath = @"C:\bla\vgmCache"
+
+    let refOps = Some (OperationsComp.loadOperationsFromFile(referenceOperationsFile))
 
     Directory.CreateDirectory(storagePath) |> ignore
     let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"])
@@ -450,6 +453,7 @@ let main argv =
             contrToTrackpad     = controllerToTrackpadTrafo
             allOperations       = [||]
             refOperationsFile   = referenceOperationsFile
+            referenceOperations = refOps
             
             specialObjectIds    = specialObjectIds
             interactionInfo1    = DefaultInteractionInfo
