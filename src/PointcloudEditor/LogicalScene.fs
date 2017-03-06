@@ -105,9 +105,9 @@ module LogicalScene =
             
         let updatePointState(p : Point, op : Operation) =
             if op.opType = OperationType.Select then 
-                Point(p.Position, p.Normal, p.Color, 0x1uy) 
+                Point(p.Position, p.Normal, p.Color, PointState.Selected)
             elif op.opType = OperationType.Deselect then 
-                Point(p.Position, p.Normal, p.Color, 0x0uy) 
+                Point(p.Position, p.Normal, p.Color, PointState.Normal)
             else 
                 p
 
@@ -246,6 +246,29 @@ module LogicalScene =
             }
 
         Async.Start(worker)
+        
+    let deleteMarked (pointCloudOctree : Octree) =
+
+        let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) =
+            let n = !node
+
+            match n with
+            | Empty             ->  
+                lazy n
+            | Leaf points       -> 
+                lazy 
+                    let dethunkedPoints = points.Value
+                    let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if p.State = PointState.Selected then Point(p.Position, p.Normal, p.Color, PointState.Deleted) else p))
+                    Leaf(newPoints.Value.Length, memoryThunk newPoints)
+            | Node (points,children) ->
+                lazy
+                    let dethunkedPoints = points.Value
+                    let newChildren = children |> Array.mapi (fun i child -> memoryThunk(traverse (child) (cell.GetChild i)) :> thunk<_>)
+                    let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> if p.State = PointState.Selected then Point(p.Position, p.Normal, p.Color, PointState.Deleted) else p))
+                    Node(newPoints.Value.Length, memoryThunk newPoints, newChildren)
+
+        let newRoot = traverse pointCloudOctree.root pointCloudOctree.cell
+        { pointCloudOctree with root = memoryThunk newRoot }
 
     let update (scene : Scene) (message : Message) : Scene =
 
@@ -324,10 +347,16 @@ module LogicalScene =
                 let newInteractionInfo = { interactionInfo with triggerPressed = true}
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
-            // press app menu button
-            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.ApplicationMenu) ->
+            // press grip button
+            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Grip) ->
+                let newOctree = 
+                    if scene.allOperations.Length > 0 then
+                        deleteMarked scene.currentOctree
+                    else
+                        scene.currentOctree
+
                 updateReferenceOperations(scene.loadGroundTruth, scene.referenceOperations, scene.allOperations, scene.initialOctree, scene.refOperationsFile)
-                scene
+                { scene with currentOctree = newOctree }
                     
             // release trigger
             | DeviceRelease(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -385,8 +414,6 @@ module LogicalScene =
                             }
                         let newOctree = marked scene.currentOctree newOperation
                         let newOperations = Array.append (scene.allOperations) [|newOperation|]
-
-//                        updateReferenceOperations(scene.referenceOperations, newOperations, scene.initialOctree, scene.refOperationsFile)
 
                         newOctree, newOperations
                     else

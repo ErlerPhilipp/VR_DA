@@ -52,14 +52,10 @@ module OperationsComp =
     type ComparisonResults =
         {
             selectionQualityMeasure : SelectionQualityMeasure
-            numSelectOperationsA : int
-            numSelectOperationsB : int
-            numDeSelectOperationsA : int
-            numDeSelectOperationsB : int
-            operationTypesA : int[]
-            operationTypesB : int[]
-            numSelectionVolumesA : int[]
-            numSelectionVolumesB : int[]
+            numSelectOperations : int
+            numDeSelectOperations : int
+            operationTypes : int[]
+            numSelectionVolumes : int[]
         }
 
     let saveOperationsToFile(operations : Operation[], filePath : string) =
@@ -72,8 +68,8 @@ module OperationsComp =
         let operations = File.readAllText filePath |> serializer.UnPickleOfString
         operations
 
-    let compareOperations(operationsA : Operation[], operationsB : Operation[], octree : Octree) =
-
+    let compareOperations(refOps : Operation[], myOps : Operation[], octree : Octree) =
+        
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
 
         let pointToBeMarked (point : Point, operations : Operation[]) = 
@@ -81,6 +77,12 @@ module OperationsComp =
                             op.selectionVolumeTrafos |> Array.exists (fun t -> 
                                                         (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)))
             
+        let getDeleted(dethunkedPoints : Point[], operations : Operation[]) = 
+            dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p, operations) with
+                                                    | Some op -> op.opType = OperationType.Select
+                                                    | None -> false
+                                          )
+
         let getSelected(dethunkedPoints : Point[], operations : Operation[]) = 
             dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p, operations) with
                                                     | Some op -> op.opType = OperationType.Select
@@ -95,12 +97,12 @@ module OperationsComp =
                 SelectionQualityMeasure.Zero
             | Leaf points       -> 
                 let dethunkedPoints = points.Value
-                let selectedA = getSelected(dethunkedPoints, operationsA)
-                let selectedB = getSelected(dethunkedPoints, operationsB)
-                let correctlySelected =             selectedA |> Array.mapi (fun i selected -> if     selected &&     selectedB.[i] then 1 else 0) |> Array.sum
-                let wronglySelected =               selectedA |> Array.mapi (fun i selected -> if not selected &&     selectedB.[i] then 1 else 0) |> Array.sum
-                let correctlyNonSelectedPoints =    selectedA |> Array.mapi (fun i selected -> if not selected && not selectedB.[i] then 1 else 0) |> Array.sum
-                let wronglyNonSelectedPoints =      selectedA |> Array.mapi (fun i selected -> if     selected && not selectedB.[i] then 1 else 0) |> Array.sum
+                let selectedRef = getSelected(dethunkedPoints, refOps)
+                let selectedCur = getDeleted(dethunkedPoints, myOps)
+                let correctlySelected =             selectedRef |> Array.mapi (fun i selected -> if     selected &&     selectedCur.[i] then 1 else 0) |> Array.sum
+                let wronglySelected =               selectedRef |> Array.mapi (fun i selected -> if not selected &&     selectedCur.[i] then 1 else 0) |> Array.sum
+                let correctlyNonSelectedPoints =    selectedRef |> Array.mapi (fun i selected -> if not selected && not selectedCur.[i] then 1 else 0) |> Array.sum
+                let wronglyNonSelectedPoints =      selectedRef |> Array.mapi (fun i selected -> if     selected && not selectedCur.[i] then 1 else 0) |> Array.sum
                 SelectionQualityMeasure(correctlySelected, wronglySelected, correctlyNonSelectedPoints, wronglyNonSelectedPoints)
 
             | Node (_,children) ->
@@ -112,24 +114,17 @@ module OperationsComp =
 
         let selectionQualityMeasures = traverse octree.root octree.cell
         
-        let selectOperationsA = operationsA |> Array.map(fun op -> if op.opType = OperationType.Select then 1 else 0)
-        let selectOperationsB = operationsB |> Array.map(fun op -> if op.opType = OperationType.Select then 1 else 0)
-        let deSelectOperationsA = operationsA |> Array.map(fun op -> if op.opType = OperationType.Deselect then 0 else 1)
-        let deSelectOperationsB = operationsB |> Array.map(fun op -> if op.opType = OperationType.Deselect then 0 else 1)
-        let numSelectionVolumesA = operationsA |> Array.map(fun op -> op.selectionVolumeTrafos.Length)
-        let numSelectionVolumesB = operationsB |> Array.map(fun op -> op.selectionVolumeTrafos.Length)
+        let selectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Select then 1 else 0)
+        let deSelectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Deselect then 0 else 1)
+        let numSelectionVolumes = myOps |> Array.map(fun op -> op.selectionVolumeTrafos.Length)
 
         let comparisonResults = 
             {
                 selectionQualityMeasure = selectionQualityMeasures
-                numSelectOperationsA    = selectOperationsA |> Array.sum
-                numSelectOperationsB    = selectOperationsB |> Array.sum
-                numDeSelectOperationsA  = deSelectOperationsA |> Array.sum
-                numDeSelectOperationsB  = deSelectOperationsB |> Array.sum
-                operationTypesA         = selectOperationsA
-                operationTypesB         = selectOperationsB
-                numSelectionVolumesA    = numSelectionVolumesA
-                numSelectionVolumesB    = numSelectionVolumesB
+                numSelectOperations    = selectOperations |> Array.sum
+                numDeSelectOperations  = deSelectOperations |> Array.sum
+                operationTypes         = selectOperations
+                numSelectionVolumes    = numSelectionVolumes
             }
         comparisonResults
         
@@ -161,20 +156,16 @@ module OperationsComp =
         let arrayToString(arr : array<_>) =
             "[|" + (arr |> Array.map(fun i -> i.ToString()) |> String.concat ";") + "|]"
 
-//        let operationTypesA = compRes.operationTypesA |> arrayToString
-        let operationTypesB = compRes.operationTypesB |> arrayToString
-//        let numSelectionVolumesA = compRes.numSelectionVolumesA |> arrayToString
-        let numSelectionVolumesB = compRes.numSelectionVolumesB |> arrayToString
+        let operationTypes = compRes.operationTypes |> arrayToString
+        let numSelectionVolumes = compRes.numSelectionVolumes |> arrayToString
                 
         let compResString = 
             compRes.selectionQualityMeasure.ToString()   + System.Environment.NewLine +
             "correctlySelected =        " + correctlySelectedOfAllSelected.ToString()       + System.Environment.NewLine +
             "correctlyNonSelected =     " + correctlyNonSelectedOfAllNonSelected.ToString() + System.Environment.NewLine +
             "correctOfAll =             " + correctOfAll.ToString()                         + System.Environment.NewLine +
-            "numSelectOperationsA =     " + compRes.numSelectOperationsA.ToString()         + System.Environment.NewLine +
-            "numSelectOperationsB =     " + compRes.numSelectOperationsB.ToString()         + System.Environment.NewLine +
-            "numDeSelectOperationsA =   " + compRes.numDeSelectOperationsA.ToString()       + System.Environment.NewLine +
-            "numDeSelectOperationsB =   " + compRes.numDeSelectOperationsB.ToString()       + System.Environment.NewLine +
-            "operationTypes =           " + operationTypesB                                 + System.Environment.NewLine +
-            "numSelectionVolumes =      " + numSelectionVolumesB                            + System.Environment.NewLine
+            "numSelectOperations =      " + compRes.numSelectOperations.ToString()          + System.Environment.NewLine +
+            "numDeSelectOperations =    " + compRes.numDeSelectOperations.ToString()        + System.Environment.NewLine +
+            "operationTypes =           " + operationTypes                                  + System.Environment.NewLine +
+            "numSelectionVolumes =      " + numSelectionVolumes                             + System.Environment.NewLine
         Logging.log (currentTimeString + " ### Comparison Result ###" + System.Environment.NewLine + compResString)

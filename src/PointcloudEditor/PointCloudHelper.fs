@@ -73,7 +73,7 @@ module PointCloudHelper =
                         let p = points    |> Array.map ( fun p -> V3f p.Position)
                         let n = points    |> Array.map ( fun p -> V3f p.Normal)
                         let c = points    |> Array.map ( fun p -> p.Color)
-                        let s = points    |> Array.map ( fun p -> p.State |> int)
+                        let s = points    |> Array.map ( fun p -> p.State |> float32)
 
                         let r = 
                             IndexedGeometry(
@@ -126,7 +126,7 @@ module PointCloudHelper =
             [<Tangent>]         t       : V3d
             [<Color>]           c       : V4d
             [<TexCoord>]        tc      : V2d
-            [<State>]           s       : int
+            [<State>]           s       : float
         }
 
         let internal debugNormal (v : PointCloudVertex) =
@@ -166,7 +166,9 @@ module PointCloudHelper =
 
         let sphereImposterGeometry (p : Point<PointCloudVertex>) =
             triangle {
-//                if p.Value.s = 0 then
+                if abs(p.Value.s - 2.0) < 0.001 then
+                    ()
+                else
                     let sqrt2Half = 0.7071067812
                     let tcPiQuarter = 0.8535533906
                     let oneMinusTcPiQuarter = 0.1464466094
@@ -215,11 +217,15 @@ module PointCloudHelper =
                         yield { p.Value with c = p.Value.c; wp = wp.[i];        pos = pos.[i] / pos.[i].W;          tc = tc.[i] }
             }       
 
-
         let sphereImposterFragment (v : PointCloudVertex) =
            fragment {
-                let newColor = if v.s = 0 then v.c else V4d(1.0, 0.0, 0.0, 1.0)
-                return {color = newColor}
+                let newColor = 
+                    if v.s < 0.5 then v.c
+                    elif v.s > 1.5 then V4d(0.0, 1.0, 0.0, 1.0)
+                    elif v.s > 0.5 then V4d(1.0, 0.0, 0.0, 1.0)
+                    else V4d(1.0, 1.0, 0.0, 1.0)
+
+                return { color = newColor }
             }
     
     
@@ -243,7 +249,7 @@ module PointCloudHelper =
                             DefaultSemantic.Positions, typeof<V3f>
                             DefaultSemantic.Colors, typeof<C4b>
                             DefaultSemantic.Normals, typeof<V3f>
-                            Sym.ofString "State", typeof<int>
+                            Sym.ofString "State", typeof<float32>
                         ]
                     boundingBoxSurface      = Some BoundingBox.effectRed
                 }

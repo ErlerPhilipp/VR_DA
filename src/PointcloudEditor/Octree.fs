@@ -11,12 +11,17 @@ open Aardvark.Base.Native
 
 open System.IO
 
+module PointState =
+    let Normal = 0
+    let Selected = 1
+    let Deleted = 2
+
 type Point =
     struct
         val mutable public Position : V3d   
         val mutable public Normal   : V3d     
         val mutable public Color    : C4b
-        val mutable public State    : byte
+        val mutable public State    : int
         new(p,n,c,s) = { Position = p; Normal = n; Color = c; State = s }
     end
 
@@ -510,7 +515,7 @@ module Octree =
                         empty
 
                     | Leaf pts -> 
-                        let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Normal, p.Color, 0x0uy))
+                        let all = !pts |> Array.map (fun p -> Point(p.Position + offset, p.Normal, p.Color, 0))
                         pts := all
                         visited <- visited + all.Length
 
@@ -802,7 +807,7 @@ module Pts =
            str.ReadInt(&b) then
 
            str.ReadToNewLine() |> ignore
-           p <- Point(V3d(x,y,z), V3d.Zero, C4b(byte r, byte g, byte b, 255uy), 0x0uy)
+           p <- Point(V3d(x,y,z), V3d.Zero, C4b(byte r, byte g, byte b, 255uy), 0)
 
            true
 

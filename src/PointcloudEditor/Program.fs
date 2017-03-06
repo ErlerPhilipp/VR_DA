@@ -75,8 +75,8 @@ let main argv =
             let success = System.Boolean.TryParse(arg, &asBool)
             if success then asBool else false
         else 
-            printfn @"No argument given for loading ground truth. Using 'false'"
-            false
+            printfn @"No argument given for loading ground truth. Using 'true'"
+            true
 
     let storagePath = 
         if argv.Length > 4 then
@@ -92,8 +92,8 @@ let main argv =
             let success = System.Double.TryParse(arg, &asFloat)
             if success then asFloat else 60.0
         else 
-            printfn @"No argument given for auto compare time. Using full '60.0' sec"
-            60.0
+            printfn @"No argument given for auto compare time. Using never, '0.0' sec"
+            0.0
     
 
     let refOps = OperationsComp.loadOperationsFromFile(referenceOperationsFile)
@@ -131,8 +131,8 @@ let main argv =
             Log.start "complete build"
 
             let off = V3d.Zero
-//            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
-            let tree = Octree.build db 10000 off (1 + cnt / chunkSize) points
+            let tree = Octree.build db 5000 off (1 + cnt / chunkSize) points
+//            let tree = Octree.build db 10000 off (1 + cnt / chunkSize) points
             printfn "tree : %A" tree
 
             r := tree
