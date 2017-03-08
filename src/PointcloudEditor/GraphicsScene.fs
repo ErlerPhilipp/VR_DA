@@ -33,13 +33,21 @@ module GraphicsScene =
         static member Create(s : Scene) =
             let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
             let centroidTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.centroidId, s.objects)
+
+            let getSelectionVolumeTrafos(interactionInfo : InteractionInfo, octreeOffset : V3d) =
+                let currentScale = Trafo3d.Scale(SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale)
+                interactionInfo.selectionVolumePath |> Array.map(fun p -> currentScale * Trafo3d.Translation(p + octreeOffset) * s.pointCloudTrafo * centroidTrafo)
+
+            let selectionVolumeTrafos = 
+                (Array.append (getSelectionVolumeTrafos(s.interactionInfo1, s.initialOctree.offset)) (getSelectionVolumeTrafos(s.interactionInfo2, s.initialOctree.offset)))
+                
             {
                 original            = s
                 graphicsObjects     = CSet.ofSeq (PersistentHashSet.toSeq s.objects |> Seq.map Conversion.Create)
                 viewTrafo           = Mod.init s.viewTrafo
                 lightPos            = Mod.init lightPos
                 lightColor          = Mod.init s.lightColor
-                selVolPath          = Mod.init (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
+                selVolPath          = Mod.init selectionVolumeTrafos
                 octree              = Mod.init s.currentOctree
 
                 scoreTrafo          = Mod.init s.scoreTrafo
@@ -58,12 +66,22 @@ module GraphicsScene =
             if not (System.Object.ReferenceEquals(ms.original, s)) then
                 let lightPos = getTrafoOfFirstObjectWithId(s.specialObjectIds.lightId, s.objects).Forward.TransformPos(V3d())
                 let centroidTrafo = getTrafoOfFirstObjectWithId(s.specialObjectIds.centroidId, s.objects)
+                
+                let getSelectionVolumeTrafos(interactionInfo : InteractionInfo, octreeOffset : V3d) =
+                    let currentScale = interactionInfo.currSelVolScale * SelectionVolume.selectionVolumeRadius
+                    let pointcloudToWorld = s.pointCloudTrafo * centroidTrafo
+                    interactionInfo.selectionVolumePath |> Array.map(fun p -> 
+                        let worldSpacePos = (Trafo3d.Translation(p + octreeOffset) * pointcloudToWorld).Forward.TransformPos(V3d())
+                        Trafo3d.Scale(currentScale) * Trafo3d.Translation(worldSpacePos))
+
+                let selectionVolumeTrafos = 
+                    (Array.append (getSelectionVolumeTrafos(s.interactionInfo1, s.initialOctree.offset)) (getSelectionVolumeTrafos(s.interactionInfo2, s.initialOctree.offset)))
 
                 ms.original <- s
                 ms.viewTrafo.Value <- s.viewTrafo
                 ms.lightPos.Value <- lightPos
                 ms.lightColor.Value <- s.lightColor
-                ms.selVolPath.Value <- (Array.append s.interactionInfo1.selectionVolumePath s.interactionInfo2.selectionVolumePath)
+                ms.selVolPath.Value <- selectionVolumeTrafos
                 ms.octree.Value <- s.currentOctree
                 
                 ms.scoreTrafo.Value <- s.scoreTrafo
@@ -144,7 +162,7 @@ module GraphicsScene =
                 |> Sg.blendMode(Mod.constant (BlendMode(true)))
                 |> Sg.stencilMode (Mod.constant Additive)
                 |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Stencil))
-                |> Sg.uniform "PointcloudToWorld" (graphicsScene.pointCloudTrafo)
+                |> Sg.uniform "PointcloudToWorld" (Mod.constant Trafo3d.Identity) //(graphicsScene.pointCloudTrafo)
                 |> Sg.pass (Renderpasses.SelectionPass)
                 
         let stencilModeHighLightOnes = Rendering.StencilMode(

@@ -50,18 +50,16 @@ module LogicalScene =
             
             let minDistToNextPosWS = 0.01
             let minDistToNextPosPC = worldToPointcloud.Forward.TransformDir(V3d(minDistToNextPosWS, 0.0, 0.0)).Length
-            let newPosWS = t.Forward.TransformPos(SelectionVolume.controllerToRingCenter)
-            let newPosPC = (t * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerToRingCenter)
+            let newPosPC = (t * worldToPointcloud).Forward.TransformPos(SelectionVolume.controllerToRingCenter) - scene.initialOctree.offset
 
-            let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun oldTrafo -> (oldTrafo.Forward.TransformPos(V3d()) - newPosPC).Length < minDistToNextPosPC)
+            let hasPosNearNewPos = interactionInfo.selectionVolumePath |> Array.exists (fun oldPos -> (oldPos - newPosPC).Length < minDistToNextPosPC)
 
             if hasPosNearNewPos then
 //                printfn "has sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath)
                 interactionInfo.selectionVolumePath
             else
 //                printfn "add sel vol pos, count = %A" (Array.length interactionInfo.selectionVolumePath + 1)
-                let scaleTrafo = Trafo3d.Scale(SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale)
-                Array.append interactionInfo.selectionVolumePath [| (scaleTrafo * Trafo3d.Translation(newPosWS) * worldToPointcloud) |]
+                Array.append interactionInfo.selectionVolumePath [| newPosPC |]
         else
             interactionInfo.selectionVolumePath
 
@@ -82,25 +80,25 @@ module LogicalScene =
     let marked (pointCloudOctree : Octree) (operation : Operation) =
 
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
-        let sphere(t : Trafo3d, op : Operation) = 
-            Sphere3d(t.Forward.TransformPos(V3d()), op.selectionVolumeRadiusPC)
+        let sphere(p : V3d, op : Operation) = 
+            Sphere3d(p, op.selectionVolumeRadiusPC)
 
         let opIntersectsCell(op : Operation, cell : GridCell) =
-            op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Intersects(sphere(t, op)))
+            op.selectionVolumePath |> Array.exists (fun p -> cell.BoundingBox.Intersects(sphere(p + pointCloudOctree.offset, op)))
 
         let cellToBeTraversed (cell : GridCell) = 
             opIntersectsCell(operation, cell)
             
         let opContainsCell(op : Operation, cell : GridCell) =
-            op.selectionVolumeTrafos |> Array.exists (fun t -> cell.BoundingBox.Contains(sphere(t, op)))
+            op.selectionVolumePath |> Array.exists (fun p -> cell.BoundingBox.Contains(sphere(p + pointCloudOctree.offset, op)))
 
         let cellToBeMarked (cell : GridCell) = 
             opContainsCell(operation, cell)
 
-        let pointToBeMarked (point : Point) = 
-            operation.selectionVolumeTrafos |> Array.exists (
-                fun t -> 
-                    (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(operation)
+        let pointToBeMarked (point : V3d) = 
+            operation.selectionVolumePath |> Array.exists (
+                fun p -> 
+                    (p + pointCloudOctree.offset - point).LengthSquared < selectionVolumeRadiusSquared(operation)
                 )
             
         let updatePointState(p : Point, op : Operation) =
@@ -112,7 +110,7 @@ module LogicalScene =
                 p
 
         let checkPointsToBeMarked(dethunkedPoints : Point[]) = 
-            lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeMarked(p) then updatePointState(p, operation) else p))
+            lazy (dethunkedPoints |> Array.map (fun p -> if pointToBeMarked(p.Position) then updatePointState(p, operation) else p))
 
         let markEntireLeaf(dethunkedPoints : Point[], op : Operation) =
             let newPoints = lazy (dethunkedPoints |> Array.map (fun p -> updatePointState(p, op)))
@@ -174,13 +172,13 @@ module LogicalScene =
 
         let cellIntersectsSelVol (cell : GridCell) : bool = cell.BoundingBox.Intersects(sphere)
         let cellContainsSelVol (cell : GridCell) : bool = cell.BoundingBox.Contains(sphere)
-        let pointInSelVol (point : Point) : bool = (selVolPosPC - point.Position).LengthSquared < selectionVolumeRadiusSquared
+        let pointInSelVol (point : V3d) : bool = (selVolPosPC - point).LengthSquared < selectionVolumeRadiusSquared
 
         let rec traverse (node : thunk<OctreeNode>) (cell: GridCell) (level : int) (cellContained : bool) (pointsFoundSoFar : int) : int =
             let n = !node
             
             let numPointsInSelectionVolume(dethunkedPoints : Point[]) = 
-                dethunkedPoints |> Array.filter (fun p -> pointInSelVol(p)) |> Array.length
+                dethunkedPoints |> Array.filter (fun p -> pointInSelVol(p.Position)) |> Array.length
 
             let numPointsInLeaf(dethunkedPoints : Point[]) =
                 dethunkedPoints |> Array.length
@@ -398,7 +396,7 @@ module LogicalScene =
                     if interactionInfo.currActionType = TrackpadActionType.Select || interactionInfo.currActionType = TrackpadActionType.Deselect then
                         let centroidTrafo = getTrafoOfFirstObjectWithId(scene.specialObjectIds.centroidId, scene.objects)
                         let worldToPointcloud = (scene.pointCloudTrafo * centroidTrafo).Inverse
-                        let selectionVolumeTrafos = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
+                        let selectionVolumePath = Array.append scene.interactionInfo1.selectionVolumePath scene.interactionInfo2.selectionVolumePath
                         
                         let selectionVolumeRadiusWS = SelectionVolume.selectionVolumeRadius * interactionInfo.currSelVolScale
                         let selectionVolumeRadiusPC = worldToPointcloud.Forward.TransformDir(V3d(selectionVolumeRadiusWS, 0.0, 0.0)).Length
@@ -408,7 +406,7 @@ module LogicalScene =
                         let newOperation = 
                             {
                                 opType = opType
-                                selectionVolumeTrafos = selectionVolumeTrafos
+                                selectionVolumePath = selectionVolumePath
                                 worldToPointcloud = worldToPointcloud
                                 selectionVolumeRadiusPC = selectionVolumeRadiusPC
                             }

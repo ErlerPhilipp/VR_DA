@@ -72,19 +72,13 @@ module OperationsComp =
         
         let selectionVolumeRadiusSquared(op : Operation) = op.selectionVolumeRadiusPC * op.selectionVolumeRadiusPC
 
-        let pointToBeMarked (point : Point, operations : Operation[]) = 
+        let pointToBeMarked (point : V3d, operations : Operation[]) = 
             operations |> Array.tryFindBack (fun op -> 
-                            op.selectionVolumeTrafos |> Array.exists (fun t -> 
-                                                        (t.Forward.TransformPos(V3d()) - point.Position).LengthSquared < selectionVolumeRadiusSquared(op)))
+                            op.selectionVolumePath |> Array.exists (fun p -> 
+                                                        (p + octree.offset - point).LengthSquared < selectionVolumeRadiusSquared(op)))
             
-        let getDeleted(dethunkedPoints : Point[], operations : Operation[]) = 
-            dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p, operations) with
-                                                    | Some op -> op.opType = OperationType.Select
-                                                    | None -> false
-                                          )
-
         let getSelected(dethunkedPoints : Point[], operations : Operation[]) = 
-            dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p, operations) with
+            dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p.Position - octree.offset, operations) with
                                                     | Some op -> op.opType = OperationType.Select
                                                     | None -> false
                                           )
@@ -98,7 +92,7 @@ module OperationsComp =
             | Leaf points       -> 
                 let dethunkedPoints = points.Value
                 let selectedRef = getSelected(dethunkedPoints, refOps)
-                let selectedCur = getDeleted(dethunkedPoints, myOps)
+                let selectedCur = getSelected(dethunkedPoints, myOps)
                 let correctlySelected =             selectedRef |> Array.mapi (fun i selected -> if     selected &&     selectedCur.[i] then 1 else 0) |> Array.sum
                 let wronglySelected =               selectedRef |> Array.mapi (fun i selected -> if not selected &&     selectedCur.[i] then 1 else 0) |> Array.sum
                 let correctlyNonSelectedPoints =    selectedRef |> Array.mapi (fun i selected -> if not selected && not selectedCur.[i] then 1 else 0) |> Array.sum
@@ -116,7 +110,7 @@ module OperationsComp =
         
         let selectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Select then 1 else 0)
         let deSelectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Deselect then 0 else 1)
-        let numSelectionVolumes = myOps |> Array.map(fun op -> op.selectionVolumeTrafos.Length)
+        let numSelectionVolumes = myOps |> Array.map(fun op -> op.selectionVolumePath.Length)
 
         let comparisonResults = 
             {

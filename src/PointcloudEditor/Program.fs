@@ -96,7 +96,11 @@ let main argv =
             0.0
     
 
-    let refOps = OperationsComp.loadOperationsFromFile(referenceOperationsFile)
+    let refOps = 
+        if loadGroundTruth then
+            OperationsComp.loadOperationsFromFile(referenceOperationsFile)
+        else
+            [||]
 
     Directory.CreateDirectory(storagePath) |> ignore
     let mem     = Memory.mapped (Path.combine [storagePath;"memory.mapped"])

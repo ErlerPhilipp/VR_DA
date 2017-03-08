@@ -41,7 +41,7 @@ module LogicalSceneTypes =
     type Operation =
         {
             opType                  : OperationType
-            selectionVolumeTrafos   : Trafo3d[]
+            selectionVolumePath     : V3d[]
             worldToPointcloud       : Trafo3d
             selectionVolumeRadiusPC : float
         }
@@ -94,7 +94,7 @@ module LogicalSceneTypes =
             vibStrLastFrame     : float
             triggerPressed      : bool
             trackpadPressed     : bool
-            selectionVolumePath : Trafo3d[]
+            selectionVolumePath : V3d[]
             numPointsInSelVol   : int
             currActionType      : TrackpadActionType
             currSelVolScale     : float
