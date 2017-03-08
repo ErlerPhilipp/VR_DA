@@ -75,7 +75,7 @@ module OperationsComp =
         let pointToBeMarked (point : V3d, operations : Operation[]) = 
             operations |> Array.tryFindBack (fun op -> 
                             op.selectionVolumePath |> Array.exists (fun p -> 
-                                                        (p + octree.offset - point).LengthSquared < selectionVolumeRadiusSquared(op)))
+                                                        (p - point).LengthSquared < selectionVolumeRadiusSquared(op)))
             
         let getSelected(dethunkedPoints : Point[], operations : Operation[]) = 
             dethunkedPoints |> Array.map (fun p -> match pointToBeMarked(p.Position - octree.offset, operations) with
