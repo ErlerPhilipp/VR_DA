@@ -171,8 +171,10 @@ module LogicalSceneTypes =
             scoreText           : string
             running             : bool
             numRounds           : int
-            grabAttempts        : int
-            grabs               : int
+            gameGrabAttempts    : int
+            gameGrabs           : int
+            roundGrabAttempts   : int
+            roundGrabs          : int
         }
 
     let DefaultGameInfo = 

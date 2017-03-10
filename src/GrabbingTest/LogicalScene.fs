@@ -127,8 +127,10 @@ module LogicalScene =
                                     scene
 
                 let mutable newPhysicsMessages = scene.physicsMessages
-                let mutable newGrabs = scene.gameInfo.grabs
-                let newGrabAttemps = scene.gameInfo.grabAttempts + 1
+                let mutable newGrabs = scene.gameInfo.gameGrabs
+                let mutable newRoundGrabs = scene.gameInfo.roundGrabs
+                let newGrabAttemps = scene.gameInfo.gameGrabAttempts + 1
+                let newRoundGrabAttempts = scene.gameInfo.roundGrabAttempts + 1
                 let newObjects = 
                     scene.objects 
                         |> PersistentHashSet.map (fun o ->
@@ -138,13 +140,17 @@ module LogicalScene =
                                     o.isGrabbable = GrabbableOptions.BothControllers) then 
                                     newPhysicsMessages <- newPhysicsMessages @ [PhysicsMessage.Grab (o.id, firstController)]
                                     newGrabs <- newGrabs + 1
+                                    newRoundGrabs <- newRoundGrabs + 1
                                     { o with 
                                         isGrabbed = if firstController then GrabbedOptions.Controller1 else GrabbedOptions.Controller2
                                         hasScored = false
                                     } 
                                 else o
                             ) 
-                { scene with objects = newObjects; physicsMessages = newPhysicsMessages; gameInfo = {scene.gameInfo with grabs = newGrabs; grabAttempts = newGrabAttemps} }
+
+                let newGameInfo = {scene.gameInfo with gameGrabs = newGrabs; gameGrabAttempts = newGrabAttemps; roundGrabs = newRoundGrabs; roundGrabAttempts = newRoundGrabAttempts}
+
+                { scene with objects = newObjects; physicsMessages = newPhysicsMessages; gameInfo = newGameInfo }
                     
             // release trigger
             | DeviceUntouch(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Trigger) ->
@@ -199,6 +205,9 @@ module LogicalScene =
                 let (newObjects, newGameInfo) =   
                     if remainingTime < 0.0 && newGameInfo.running then
                         Logging.log (newGameInfo.timeSinceStart.ToString() + ": Time's up!")
+                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Round finished")
+                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grab attempts " + newGameInfo.roundGrabAttempts.ToString())
+                        Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grabs " + newGameInfo.roundGrabs.ToString())
                                         
                         let newRound = newGameInfo.numRounds + 1
                         let lastRound = scene.grabbingVolShape.Length
@@ -216,8 +225,8 @@ module LogicalScene =
                         let (newObjects, newGameInfo) =
                             if newGame then    // finish game
                                 Logging.log (newGameInfo.timeSinceStart.ToString() + ": Game finished")
-                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grab attempts " + newGameInfo.grabAttempts.ToString())
-                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grabs " + newGameInfo.grabs.ToString())
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grab attempts " + newGameInfo.gameGrabAttempts.ToString())
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grabs " + newGameInfo.gameGrabs.ToString())
                                 seededRandomNumberGen <- System.Random(seed)
                                 (newObjects, {newGameInfo with 
                                                 warmupScore = 0
@@ -230,7 +239,7 @@ module LogicalScene =
                                 (newObjects, {newGameInfo with numRounds = newRound})
                         
                         if not (scene.sireneSoundSource.IsPlaying()) then scene.sireneSoundSource.Play()
-                        (newObjects, { newGameInfo with timeSinceStart = 0.0; timeSinceRoundStart = 0.0 })
+                        (newObjects, { newGameInfo with timeSinceStart = 0.0; timeSinceRoundStart = 0.0; roundGrabs = 0; roundGrabAttempts = 0 })
                     else
                         let newTimeSinceStart = newGameInfo.timeSinceStart + dt
                         let newTimeSinceRoundStart = newGameInfo.timeSinceRoundStart + dt
@@ -319,7 +328,7 @@ module LogicalScene =
                                         Logging.log (newGameInfo.timeSinceStart.ToString() + ": Scored " + newGameInfo.score.ToString())
                                         let scoreUntilStart = 3
                                         if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
-                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0; grabs = 0; grabAttempts = 0}
+                                            newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0; gameGrabs = 0; gameGrabAttempts = 0}
                                             Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
                                         Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
