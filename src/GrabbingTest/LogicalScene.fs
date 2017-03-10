@@ -225,8 +225,8 @@ module LogicalScene =
                         let (newObjects, newGameInfo) =
                             if newGame then    // finish game
                                 Logging.log (newGameInfo.timeSinceStart.ToString() + ": Game finished")
-                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grab attempts " + newGameInfo.gameGrabAttempts.ToString())
-                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Grabs " + newGameInfo.gameGrabs.ToString())
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Final Grab attempts " + newGameInfo.gameGrabAttempts.ToString())
+                                Logging.log (newGameInfo.timeSinceStart.ToString() + ": Final Grabs " + newGameInfo.gameGrabs.ToString())
                                 seededRandomNumberGen <- System.Random(seed)
                                 (newObjects, {newGameInfo with 
                                                 warmupScore = 0

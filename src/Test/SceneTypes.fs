@@ -249,6 +249,7 @@ module LogicalSceneTypes =
             physicsInfo         : PhysicsInfo
 
             enableExperimental  : bool
+            shortVersion        : bool
         }
         
     let setTrafoOfObjectsWithId(id : int, t : Trafo3d, objects : PersistentHashSet<Object>, dt : float) = 

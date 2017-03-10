@@ -283,7 +283,7 @@ let main argv =
     //#region Objects   
     let simpleControllerBodyAssimpScene = Loader.Assimp.Load(@"..\..\resources\models\SteamVR\vr_controller_vive_1_5\bodySimplified\bodytrisimple.obj", assimpFlagsSteamVR) 
     let simpleControllerBodyCollShape = createShape Trafo3d.Identity simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape
-    let numScales = 5
+    let numScales = 3
     let simpleControllerBodyCollShapeScaled = [| for i in 0..numScales -> 
                                                     let minScaling = 1.05
                                                     let maxScaling = 1.5

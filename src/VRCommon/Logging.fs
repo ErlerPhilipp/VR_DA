@@ -2,7 +2,7 @@
 
 module Logging = 
     open System.IO
-    let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+    let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss")
     let appName = System.AppDomain.CurrentDomain.FriendlyName
     System.IO.Directory.CreateDirectory("output") |> ignore
     let sessionFileName = @"output\" + appName + "_" + startupTimeString + ".txt"
@@ -15,7 +15,7 @@ module Logging =
         printfn "%A" text
 
     let endSession() =
-        let endTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+        let endTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss")
         streamWriter.WriteLine(endTimeString + ": End session")
         streamWriter.Flush() // doesn't do anything?
         streamWriter.Dispose()

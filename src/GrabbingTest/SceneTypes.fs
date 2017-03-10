@@ -188,8 +188,10 @@ module LogicalSceneTypes =
             scoreText           = "Score: 000\r\nTime: 000.00"
             running             = false
             numRounds           = 0
-            grabAttempts        = 0
-            grabs               = 0
+            gameGrabAttempts    = 0
+            gameGrabs           = 0
+            roundGrabAttempts   = 0
+            roundGrabs          = 0
         }
 
     type PhysicsInfo = 

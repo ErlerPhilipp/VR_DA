@@ -123,7 +123,7 @@ module OperationsComp =
         comparisonResults
         
     let performComparison (refOps : Operation[], myOps : Operation[], octree : Octree) = 
-        let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+        let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss")
         
         System.IO.Directory.CreateDirectory("output") |> ignore
 

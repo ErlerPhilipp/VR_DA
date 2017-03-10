@@ -1,2 +1,2 @@
 cd bin\Release\
-Basketball.exe
+Basketball.exe true

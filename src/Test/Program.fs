@@ -43,7 +43,16 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
+    let firstArgAsBool = 
+        if argv.Length > 0 then
+            let firstArg = argv.[0]
+            let mutable asBool = false
+            let success = System.Boolean.TryParse(firstArg, &asBool)
+            if success then asBool else false
+        else false
+    
     Logging.log("Starting Basketball")
+    Logging.log("Using short version: " + firstArgAsBool.ToString())
     
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9
@@ -621,7 +630,7 @@ let main argv =
         @ [pedestal; cushion; hoop]
         @ [controller1Object; controller2Object; camObject1; camObject2; headCollider]
         @ [grabTrigger1; grabTrigger2]
-        
+
     let specialObjectIds =
         {
             cam1ObjectId        = camObject1.id
@@ -672,6 +681,7 @@ let main argv =
                                   }
 
             enableExperimental  = false
+            shortVersion = firstArgAsBool
         }
 
     let scene = GraphicsScene.createScene sceneObj vrWin

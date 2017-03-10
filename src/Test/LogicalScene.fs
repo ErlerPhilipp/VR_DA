@@ -288,8 +288,10 @@ module LogicalScene =
 
                 let newGameInfo = scene.gameInfo
 
+                let circleAfterRound = if scene.shortVersion then 1 else 3
+
                 let (newObjects, newGameInfo) = 
-                    if newGameInfo.numRounds = 2 then
+                    if not scene.shortVersion && newGameInfo.numRounds = 2 then
                         let speedFactor = 0.1 * Constant.Pi
                         let newGoalMovementPhase = newGameInfo.goalMovementPhase + dt * speedFactor
                         let newGoalMovementPhase = if newGoalMovementPhase > Constant.PiTimesTwo then newGoalMovementPhase - Constant.PiTimesTwo else newGoalMovementPhase
@@ -298,8 +300,8 @@ module LogicalScene =
                         let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
                         let (newObjects, newGameInfo) = setHoopPos(translationTrafo, scene, newGameInfo, newObjects)
                         (newObjects, {newGameInfo with goalMovementPhase = newGoalMovementPhase})
-                    elif newGameInfo.numRounds >= 3 then
-                        let numRoundsSpeedFactor = float (newGameInfo.numRounds - 2)
+                    elif newGameInfo.numRounds >= circleAfterRound then
+                        let numRoundsSpeedFactor = float (newGameInfo.numRounds - circleAfterRound + 1)
                         let speedFactor = 0.1 * numRoundsSpeedFactor * numRoundsSpeedFactor * Constant.Pi
                         let newGoalMovementPhase = newGameInfo.goalMovementPhase + dt * speedFactor
                         let newGoalMovementPhase = if newGoalMovementPhase > Constant.PiTimesTwo then newGoalMovementPhase - Constant.PiTimesTwo else newGoalMovementPhase
@@ -318,7 +320,7 @@ module LogicalScene =
                         Logging.log (newGameInfo.timeSinceStart.ToString() + ": Time's up!")
                                         
                         let newRound = newGameInfo.numRounds + 1
-                        let lastRound = 5
+                        let lastRound = if scene.shortVersion then 2 else 5
 
                         let (newObjects, newGameInfo) =
                             if newRound = lastRound then
@@ -544,7 +546,7 @@ module LogicalScene =
                             )
                 
                 let (newObjects, newGameInfo) = 
-                    if hasScored && newGameInfo.numRounds = 1 then 
+                    if not scene.shortVersion && hasScored && newGameInfo.numRounds = 1 then 
                         let offset = (V3d(seededRandomNumberGen.NextDouble(), 0.0, seededRandomNumberGen.NextDouble()) - V3d(0.5, 0.0, 0.5)) * 2.0
                         let goalAreaSizeFactor = getGoalAreaSizeFactor(scene)
                         let translationTrafo = Trafo3d.Translation(offset * goalAreaSizeFactor)
