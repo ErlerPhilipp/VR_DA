@@ -43,6 +43,7 @@ let main argv =
     use app = new OpenGlApplication()
     let vrWin = VrWindow.VrWindow(app.Runtime, true)
     
+    Logging.log("Starting Basketball")
     
     //#region Trafos / Architecture   
     let trackingAreaSize = 2.9

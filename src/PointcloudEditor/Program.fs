@@ -95,6 +95,7 @@ let main argv =
             printfn @"No argument given for auto compare time. Using never, '0.0' sec"
             0.0
     
+    Logging.log("Starting Pointcloud Editor with loadGroundTruth = " + loadGroundTruth.ToString())
 
     let refOps = 
         if loadGroundTruth then

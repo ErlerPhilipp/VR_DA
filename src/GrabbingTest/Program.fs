@@ -593,6 +593,8 @@ let main argv =
             | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
     let feedback = argToFeedbackType(firstArgAsInt)
 
+    Logging.log("Starting Grabbing Test with feedback = " + feedback.ToString())
+
     let sceneObj =
         {
             objects             = PersistentHashSet.ofList objects

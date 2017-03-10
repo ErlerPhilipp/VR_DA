@@ -3,8 +3,9 @@
 module Logging = 
     open System.IO
     let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-mm-dd_HH-mm-ss")
+    let appName = System.AppDomain.CurrentDomain.FriendlyName
     System.IO.Directory.CreateDirectory("output") |> ignore
-    let sessionFileName = @"output\" + startupTimeString + ".txt"
+    let sessionFileName = @"output\" + appName + "_" + startupTimeString + ".txt"
     let streamWriter = new StreamWriter(sessionFileName, true)
     streamWriter.AutoFlush <- true
     streamWriter.WriteLine(startupTimeString + ": Start session")
