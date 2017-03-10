@@ -345,8 +345,8 @@ module LogicalScene =
                 let newInteractionInfo = { interactionInfo with triggerPressed = true}
                 makeSceneWithInteractionInfo(firstController, newInteractionInfo, scene)
                     
-            // press grip button
-            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.Grip) ->
+            // press app menu button
+            | DevicePress(deviceId, a, _) when (deviceId = assignedInputs.controller1Id || deviceId = assignedInputs.controller2Id) && a = int (VrAxis.VrControllerAxis.ApplicationMenu) ->
                 let newOctree = 
                     if scene.allOperations.Length > 0 then
                         deleteMarked scene.currentOctree
