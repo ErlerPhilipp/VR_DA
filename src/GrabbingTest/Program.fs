@@ -289,7 +289,9 @@ let main argv =
                                                     let maxScaling = 1.5
                                                     let reductionPerRound = (maxScaling - minScaling) / float numScales
                                                     let scale = maxScaling - (float i) * reductionPerRound
-                                                    createShape (Trafo3d.Scale(scale)) simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape |]
+                                                    let controllerToVisualOrigin = Trafo3d.Translation(0.0, 0.01, -0.01)
+                                                    let scaleTrafoWithOtherOrigin = controllerToVisualOrigin * Trafo3d.Scale(scale) * controllerToVisualOrigin.Inverse
+                                                    createShape scaleTrafoWithOtherOrigin simpleControllerBodyAssimpScene.root |> BulletHelper.TriangleMesh |> toCollisionShape |]
 
     let controller1Object = 
         { defaultObject with
@@ -306,12 +308,18 @@ let main argv =
             collisionMask = avatarCollidesWith
         }
     let controller2Object = { controller1Object with id = newId() }
+//    let controllerToVisualOrigin = Trafo3d.Translation(0.0, 0.01, -0.01) // left-right, up-down, forward-backward
     let grabTrigger1 = 
         { defaultObject with
             id = newId()
             castsShadow = false
             objectType = ObjectTypes.Ghost
             collisionShape = Some simpleControllerBodyCollShapeScaled.[0]
+//            model = Some (controllerSg 
+//                            |> Sg.trafo(Mod.constant(controllerToVisualOrigin * Trafo3d.Scale(1.1) * controllerToVisualOrigin.Inverse)) 
+//                            |> Sg.blendMode(Mod.constant (BlendMode(true)))
+//                            |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Colors)))
+//            surface = Some rayCastHitSurface
             isColliding = false
             collisionGroup = CollisionGroups.HandTrigger |> int16
             collisionMask = handTriggerCollidesWith

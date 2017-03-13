@@ -451,7 +451,7 @@ let main argv =
         [lightObject; centroidObject]
         @ [groundObject; ceilingObject]
         @ [wall1; wall2; wall3; wall4]
-        @ [pedestal; cushion]
+        //@ [pedestal; cushion]
         @ [controller1Object; controller2Object; camObject1; camObject2; thumbPosObject1; thumbPosObject2; selectionVolumeObject1; selectionVolumeObject2]
     //#endregion
     

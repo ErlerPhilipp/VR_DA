@@ -324,6 +324,7 @@ module LogicalScene =
                 let minVibStrength = 0.0
 //                let linStrength = minVibStrength + ((1.0 - minVibStrength) * (clamp 0.0 1.0 (float numPointsInSelVol / float searchUntilXPoints)))
                 let limitedGrowthStrength = clamp 0.0 1.0 (1.0 - (1.0 - minVibStrength) * Math.Exp(-0.05 * float numPointsInSelVol))
+                let limitedGrowthStrength = limitedGrowthStrength / 4.0 // full strength gets annoying
 
 //                printfn "numPointsInSelVol = %A; limitedGrowthStrength = %A" numPointsInSelVol limitedGrowthStrength; 
                 let newVibrationStrength = if numPointsInSelVol = 0 then 0.0 else limitedGrowthStrength
