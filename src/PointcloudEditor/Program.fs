@@ -82,8 +82,8 @@ let main argv =
         if argv.Length > 4 then
             argv.[4]
         else 
-            printfn @"No argument given for storage path. Using 'C:\bla\vgmCache'"
-            @"C:\bla\vgmCache"
+            printfn @"No argument given for storage path. Using '..\..\vgmCache'"
+            @"..\..\vgmCache"
 
     let autoCompareInSec = 
         if argv.Length > 5 then

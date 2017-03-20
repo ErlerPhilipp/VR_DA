@@ -330,10 +330,10 @@ module LogicalScene =
                                         if not newGameInfo.running && newGameInfo.warmupScore = scoreUntilStart then
                                             newGameInfo <- {newGameInfo with running = true; timeSinceStart = 0.0; timeSinceRoundStart = 0.0; score = 0; gameGrabs = 0; gameGrabAttempts = 0}
                                             Logging.log (newGameInfo.timeSinceStart.ToString() + ": Warm-up finished, starting round " + newGameInfo.numRounds.ToString())
-                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
-                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
-                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
-                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
+//                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller1Id)
+//                                        Vibration.stopVibration(Vibration.Score, uint32 assignedInputs.controller2Id)
+//                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller1Id, 1.0)
+//                                        Vibration.sinusiodFunctionPulses(3, 15, 0.3, Vibration.Score, uint32 assignedInputs.controller2Id, 1.0)
                                     
                                         { o with 
                                             hasScored = true
