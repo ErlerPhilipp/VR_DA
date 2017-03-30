@@ -585,23 +585,23 @@ let main argv =
     let firstArgAsInt = 
         if argv.Length > 0 then
             let firstArg = argv.[0]
-            let mutable asInt = 0
+            let mutable asInt = 3
             let success = System.Int32.TryParse(firstArg, &asInt)
-            if success then asInt else 0
-        else 0
+            if success then asInt else 3
+        else 
+            printfn "No argument given. Using both feedback types"
+            3
 
-
-    if firstArgAsInt = 0 then printfn "No argument given. Using both feedback types"
     let argToFeedbackType(a : int) =
         match a with
-            | 0 -> FeedbackTypes.Both
-            | 1 -> FeedbackTypes.OpticalFeedback
-            | 2 -> FeedbackTypes.HapticFeedback
-            | 3 -> FeedbackTypes.NoFeedback
+            | 0 -> FeedbackTypes.NoFeedback
+            | 1 -> FeedbackTypes.HapticFeedback
+            | 2 -> FeedbackTypes.OpticalFeedback
+            | 3 -> FeedbackTypes.Both
             | _ -> printfn "Invalid argument given. Using both feedback types"; FeedbackTypes.Both
     let feedback = argToFeedbackType(firstArgAsInt)
 
-    Logging.log("Starting Grabbing Test with feedback = " + feedback.ToString())
+    Logging.log("Starting Grabbing Test with feedback = " + firstArgAsInt.ToString())
 
     let sceneObj =
         {

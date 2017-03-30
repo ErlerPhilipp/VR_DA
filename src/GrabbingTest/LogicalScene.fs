@@ -51,9 +51,9 @@ module LogicalScene =
     let getLightColor(gameInfo : GameInfo) =
         let blinkDuration = 0.5
         if gameInfo.running then
-            if gameInfo.timeSinceRoundStart < blinkDuration then
-                V3d(0.5, 1.0, 0.5)
-            else
+//            if gameInfo.timeSinceRoundStart < blinkDuration then
+//                V3d(0.5, 1.0, 0.5)
+//            else
                 V3d.III
         else
             V3d(1.0, 1.0, 0.5)

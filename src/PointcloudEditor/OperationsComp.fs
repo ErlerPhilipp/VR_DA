@@ -109,7 +109,7 @@ module OperationsComp =
         let selectionQualityMeasures = traverse octree.root octree.cell
         
         let selectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Select then 1 else 0)
-        let deSelectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Deselect then 0 else 1)
+        let deSelectOperations = myOps |> Array.map(fun op -> if op.opType = OperationType.Select then 0 else 1)
         let numSelectionVolumes = myOps |> Array.map(fun op -> op.selectionVolumePath.Length)
 
         let comparisonResults = 
@@ -123,11 +123,12 @@ module OperationsComp =
         comparisonResults
         
     let performComparison (refOps : Operation[], myOps : Operation[], octree : Octree) = 
+        let startupDateString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd")
         let currentTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss")
         
-        System.IO.Directory.CreateDirectory("output") |> ignore
+        System.IO.Directory.CreateDirectory(@"output\" + startupDateString) |> ignore
 
-        saveOperationsToFile(myOps, @"output\operations_" + currentTimeString + ".xml")
+        saveOperationsToFile(myOps, @"output\" + startupDateString + @"\operations_" + currentTimeString + ".xml")
 
         let screenshot = new System.Drawing.Bitmap(System.Windows.Forms.SystemInformation.VirtualScreen.Width, 
                                                     System.Windows.Forms.SystemInformation.VirtualScreen.Height, 
@@ -140,7 +141,7 @@ module OperationsComp =
                                     System.Windows.Forms.SystemInformation.VirtualScreen.Size, 
                                     System.Drawing.CopyPixelOperation.SourceCopy);
 
-        screenshot.Save(@"output\" + currentTimeString + "_screenshot.png", System.Drawing.Imaging.ImageFormat.Png);
+        screenshot.Save(@"output\" + startupDateString + @"\" + currentTimeString + "_screenshot.png", System.Drawing.Imaging.ImageFormat.Png);
 
 
         let compRes = compareOperations(refOps, myOps, octree)

@@ -1,2 +1,2 @@
 cd bin\Release\
-GrabbingTest.exe 3
+GrabbingTest.exe 0

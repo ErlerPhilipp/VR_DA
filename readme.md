@@ -9,7 +9,7 @@ How to Start
 ------------
 
  1. Start SteamVR and make sure all controllers are detected.
- 2. Start Basketball.exe.
+ 2. Start Basketball.exe. (set the first command line parameter to 'true' if you want the short version with 2 rounds)
  3. Put on the head mounted display, controller loops and earphones.
 
 How to Play

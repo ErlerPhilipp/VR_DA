@@ -2,10 +2,11 @@
 
 module Logging = 
     open System.IO
+    let startupDateString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd")
     let startupTimeString = System.DateTime.UtcNow.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss")
     let appName = System.AppDomain.CurrentDomain.FriendlyName
-    System.IO.Directory.CreateDirectory("output") |> ignore
-    let sessionFileName = @"output\" + appName + "_" + startupTimeString + ".txt"
+    System.IO.Directory.CreateDirectory(@"output\" + startupDateString) |> ignore
+    let sessionFileName = @"output\" + startupDateString + @"\" + appName + "_" + startupTimeString + ".txt"
     let streamWriter = new StreamWriter(sessionFileName, true)
     streamWriter.AutoFlush <- true
     streamWriter.WriteLine(startupTimeString + ": Start session")
