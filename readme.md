@@ -61,12 +61,12 @@ How to Start
 
  1. Start SteamVR and make sure all controllers are detected.
  2. Start PointcloudEditor.exe directly or with command line parameters. The parameters are:
-    1. Rendering quality: float, 0.0 - 1.0
-	2. Pointset file: string, path + file name + extension to a pointset file; 1st line is number of points, other lines are: pos.x pos.y pos.z intensity red green blue
-	3. Reference operations file: string, path + file name + extension to an XML file containing the reference operations
-	4. Load reference: bool, should load the reference operations and compare the current selection with it, or save the current selection to the reference file
-	5. Storage path: string, path where the compressed cache of the pointset should be stored
-	6. Auto compare in sec: float, time after which the comparison is automatically performed; 0 to disable
+    1. Rendering quality: float, 0.0 - 1.0 (not used at the moment)
+	  2. Pointset file: string, path + file name + extension to a pointset file; 1st line is number of points, other lines are: pos.x pos.y pos.z intensity red green blue
+	  3. Reference operations file: string, path + file name + extension to an XML file containing the reference operations
+	  4. Load reference: bool, should load the reference operations and compare the current selection with it, or save the current selection to the reference file
+	  5. Storage path: string, path where the compressed cache of the pointset should be stored
+	  6. Auto compare in sec: float, time after which the comparison is automatically performed; 0 to disable
  3. Put on the head mounted display and start
 
 How to Use
@@ -85,12 +85,18 @@ Notes
 How to Build
 ------------
 
- 1. Clone the repository or download the zip.
+ 1. Clone the repository or download the zip of Aardvark_VR.
+ 1. Check out Aardvark.Rendering Master Branch Rev. 2032d... from 17.01.2017 15:46:15 to a folder next to Aardvark_VR
+ 1. Change in "src/Aardvark.Base.Rendering/Buffers.fs" line 163 from "for l in res do l.Lock.Enter(ResourceUsage.Render, l.OnLock)" to "for l in res do l.Lock.Enter(l.OnLock)" 
+ 1. Comment out in "src/Demo/FontRendering/Program.fs" lines 190-270
+ <!-- 1. Check out FShade Master Branch Rev. 2d078a... from 02.12.2016 16:36:44 to a folder next to Aardvark_VR -->
+ 1. Install [OpenAL](https://www.openal.org/downloads/) if necessery
  2. Open a command line window in the solution directory.
- 3. Execute "build install". The build script will now download and install the dependencies.
+ 3. Execute "build". The build script will now download and install the dependencies.
  4. Open the solution in Visual Studio (2015).
  5. Set the desired project as start-up project.
- 6. Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take up to 5 minutes.
+ 6. Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take more than 5 minutes.
+ 7. It can be necessary to revert "libbulletc-windows-x86.dll" and "libbulletc.dll"
 
 Credits
 ------------

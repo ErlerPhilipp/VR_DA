@@ -14,6 +14,7 @@ nuget Aardvark.Rendering.Text              ~> 2.6.1
 nuget BulletSharp
 
 nuget FShade = 2.3.5
+nuget AssimpNet = 3.3.1
 
 nuget Aardvark.Git                         ~> 2.1.4
 
