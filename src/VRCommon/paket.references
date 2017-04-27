@@ -3,3 +3,4 @@ Aardvark.SceneGraph
 Aardvark.SceneGraph.IO
 Aardvark.Rendering.Text
 BulletSharp
+FShade.Core
