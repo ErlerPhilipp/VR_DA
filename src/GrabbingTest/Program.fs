@@ -107,7 +107,7 @@ let main argv =
     ambient1Sound.Play()
 
     let ambient2Buffer = Audio.Sound.bufferFromFile(@"..\..\resources\sound\371277__goulven__dark-ambient-loop.wav")
-    let ambient2Sound = Audio.Sound.sourceFromBuffer(ambient1Buffer)
+    let ambient2Sound = Audio.Sound.sourceFromBuffer(ambient2Buffer)
     ambient2Sound.Volume <- 0.02
     ambient2Sound.Location <- V3d(-25.0, 0.0, -5.0)
     ambient2Sound.Loop <- true
