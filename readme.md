@@ -86,10 +86,7 @@ How to Build
 ------------
 
  1. Clone the repository or download the zip of Aardvark_VR.
- 1. Check out Aardvark.Rendering Master Branch Rev. 2032d... from 17.01.2017 15:46:15 to a folder next to Aardvark_VR
- 1. Change in "src/Aardvark.Base.Rendering/Buffers.fs" line 163 from "for l in res do l.Lock.Enter(ResourceUsage.Render, l.OnLock)" to "for l in res do l.Lock.Enter(l.OnLock)" 
- 1. Comment out in "src/Demo/FontRendering/Program.fs" lines 190-270
- <!-- 1. Check out FShade Master Branch Rev. 2d078a... from 02.12.2016 16:36:44 to a folder next to Aardvark_VR -->
+ 1. Check out Aardvark.Rendering branch 'philipp'.
  1. Install [OpenAL](https://www.openal.org/downloads/) if necessery
  2. Open a command line window in the solution directory.
  3. Execute "build". The build script will now download and install the dependencies.
