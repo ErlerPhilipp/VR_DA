@@ -21,3 +21,5 @@ module VrTypes =
                     | 2 -> x.rAxis2
                     | 3 -> x.rAxis3
                     | _ -> x.rAxis4
+
+    let MonitorWindowSize = V2i(1600, 900)

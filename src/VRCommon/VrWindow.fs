@@ -23,7 +23,7 @@ module VrWindow =
 
     type BlitWindow(b : ref<Framebuffer>, c : ref<Framebuffer>) =
         inherit OpenTK.GameWindow(
-            1024, 768,
+            VrTypes.MonitorWindowSize.X, VrTypes.MonitorWindowSize.Y,
             GraphicsMode(
                 ColorFormat(Config.BitsPerPixel), 
                 0, 
@@ -99,10 +99,10 @@ module VrWindow =
         
         let screenA, screenB, screenC =
             if createWindow then
-                let aTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
-                let bTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
-                let cTex  = runtime.CreateTexture(V2i(1024, 768), TextureFormat.Rgba8, 1,1,1)
-                let depth   = runtime.CreateRenderbuffer(V2i(1024, 768), RenderbufferFormat.Depth24Stencil8, 1)
+                let aTex  = runtime.CreateTexture(VrTypes.MonitorWindowSize, TextureFormat.Rgba8, 1,1,1)
+                let bTex  = runtime.CreateTexture(VrTypes.MonitorWindowSize, TextureFormat.Rgba8, 1,1,1)
+                let cTex  = runtime.CreateTexture(VrTypes.MonitorWindowSize, TextureFormat.Rgba8, 1,1,1)
+                let depth   = runtime.CreateRenderbuffer(VrTypes.MonitorWindowSize, RenderbufferFormat.Depth24Stencil8, 1)
                 let aFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = aTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
                 let bFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = bTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
                 let cFbo = runtime.CreateFramebuffer(signature, [DefaultSemantic.Colors, { texture = cTex; slice = 0; level = 0 } :> IFramebufferOutput; DefaultSemantic.Depth, depth :> IFramebufferOutput])
