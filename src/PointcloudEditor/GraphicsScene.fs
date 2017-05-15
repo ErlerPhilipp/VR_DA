@@ -162,9 +162,18 @@ module GraphicsScene =
                 |> Sg.blendMode(Mod.constant (BlendMode(true)))
                 |> Sg.stencilMode (Mod.constant Additive)
                 |> Sg.writeBuffers (Some (Set.singleton DefaultSemantic.Stencil))
-                |> Sg.uniform "PointcloudToWorld" (Mod.constant Trafo3d.Identity) //(graphicsScene.pointCloudTrafo)
+                |> Sg.uniform "PointcloudToWorld" (Mod.constant Trafo3d.Identity)
                 |> Sg.pass (Renderpasses.SelectionPass)
                 
+        let selectionVisualizationPath = 
+            Sg.instancedGeometry (graphicsScene.selVolPath) (SelectionVolume.makeSelectionVolumeGeometry())
+                |> Sg.surface (Mod.constant (SelectionVolume.makeSelectionVolumeSurfaceInstance(win)))
+                |> Sg.blendMode(Mod.constant (BlendMode(true)))
+                |> Sg.stencilMode (Mod.constant Additive)
+                |> Sg.writeBuffers (Some (Set.ofList ([DefaultSemantic.Colors])))
+                |> Sg.uniform "PointcloudToWorld" (Mod.constant Trafo3d.Identity)
+                |> Sg.pass (Renderpasses.SelVisPass)
+
         let stencilModeHighLightOnes = Rendering.StencilMode(
                                         IsEnabled   = true,
                                         Compare     = Rendering.StencilFunction(Rendering.StencilCompareFunction.LessOrEqual, 1, 0xFFu),
@@ -195,7 +204,7 @@ module GraphicsScene =
         let fakeView = Mod.map2 (fun (m : Trafo3d) v -> m * v) graphicsScene.pointCloudTrafo graphicsScene.viewTrafo 
         let pointCloudSg = pointcloudSg fakeView
 
-        Sg.ofList ([selectionPath; fullscreenQuad; sg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])
+        Sg.ofList ([selectionPath; fullscreenQuad; sg; pointCloudSg |> Sg.trafo (graphicsScene.pointCloudTrafo)])//; selectionVisualizationPath])
             |> Sg.viewTrafo graphicsScene.viewTrafo
             |> Sg.projTrafo win.Projection
             |> Sg.uniform "ViewportSize" (Mod.constant VrDriver.desiredSize)
