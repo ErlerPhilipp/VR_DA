@@ -84,16 +84,22 @@ Notes
 
 How to Build
 ------------
-
- 1. Clone the repository or download the zip of Aardvark_VR.
- 1. Check out Aardvark.Rendering branch 'philipp'.
- 1. Install [OpenAL](https://www.openal.org/downloads/) if necessery
- 2. Open a command line window in the solution directory.
- 3. Execute "build". The build script will now download and install the dependencies.
- 4. Open the solution in Visual Studio (2015).
- 5. Set the desired project as start-up project.
- 6. Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take more than 5 minutes.
- 7. It can be necessary to revert "libbulletc-windows-x86.dll" and "libbulletc.dll"
+ 
+ 1. Get the source
+    1. Open cmd in a new project folder
+    1. git clone https://github.com/ErlerPhilipp/VR_DA.git
+    2. git clone https://github.com/vrvis/aardvark.rendering.git
+	3. cd aardvark.rendering
+    3. git checkout philipp
+ 1. Install [OpenAL](https://www.openal.org/downloads/) if you haven't before
+ 1. Download dependencies and build
+    1. Open a command line window in the VR_DA directory.
+    3. Execute "build". The build script will now download and install the dependencies.
+    4. The executables are created in "VR_DA\bin\Release\"
+ 1. Run in Visual Studio
+    1. Open the solution in Visual Studio (2015).
+    5. Set the desired project as start-up project.
+    6. Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take more than 5 minutes.
 
 Credits
 ------------

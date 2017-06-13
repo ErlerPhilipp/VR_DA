@@ -106,18 +106,21 @@
 <h2 id="how-to-build">How to Build</h2>
 
 <ol>
-<li>Clone the repository or download the zip of Aardvark_VR.</li>
-<li>Check out Aardvark.Rendering Master Branch Rev. 2032d… from 17.01.2017 15:46:15 to a folder next to Aardvark_VR</li>
-<li>Change in “src/Aardvark.Base.Rendering/Buffers.fs” line 163 from “for l in res do l.Lock.Enter(ResourceUsage.Render, l.OnLock)” to “for l in res do l.Lock.Enter(l.OnLock)” </li>
-<li>Comment out in “src/Demo/FontRendering/Program.fs” lines 190-270 <br>
-<!-- 1. Check out FShade Master Branch Rev. 2d078a... from 02.12.2016 16:36:44 to a folder next to Aardvark_VR --></li>
-<li>Install <a href="https://www.openal.org/downloads/">OpenAL</a> if necessery</li>
-<li>Open a command line window in the solution directory.</li>
+<li>Get the source <br>
+<ol><li>Open cmd in a new project folder</li>
+<li>git clone <a href="https://github.com/ErlerPhilipp/VR_DA.git">https://github.com/ErlerPhilipp/VR_DA.git</a></li>
+<li>git clone <a href="https://github.com/vrvis/aardvark.rendering.git">https://github.com/vrvis/aardvark.rendering.git</a></li>
+<li>cd aardvark.rendering</li>
+<li>git checkout philipp</li></ol></li>
+<li>Install <a href="https://www.openal.org/downloads/">OpenAL</a> if you haven’t before</li>
+<li>Download dependencies and build <br>
+<ol><li>Open a command line window in the VR_DA directory.</li>
 <li>Execute “build”. The build script will now download and install the dependencies.</li>
-<li>Open the solution in Visual Studio (2015).</li>
+<li>The executables are created in “VR_DA\bin\Release\”</li></ol></li>
+<li>Run in Visual Studio <br>
+<ol><li>Open the solution in Visual Studio (2015).</li>
 <li>Set the desired project as start-up project.</li>
-<li>Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take more than 5 minutes.</li>
-<li>It can be necessary to revert “libbulletc-windows-x86.dll” and “libbulletc.dll”</li>
+<li>Build and run the application. Better start without debugger and attach later. Otherwise, the shader compilation can take more than 5 minutes.</li></ol></li>
 </ol>
 
 <h2 id="credits">Credits</h2>
