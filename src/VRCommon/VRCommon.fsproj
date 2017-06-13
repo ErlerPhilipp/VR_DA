@@ -63,8 +63,8 @@
     <Compile Include="VrWindow.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\VR\Aardvark.VR.csproj">
-      <Name>Aardvark.VR</Name>
+    <ProjectReference Include="..\VR\OpenVR.csproj">
+      <Name>OpenVR</Name>
       <Project>{65bc41bd-6844-45eb-aa4d-af07b080f03e}</Project>
       <Private>True</Private>
     </ProjectReference>

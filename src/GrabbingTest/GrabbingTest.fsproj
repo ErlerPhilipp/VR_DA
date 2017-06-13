@@ -66,8 +66,8 @@
       <Project>{f5129646-75e0-4565-8023-7e39da4a625d}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\VR\Aardvark.VR.csproj">
-      <Name>Aardvark.VR</Name>
+    <ProjectReference Include="..\VR\OpenVR.csproj">
+      <Name>OpenVR</Name>
       <Project>{65bc41bd-6844-45eb-aa4d-af07b080f03e}</Project>
       <Private>True</Private>
     </ProjectReference>

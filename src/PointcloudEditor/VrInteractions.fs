@@ -20,9 +20,11 @@ module VrInteractions =
 
     let transformForPointCloud(deltaTrafo : Trafo3d, currTrafo : Trafo3d, pivot : V3d) =
             let pointcloudOffset = currTrafo.Forward.TransformPos(V3d())
-            let toPointcloudOrigin = Trafo3d.Translation(-pointcloudOffset)
-            let centroidToPivot = Trafo3d.Translation(pointcloudOffset-pivot)
-            toPointcloudOrigin * centroidToPivot * deltaTrafo * centroidToPivot.Inverse * toPointcloudOrigin.Inverse
+            let centroidToPivot = Trafo3d.Translation(-pivot)
+            centroidToPivot * deltaTrafo * centroidToPivot.Inverse
+//            let toPointcloudOrigin = Trafo3d.Translation(-pointcloudOffset)
+//            let centroidToPivot = Trafo3d.Translation(pointcloudOffset-pivot)
+//            toPointcloudOrigin * centroidToPivot * deltaTrafo * centroidToPivot.Inverse * toPointcloudOrigin.Inverse
 
     let scaleForPointCloud(scalingFactor : float, currTrafo : Trafo3d, pivot : V3d) =
             let deltaTrafo = Trafo3d.Scale(scalingFactor)
@@ -68,10 +70,6 @@ module VrInteractions =
         let getControllerMiddleTrafo(controller1Trafo : Trafo3d, controller2Trafo : Trafo3d) =
             let controller1Pos = controller1Trafo.Forward.TransformPos(V3d())
             let controller2Pos = controller2Trafo.Forward.TransformPos(V3d())
-//            let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.OOI)
-//            let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.OOI)
-//            let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.OIO)
-//            let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.OIO)
             let controller1Forward = controller1Trafo.Forward.TransformPos(V3d.IOO)
             let controller2Forward = controller2Trafo.Forward.TransformPos(V3d.IOO)
 
